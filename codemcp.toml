@@ -1,0 +1,15 @@
+project_prompt = """
+When working on this project, ensure that Gemini quick replies UI enhancements are distinct, intuitive, and dynamically generated based on the Gemini response context.
+"""
+
+[commands]
+format = ["flutter", "format", "."]
+test = ["flutter", "test"]
+
+[commands.test]
+command = ["flutter", "test"]
+doc = "Runs Flutter unit and integration tests. Accepts optional arguments for specific test targets."
+
+[commands.format]
+command = ["flutter", "format", "."]
+doc = "Formats the entire project according to Dart and Flutter style guidelines."

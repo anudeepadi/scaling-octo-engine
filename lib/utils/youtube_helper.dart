@@ -1,3 +1,5 @@
+import 'package:flutter/material.dart';
+
 class YouTubeHelper {
   static String? getVideoId(String url) {
     if (url.contains('youtube.com')) {
@@ -16,5 +18,9 @@ class YouTubeHelper {
 
   static String getThumbnailUrl(String videoId) {
     return 'https://img.youtube.com/vi/$videoId/0.jpg';
+  }
+  
+  static String getWatchUrl(String videoId) {
+    return 'https://www.youtube.com/watch?v=$videoId';
   }
 }

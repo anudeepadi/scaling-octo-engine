@@ -1,10 +1,14 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:provider/provider.dart';
+import 'dart:io' show Platform;
 import '../providers/chat_provider.dart';
 import '../widgets/chat_message_widget.dart';
 import '../services/media_picker_service.dart';
+import '../services/gif_service.dart';
 import '../models/chat_message.dart';
 import '../utils/youtube_helper.dart';
+import '../widgets/platform/ios_message_input.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -63,9 +67,176 @@ class _HomeScreenState extends State<HomeScreen> {
     _scrollToBottom();
   }
 
+  Future<void> _pickGif() async {
+    // Show a grid of local GIFs in a bottom sheet
+    if (Platform.isIOS) {
+      showCupertinoModalPopup(
+        context: context,
+        builder: (BuildContext context) => _buildGifPicker(),
+      );
+    } else {
+      showModalBottomSheet(
+        context: context,
+        builder: (BuildContext context) => _buildGifPicker(),
+      );
+    }
+  }
+
+  Widget _buildGifPicker() {
+    return Material(
+      child: Container(
+        height: 300,
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Padding(
+              padding: const EdgeInsets.only(bottom: 16),
+              child: Text(
+                'Select a GIF',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: Platform.isIOS ? CupertinoColors.label : Colors.black,
+                ),
+              ),
+            ),
+            Expanded(
+              child: FutureBuilder<List<String>>(
+                future: GifService.getLocalGifs(),
+                builder: (context, snapshot) {
+                  if (snapshot.connectionState == ConnectionState.waiting) {
+                    return const Center(child: CircularProgressIndicator());
+                  }
+                  
+                  if (snapshot.hasError) {
+                    return Center(child: Text('Error: ${snapshot.error}'));
+                  }
+                  
+                  final gifPaths = snapshot.data ?? [];
+                  
+                  if (gifPaths.isEmpty) {
+                    return const Center(child: Text('No GIFs found'));
+                  }
+                  
+                  return GridView.builder(
+                    gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                      crossAxisCount: 3,
+                      crossAxisSpacing: 8,
+                      mainAxisSpacing: 8,
+                    ),
+                    itemCount: gifPaths.length,
+                    itemBuilder: (context, index) {
+                      return InkWell(
+                        onTap: () {
+                          Navigator.pop(context);
+                          _sendGif(gifPaths[index]);
+                        },
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(8),
+                          child: Image.asset(
+                            gifPaths[index],
+                            fit: BoxFit.cover,
+                            errorBuilder: (context, error, stackTrace) {
+                              print('Error loading GIF: $error');
+                              return Container(
+                                color: Colors.grey[300],
+                                child: const Center(
+                                  child: Icon(Icons.broken_image, size: 32),
+                                ),
+                              );
+                            },
+                          ),
+                        ),
+                      );
+                    },
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _sendGif(String gifPath) {
+    final chatProvider = context.read<ChatProvider>();
+    chatProvider.addGifMessage(gifPath);
+  }
+
   Future<void> _pickMedia() async {
+    if (Platform.isIOS) {
+      // Show iOS-style action sheet
+      showCupertinoModalPopup(
+        context: context,
+        builder: (BuildContext context) => CupertinoActionSheet(
+          title: const Text('Select Media'),
+          message: const Text('Choose a media source'),
+          actions: <CupertinoActionSheetAction>[
+            CupertinoActionSheetAction(
+              onPressed: () {
+                Navigator.pop(context);
+                _pickMediaFromSource(MediaSource.camera);
+              },
+              child: const Text('Take Photo or Video'),
+            ),
+            CupertinoActionSheetAction(
+              onPressed: () {
+                Navigator.pop(context);
+                _pickMediaFromSource(MediaSource.gallery);
+              },
+              child: const Text('Choose from Library'),
+            ),
+          ],
+          cancelButton: CupertinoActionSheetAction(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+        ),
+      );
+    } else {
+      // Show Android-style bottom sheet
+      showModalBottomSheet(
+        context: context,
+        builder: (BuildContext context) {
+          return SafeArea(
+            child: Wrap(
+              children: <Widget>[
+                ListTile(
+                  leading: const SizedBox(
+                    width: 24,
+                    child: Icon(Icons.camera_alt),
+                  ),
+                  title: const Text('Take Photo or Video'),
+                  onTap: () {
+                    Navigator.pop(context);
+                    _pickMediaFromSource(MediaSource.camera);
+                  },
+                ),
+                ListTile(
+                  leading: const SizedBox(
+                    width: 24,
+                    child: Icon(Icons.photo_library),
+                  ),
+                  title: const Text('Choose from Gallery'),
+                  onTap: () {
+                    Navigator.pop(context);
+                    _pickMediaFromSource(MediaSource.gallery);
+                  },
+                ),
+              ],
+            ),
+          );
+        },
+      );
+    }
+  }
+  
+  Future<void> _pickMediaFromSource(MediaSource source) async {
     final result = await MediaPickerService.pickMedia(
       allowedExtensions: ['jpg', 'jpeg', 'png', 'gif', 'mp4'],
+      source: source,
     );
 
     if (result != null && result.files.isNotEmpty) {
@@ -89,66 +260,73 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget _buildSidebar() {
     return Container(
       width: 250,
-      decoration: BoxDecoration(
-        color: Theme.of(context).scaffoldBackgroundColor,
-        boxShadow: [
-          BoxShadow(
-            color: Theme.of(context).shadowColor.withAlpha(20),
-            blurRadius: 4,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
+      color: Theme.of(context).scaffoldBackgroundColor,
       child: Column(
         children: [
-          DrawerHeader(
-            decoration: BoxDecoration(
-              color: Theme.of(context).primaryColor,
-            ),
-            child: const Center(
-              child: Text(
-                'Channels',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 24,
-                  fontWeight: FontWeight.bold,
+          Material(
+            color: Theme.of(context).primaryColor,
+            child: DrawerHeader(
+              decoration: const BoxDecoration(),
+              child: const Center(
+                child: Text(
+                  'Channels',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 24,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
               ),
             ),
           ),
           Expanded(
-            child: ListView(
-              padding: const EdgeInsets.symmetric(vertical: 8),
-              children: [
-                ListTile(
-                  leading: const Icon(Icons.email),
-                  title: const Text('Email'),
-                  onTap: () {
-                    setState(() => _isDrawerOpen = false);
-                  },
-                ),
-                ListTile(
-                  leading: const Icon(Icons.chat),
-                  title: const Text('WhatsApp'),
-                  onTap: () {
-                    setState(() => _isDrawerOpen = false);
-                  },
-                ),
-                ListTile(
-                  leading: const Icon(Icons.message),
-                  title: const Text('SMS'),
-                  onTap: () {
-                    setState(() => _isDrawerOpen = false);
-                  },
-                ),
-                ListTile(
-                  leading: const Icon(Icons.forum),
-                  title: const Text('RCS'),
-                  onTap: () {
-                    setState(() => _isDrawerOpen = false);
-                  },
-                ),
-              ],
+            child: Material(
+              color: Theme.of(context).scaffoldBackgroundColor,
+              child: ListView(
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                children: [
+                  ListTile(
+                    leading: const SizedBox(
+                      width: 24,
+                      child: Icon(Icons.email),
+                    ),
+                    title: const Text('Email'),
+                    onTap: () {
+                      setState(() => _isDrawerOpen = false);
+                    },
+                  ),
+                  ListTile(
+                    leading: const SizedBox(
+                      width: 24,
+                      child: Icon(Icons.chat),
+                    ),
+                    title: const Text('WhatsApp'),
+                    onTap: () {
+                      setState(() => _isDrawerOpen = false);
+                    },
+                  ),
+                  ListTile(
+                    leading: const SizedBox(
+                      width: 24,
+                      child: Icon(Icons.message),
+                    ),
+                    title: const Text('SMS'),
+                    onTap: () {
+                      setState(() => _isDrawerOpen = false);
+                    },
+                  ),
+                  ListTile(
+                    leading: const SizedBox(
+                      width: 24,
+                      child: Icon(Icons.forum),
+                    ),
+                    title: const Text('RCS'),
+                    onTap: () {
+                      setState(() => _isDrawerOpen = false);
+                    },
+                  ),
+                ],
+              ),
             ),
           ),
         ],
@@ -157,6 +335,17 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildMessageInput() {
+    if (Platform.isIOS) {
+      return IosMessageInput(
+        controller: _messageController,
+        onSubmitted: _handleSubmitted,
+        onPickMedia: _pickMedia,
+        onPickGif: _pickGif,
+        isComposing: _isComposing,
+      );
+    }
+    
+    // Default Android/Material implementation
     return Container(
       padding: const EdgeInsets.all(8.0),
       decoration: BoxDecoration(
@@ -175,6 +364,21 @@ class _HomeScreenState extends State<HomeScreen> {
             icon: const Icon(Icons.attach_file),
             onPressed: _pickMedia,
             tooltip: 'Attach media',
+          ),
+          TextButton(
+            onPressed: _pickGif,
+            style: TextButton.styleFrom(
+              padding: const EdgeInsets.symmetric(horizontal: 10),
+              minimumSize: const Size(40, 36),
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            ),
+            child: const Text(
+              'GIF',
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 14,
+              ),
+            ),
           ),
           Expanded(
             child: TextField(
@@ -213,49 +417,93 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('RCS Demo App'),
-        leading: IconButton(
-          icon: Icon(_isDrawerOpen ? Icons.menu_open : Icons.menu),
-          onPressed: () {
-            setState(() {
-              _isDrawerOpen = !_isDrawerOpen;
-            });
-          },
-        ),
-      ),
-      body: Row(
-        children: [
-          AnimatedContainer(
-            duration: const Duration(milliseconds: 300),
-            width: _isDrawerOpen ? 250 : 0,
-            child: _isDrawerOpen ? _buildSidebar() : null,
-          ),
-          Expanded(
-            child: Column(
-              children: [
-                Expanded(
-                  child: Consumer<ChatProvider>(
-                    builder: (context, chatProvider, child) {
-                      return ListView.builder(
-                        controller: _scrollController,
-                        padding: const EdgeInsets.all(8),
-                        itemCount: chatProvider.messages.length,
-                        itemBuilder: (context, index) {
-                          return ChatMessageWidget(
-                            message: chatProvider.messages[index],
-                          );
-                        },
-                      );
-                    },
-                  ),
-                ),
-                _buildMessageInput(),
-              ],
+    final appBar = Platform.isIOS
+        ? CupertinoNavigationBar(
+            middle: const Text('RCS Demo App'),
+            leading: CupertinoButton(
+              padding: EdgeInsets.zero,
+              child: Icon(_isDrawerOpen ? CupertinoIcons.sidebar_left : CupertinoIcons.line_horizontal_3),
+              onPressed: () {
+                setState(() {
+                  _isDrawerOpen = !_isDrawerOpen;
+                });
+              },
             ),
-          ),
-        ],
+          )
+        : AppBar(
+            title: const Text('RCS Demo App'),
+            leading: IconButton(
+              icon: Icon(_isDrawerOpen ? Icons.menu_open : Icons.menu),
+              onPressed: () {
+                setState(() {
+                  _isDrawerOpen = !_isDrawerOpen;
+                });
+              },
+            ),
+          );
+          
+    return Platform.isIOS
+        ? CupertinoPageScaffold(
+            navigationBar: appBar as CupertinoNavigationBar,
+            child: _buildBody(),
+          )
+        : Scaffold(
+            appBar: appBar as PreferredSizeWidget,
+            body: _buildBody(),
+          );
+  }
+  
+  Widget _buildBody() {
+    return Material(
+      type: MaterialType.transparency,
+      child: SafeArea(
+        child: Row(
+          children: [
+            AnimatedContainer(
+              duration: const Duration(milliseconds: 300),
+              width: _isDrawerOpen ? 250 : 0,
+              child: _isDrawerOpen ? Material(
+                type: MaterialType.card,
+                child: _buildSidebar(),
+              ) : null,
+            ),
+            Expanded(
+              child: Column(
+                children: [
+                  Expanded(
+                    child: Consumer<ChatProvider>(
+                      builder: (context, chatProvider, child) {
+                        WidgetsBinding.instance.addPostFrameCallback((_) {
+                          if (chatProvider.messages.isNotEmpty) {
+                            _scrollToBottom();
+                          }
+                        });
+                        return ListView.builder(
+                          controller: _scrollController,
+                          padding: const EdgeInsets.all(8),
+                          itemCount: chatProvider.messages.length,
+                          itemBuilder: (context, index) {
+                            return ChatMessageWidget(
+                              message: chatProvider.messages[index],
+                              onReplyTap: () => _scrollToBottom(),
+                              onReactionAdd: (value) {
+                                if (value.isNotEmpty) {
+                                  chatProvider.sendQuickReply(value);
+                                }
+                                _scrollToBottom();
+                              },
+                            );
+                          },
+                        );
+                      },
+                    ),
+                  ),
+                  _buildMessageInput(),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

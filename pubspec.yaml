@@ -1,5 +1,5 @@
 name: rcs_demo_app
-description: "A new Flutter project."
+description: "Rich Communication Services Demo App"
 publish_to: 'none'
 version: 1.0.0+1
 
@@ -39,3 +39,4 @@ flutter:
   assets:
     - assets/images/
     - assets/icons/
+    - assets/gifs/

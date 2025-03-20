@@ -71,6 +71,28 @@ class ChatProvider extends ChangeNotifier {
     _generateBotResponse(content);
   }
 
+  Future<void> sendQuickReply(String content) async {
+    if (content.trim().isEmpty) return;
+
+    final messageId = _uuid.v4();
+    final message = ChatMessage(
+      id: messageId,
+      content: content,
+      isMe: true,
+      timestamp: DateTime.now(),
+      type: MessageType.text,
+      status: MessageStatus.sending,
+    );
+
+    _messages.add(message);
+    notifyListeners();
+
+    await Future.delayed(const Duration(milliseconds: 500));
+    _updateMessageStatus(messageId, MessageStatus.sent);
+    
+    _generateBotResponse(content);
+  }
+
   Future<void> sendMedia(String mediaPath, MessageType type) async {
     final messageId = _uuid.v4();
     final message = ChatMessage(

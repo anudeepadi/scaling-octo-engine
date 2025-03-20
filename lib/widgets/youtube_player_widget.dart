@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/cupertino.dart';
+import 'dart:io' show Platform;
+import '../utils/youtube_helper.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 class YouTubePlayerWidget extends StatelessWidget {
@@ -9,69 +12,98 @@ class YouTubePlayerWidget extends StatelessWidget {
     required this.videoUrl,
   }) : super(key: key);
 
-  Future<void> _openYouTube() async {
-    final url = Uri.parse(videoUrl);
-    try {
-      if (await canLaunchUrl(url)) {
-        await launchUrl(url, mode: LaunchMode.externalApplication);
-      } else {
-        throw 'Could not launch YouTube video';
-      }
-    } catch (e) {
-      print('Error launching YouTube: $e');
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
-    return InkWell(
-      onTap: _openYouTube,
+    final videoId = YouTubeHelper.getVideoId(videoUrl);
+    if (videoId == null) {
+      return const Text('Invalid YouTube URL');
+    }
+
+    return GestureDetector(
+      onTap: () => _launchYouTubeVideo(videoId),
       child: Container(
+        clipBehavior: Clip.antiAlias,
         decoration: BoxDecoration(
-          color: Theme.of(context).cardColor,
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: Theme.of(context).dividerColor,
-          ),
         ),
         child: Column(
-          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Container(
-              height: 200,
-              decoration: BoxDecoration(
-                color: Colors.black87,
-                borderRadius: const BorderRadius.vertical(
-                  top: Radius.circular(12),
+            Stack(
+              alignment: Alignment.center,
+              children: [
+                Image.network(
+                  YouTubeHelper.getThumbnailUrl(videoId),
+                  width: double.infinity,
+                  height: 180,
+                  fit: BoxFit.cover,
+                  loadingBuilder: (context, child, loadingProgress) {
+                    if (loadingProgress == null) return child;
+                    return SizedBox(
+                      height: 180,
+                      child: Center(
+                        child: Platform.isIOS 
+                          ? const CupertinoActivityIndicator() 
+                          : const CircularProgressIndicator(),
+                      ),
+                    );
+                  },
+                  errorBuilder: (context, error, stackTrace) {
+                    return Container(
+                      height: 180,
+                      color: Colors.grey[300],
+                      child: Center(
+                        child: Icon(
+                          Platform.isIOS 
+                            ? CupertinoIcons.exclamationmark_circle 
+                            : Icons.error,
+                          color: Colors.red,
+                        ),
+                      ),
+                    );
+                  },
                 ),
-              ),
-              child: const Center(
-                child: Icon(
-                  Icons.play_circle_fill,
-                  size: 64,
-                  color: Colors.white,
+                Container(
+                  width: 50,
+                  height: 50,
+                  decoration: BoxDecoration(
+                    color: Colors.red,
+                    borderRadius: BorderRadius.circular(25),
+                  ),
+                  child: Icon(
+                    Platform.isIOS 
+                      ? CupertinoIcons.play_fill 
+                      : Icons.play_arrow,
+                    color: Colors.white,
+                    size: 30,
+                  ),
                 ),
-              ),
+              ],
             ),
             Padding(
-              padding: const EdgeInsets.all(12.0),
-              child: Row(
-                children: [
-                  const Icon(Icons.youtube_searched_for),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      'Watch on YouTube',
-                      style: Theme.of(context).textTheme.titleMedium,
-                    ),
-                  ),
-                  const Icon(Icons.open_in_new),
-                ],
+              padding: const EdgeInsets.all(8.0),
+              child: Text(
+                'YouTube Video',
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  color: Platform.isIOS 
+                    ? CupertinoColors.black 
+                    : Colors.black,
+                ),
               ),
             ),
           ],
         ),
       ),
     );
+  }
+
+  Future<void> _launchYouTubeVideo(String videoId) async {
+    final Uri url = Uri.parse(YouTubeHelper.getWatchUrl(videoId));
+    try {
+      await launchUrl(url, mode: LaunchMode.externalApplication);
+    } catch (e) {
+      print('Error launching YouTube video: $e');
+    }
   }
 }

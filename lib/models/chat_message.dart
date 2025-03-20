@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'quick_reply.dart';
+import 'gemini_quick_reply.dart';
 import 'link_preview.dart';
 
 enum MessageType {
@@ -11,6 +12,7 @@ enum MessageType {
   file,
   linkPreview,
   quickReply,
+  geminiQuickReply, // New type for Gemini-generated quick replies
   suggestion,
   voice,
   threadReply,

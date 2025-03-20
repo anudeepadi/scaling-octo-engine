@@ -1,9 +1,11 @@
 import 'package:flutter/foundation.dart';
 import '../models/chat_message.dart';
 import '../models/quick_reply.dart';
+import '../models/gemini_quick_reply.dart';
 import '../services/bot_service.dart';
 import 'package:uuid/uuid.dart';
 import 'dart:async';
+import 'dart:math' as math;
 
 class ChatProvider extends ChangeNotifier {
   final List<ChatMessage> _messages = [];
@@ -151,6 +153,21 @@ class ChatProvider extends ChangeNotifier {
     _messages.add(message);
     notifyListeners();
   }
+  
+  void addGeminiQuickReplyMessage(List<GeminiQuickReply> suggestedReplies) {
+    final messageId = _uuid.v4();
+    final message = ChatMessage(
+      id: messageId,
+      content: '',
+      isMe: false,
+      timestamp: DateTime.now(),
+      type: MessageType.geminiQuickReply, // Use the new message type
+      suggestedReplies: suggestedReplies,
+      status: MessageStatus.sent,
+    );
+    _messages.add(message);
+    notifyListeners();
+  }
 
   void addReaction(String messageId, String emoji) {
     final index = _messages.indexWhere((m) => m.id == messageId);
@@ -207,16 +224,30 @@ class ChatProvider extends ChangeNotifier {
     
     _messages.add(responseMessage);
     
-    final quickReplies = BotService.getQuickReplies(response)
-        .map((qr) => QuickReply(
-              text: qr['text']!,
-              value: qr['value']!,
-            ))
-        .toList();
-        
-    if (quickReplies.isNotEmpty) {
-      addQuickReplyMessage(quickReplies);
+    // Always generate quick replies to test functionality
+    print('Generating quick replies for response');
+    
+    // First try to get Gemini quick replies
+    List<QuickReply> quickReplies = _botService.getGeminiQuickReplies(response);
+    print('Generated ${quickReplies.length} quick replies');
+    
+    // If we get none, force some test ones
+    if (quickReplies.isEmpty) {
+      print('No quick replies generated, adding test fallbacks');
+      quickReplies = [
+        QuickReply(text: '👍 Test Reply 1', value: 'Test1'),
+        QuickReply(text: '❓ Test Reply 2', value: 'Test2'),
+        QuickReply(text: '🤔 Test Reply 3', value: 'Test3'),
+      ];
     }
+    
+    // Convert to GeminiQuickReply objects and add as geminiQuickReply type message
+    final geminiQuickReplies = quickReplies.map((qr) => 
+      GeminiQuickReply.fromQuickReply(qr)
+    ).toList();
+    
+    print('Adding ${geminiQuickReplies.length} Gemini quick replies');
+    addGeminiQuickReplyMessage(geminiQuickReplies);
     
     notifyListeners();
   }

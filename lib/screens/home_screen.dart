@@ -7,6 +7,7 @@ import '../widgets/chat_message_widget.dart';
 import '../services/media_picker_service.dart';
 import '../services/gif_service.dart';
 import '../models/chat_message.dart';
+import '../models/gemini_quick_reply.dart';
 import '../utils/youtube_helper.dart';
 import '../widgets/platform/ios_message_input.dart';
 
@@ -27,6 +28,24 @@ class _HomeScreenState extends State<HomeScreen> {
   void initState() {
     super.initState();
     _messageController.addListener(_handleTextChange);
+    
+    // Add test Gemini quick replies for debugging
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final chatProvider = context.read<ChatProvider>();
+      print('Adding test Gemini quick replies');
+      
+      // Add a test message
+      chatProvider.addTextMessage('This is a test message from the bot', isMe: false);
+      
+      // Add test Gemini quick replies
+      List<GeminiQuickReply> testReplies = [
+        GeminiQuickReply(text: '👍 Test Reply 1', value: 'Test1'),
+        GeminiQuickReply(text: '❓ Test Reply 2', value: 'Test2'),
+        GeminiQuickReply(text: '🤔 Test Reply 3', value: 'Test3'),
+      ];
+      
+      chatProvider.addGeminiQuickReplyMessage(testReplies);
+    });
   }
 
   @override
@@ -478,6 +497,14 @@ class _HomeScreenState extends State<HomeScreen> {
                             _scrollToBottom();
                           }
                         });
+                        print('Rendering chat with ${chatProvider.messages.length} messages');
+                          
+                        // Check for any Gemini quick reply messages
+                        bool hasGeminiReplies = chatProvider.messages.any((msg) => 
+                          msg.type == MessageType.geminiQuickReply
+                        );
+                        print('Has Gemini quick replies: $hasGeminiReplies');
+                          
                         return ListView.builder(
                           controller: _scrollController,
                           padding: const EdgeInsets.all(8),

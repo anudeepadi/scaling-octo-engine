@@ -1,13 +1,19 @@
 import 'package:google_generative_ai/google_generative_ai.dart';
 import 'dart:async';
+import '../models/quick_reply.dart';
+import '../utils/gemini_response_parser.dart';
 
 class BotService {
   static const String _apiKey = 'AIzaSyCODVjQ7aIyDAcHXXW3XBiB9quiPwznocs';
   late final GenerativeModel? _model;
   late final ChatSession? _chat;
   bool _useAPIMode = true;  // Set to true to use Gemini API
+  bool _isGeminiResponse = false;  // Flag to identify if response is from Gemini, default to false for safety
 
   BotService() {
+    // Force enable Gemini mode for testing
+    _useAPIMode = true;
+    
     try {
       if (_useAPIMode) {
         // Initialize with the gemini-1.5-flash model
@@ -26,40 +32,50 @@ class BotService {
       } else {
         _model = null;
         _chat = null;
+        _isGeminiResponse = false;
         print('Using fallback mode for bot responses');
       }
     } catch (e) {
       print('Error initializing Gemini model: $e');
       _model = null;
       _chat = null;
+      _isGeminiResponse = false;
     }
   }
 
   Future<String> generateResponse(String text) async {
+    // Ensure _isGeminiResponse is set to false by default
+    _isGeminiResponse = false;
+    
     // If not using API mode or model is null, use fallback responses
     if (!_useAPIMode || _model == null) {
+      print('Using fallback response (no API mode or null model)');
       return _getFallbackResponse(text);
     }
-    
+
     try {
       print('Sending request to Gemini 1.5 Flash: $text');
-      
+
       // Create content parts with the user's text
       final content = [Content.text(text)];
-      
+
       // Generate a response using the model
       final response = await _model!.generateContent(content);
-      
+
       // Get the text from the response
       final responseText = response.text;
-      
+
       // Check if the response is valid
       if (responseText == null || responseText.isEmpty) {
         print('Empty response from Gemini 1.5 Flash, using fallback');
         return _getFallbackResponse(text);
       }
+
+      // CRITICAL: This must be set AFTER we confirm a valid response
+      _isGeminiResponse = true;
+      print('Received valid Gemini response, _isGeminiResponse=$_isGeminiResponse');
+      print('Response: ${responseText.substring(0, responseText.length > 50 ? 50 : responseText.length)}...');
       
-      print('Received response from Gemini 1.5 Flash: ${responseText.substring(0, responseText.length > 50 ? 50 : responseText.length)}...');
       return responseText;
     } catch (e) {
       print('Error generating response from Gemini 1.5 Flash: $e');
@@ -70,7 +86,7 @@ class BotService {
   String _getFallbackResponse(String text) {
     // Simple pattern matching for common messages
     final lowerText = text.toLowerCase();
-    
+
     if (lowerText.contains('hello') || lowerText.contains('hi')) {
       return 'Hello! How can I help you today?';
     } else if (lowerText.contains('how are you')) {
@@ -113,7 +129,7 @@ class BotService {
   static List<Map<String, String>> getQuickReplies(String lastMessage) {
     // Context-aware quick replies based on the last message content
     final lowerMessage = lastMessage.toLowerCase();
-    
+
     if (lowerMessage.contains('weather')) {
       return [
         {'text': '☀️ Forecast', 'value': 'Show me the weather forecast'},
@@ -121,7 +137,7 @@ class BotService {
         {'text': '🌡️ Temperature', 'value': 'What will the temperature be tomorrow?'},
       ];
     }
-    
+
     if (lowerMessage.contains('joke')) {
       return [
         {'text': '🤣 Another!', 'value': 'Tell me another joke'},
@@ -129,7 +145,7 @@ class BotService {
         {'text': '🎭 Riddle', 'value': 'Tell me a riddle instead'},
       ];
     }
-    
+
     if (lowerMessage.contains('song') || lowerMessage.contains('music')) {
       return [
         {'text': '🎵 Pop', 'value': 'Tell me about pop music'},
@@ -137,7 +153,7 @@ class BotService {
         {'text': '🎹 Classical', 'value': 'I enjoy classical music'},
       ];
     }
-    
+
     if (lowerMessage.contains('news')) {
       return [
         {'text': '📰 More', 'value': 'Tell me more news'},
@@ -152,5 +168,51 @@ class BotService {
       {'text': '❓ More', 'value': 'Can you tell me more about that?'},
       {'text': '💬 Help', 'value': 'What else can you help me with?'},
     ];
+  }
+  
+  // Generate dynamic quick replies based on Gemini responses
+  List<QuickReply> getGeminiQuickReplies(String response) {
+    try {
+      print('BotService: Generating quick replies, isGeminiResponse=${_isGeminiResponse}');
+      if (!_isGeminiResponse) {
+        // Convert standard quick replies to QuickReply objects if not a Gemini response
+        final standardReplies = BotService.getQuickReplies(response);
+        print('BotService: Using standard replies, count=${standardReplies.length}');
+        final result = standardReplies.map((qr) => QuickReply(
+          text: qr['text'] ?? 'Option',
+          value: qr['value'] ?? 'Help',
+        )).toList();
+        print('BotService: Returning ${result.length} standard quick replies');
+        return result;
+      }
+      
+      // Use the response parser to extract dynamic quick replies
+      print('BotService: Using AI parser to generate replies');
+      final aiReplies = GeminiResponseParser.extractQuickReplies(response);
+      print('BotService: AI parser returned ${aiReplies.length} replies');
+      
+      // If we didn't get any replies from the parser, fall back to standard ones
+      if (aiReplies.isEmpty) {
+        print('BotService: AI replies empty, falling back to standard');
+        final standardReplies = BotService.getQuickReplies(response);
+        final result = standardReplies.map((qr) => QuickReply(
+          text: qr['text'] ?? 'Option',
+          value: qr['value'] ?? 'Help',
+        )).toList();
+        print('BotService: Returning ${result.length} fallback quick replies');
+        return result;
+      }
+      
+      print('BotService: Returning ${aiReplies.length} AI-generated quick replies');
+      return aiReplies;
+    } catch (e) {
+      print('Error generating quick replies: $e');
+      // Fallback to default replies if anything goes wrong
+      return [
+        QuickReply(text: '👍 Thanks', value: 'Thank you'),
+        QuickReply(text: '❓ More info', value: 'Tell me more'),
+        QuickReply(text: '🤔 Help', value: 'I need help'),
+      ];
+    }
   }
 }

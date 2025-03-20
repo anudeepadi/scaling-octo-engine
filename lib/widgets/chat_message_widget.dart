@@ -7,6 +7,7 @@ import 'video_player_widget.dart';
 import 'youtube_player_widget.dart';
 import 'platform/ios_chat_message_widget.dart';
 import 'quick_reply_widget.dart';
+import 'gemini_quick_reply_widget.dart';
 
 class ChatMessageWidget extends StatefulWidget {
   final ChatMessage message;
@@ -26,6 +27,7 @@ class ChatMessageWidget extends StatefulWidget {
 
 class _ChatMessageWidgetState extends State<ChatMessageWidget> {
   Widget _buildContent() {
+    print('_buildContent: MessageType=${widget.message.type}, hasReplies=${widget.message.suggestedReplies != null}, numReplies=${widget.message.suggestedReplies?.length ?? 0}');
     switch (widget.message.type) {
       case MessageType.text:
         return Text(
@@ -74,8 +76,19 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
           ],
         );
       case MessageType.quickReply:
-        return widget.message.suggestedReplies != null ? 
+        return widget.message.suggestedReplies != null ?
           QuickReplyWidget(
+            quickReplies: widget.message.suggestedReplies!,
+            onReplySelected: (value) {
+              if (widget.onReactionAdd != null) {
+                widget.onReactionAdd!(value);
+              }
+            },
+          ) : const SizedBox.shrink();
+      case MessageType.geminiQuickReply:
+        print('FOUND GEMINI QUICK REPLY MESSAGE - rendering widget');
+        return widget.message.suggestedReplies != null ?
+          GeminiQuickReplyWidget(
             quickReplies: widget.message.suggestedReplies!,
             onReplySelected: (value) {
               if (widget.onReactionAdd != null) {
@@ -216,6 +229,34 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
         message: widget.message,
         onReplyTap: widget.onReplyTap,
         onReactionAdd: widget.onReactionAdd,
+      );
+    }
+
+    // Special debug case - force render Gemini quick replies outside the bubble
+    if (widget.message.type == MessageType.geminiQuickReply) {
+      print('Rendering Gemini Quick Reply directly, bypassing bubble');
+      return Align(
+        alignment: Alignment.centerLeft,
+        child: Container(
+          constraints: const BoxConstraints(maxWidth: 300),
+          margin: const EdgeInsets.only(left: 8.0, right: 8.0, top: 4.0, bottom: 4.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Direct render of the quick replies
+              widget.message.suggestedReplies != null 
+                ? GeminiQuickReplyWidget(
+                    quickReplies: widget.message.suggestedReplies!,
+                    onReplySelected: (value) {
+                      if (widget.onReactionAdd != null) {
+                        widget.onReactionAdd!(value);
+                      }
+                    },
+                  )
+                : const Text('No suggestions available', style: TextStyle(color: Colors.grey)),
+            ],
+          ),
+        ),
       );
     }
     

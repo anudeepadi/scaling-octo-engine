@@ -5,6 +5,7 @@ import '../../models/chat_message.dart';
 import '../video_player_widget.dart';
 import '../youtube_player_widget.dart';
 import '../quick_reply_widget.dart';
+import '../gemini_quick_reply_widget.dart';
 
 class IosChatMessageWidget extends StatefulWidget {
   final ChatMessage message;
@@ -113,8 +114,19 @@ class _IosChatMessageWidgetState extends State<IosChatMessageWidget> {
           ],
         );
       case MessageType.quickReply:
-        return widget.message.suggestedReplies != null ? 
+        return widget.message.suggestedReplies != null ?
           QuickReplyWidget(
+            quickReplies: widget.message.suggestedReplies!,
+            onReplySelected: (value) {
+              if (widget.onReactionAdd != null) {
+                widget.onReactionAdd!(value);
+              }
+            },
+          ) : const SizedBox.shrink();
+      case MessageType.geminiQuickReply:
+        print('iOS Rendering Gemini quick replies');
+        return widget.message.suggestedReplies != null ?
+          GeminiQuickReplyWidget(
             quickReplies: widget.message.suggestedReplies!,
             onReplySelected: (value) {
               if (widget.onReactionAdd != null) {
@@ -129,6 +141,26 @@ class _IosChatMessageWidgetState extends State<IosChatMessageWidget> {
 
   @override
   Widget build(BuildContext context) {
+    // Special debug case - force render Gemini quick replies outside the bubble
+    if (widget.message.type == MessageType.geminiQuickReply) {
+      print('iOS - Rendering Gemini Quick Reply directly, bypassing bubble');
+      return Align(
+        alignment: Alignment.centerLeft,
+        child: Container(
+          constraints: const BoxConstraints(maxWidth: 300),
+          margin: const EdgeInsets.only(left: 8.0, right: 8.0, top: 4.0, bottom: 4.0),
+          child: GeminiQuickReplyWidget(
+            quickReplies: widget.message.suggestedReplies ?? [],
+            onReplySelected: (value) {
+              if (widget.onReactionAdd != null) {
+                widget.onReactionAdd!(value);
+              }
+            },
+          ),
+        ),
+      );
+    }
+  
     return Align(
       alignment: widget.message.isMe ? Alignment.centerRight : Alignment.centerLeft,
       child: Container(
@@ -160,7 +192,7 @@ class _IosChatMessageWidgetState extends State<IosChatMessageWidget> {
                     color: widget.message.isMe ? CupertinoColors.white.withOpacity(0.7) : CupertinoColors.systemGrey,
                   ),
                 ),
-                if (widget.message.isMe) ...[  
+                if (widget.message.isMe) ...[
                   const SizedBox(width: 4),
                   Icon(
                     _getStatusIcon(),

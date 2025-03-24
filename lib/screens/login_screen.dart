@@ -286,32 +286,40 @@ class _LoginScreenState extends State<LoginScreen> {
 
   Widget _buildPasswordField() {
     if (Platform.isIOS) {
-      return CupertinoTextFormFieldRow(
-        controller: _passwordController,
-        placeholder: 'Password',
-        prefix: const Icon(CupertinoIcons.lock),
-        obscureText: !_isPasswordVisible,
-        validator: (value) {
-          if (value == null || value.isEmpty) {
-            return 'Please enter a password';
-          }
-          if (_isSignUp && value.length < 6) {
-            return 'Password must be at least 6 characters';
-          }
-          return null;
-        },
-        decoration: BoxDecoration(
-          border: Border.all(color: CupertinoColors.systemGrey4),
-          borderRadius: BorderRadius.circular(8),
-        ),
-        padding: const EdgeInsets.all(12),
-        suffix: GestureDetector(
-          onTap: _togglePasswordVisibility,
-          child: Icon(
-            _isPasswordVisible ? CupertinoIcons.eye_slash : CupertinoIcons.eye,
-            color: CupertinoColors.systemGrey,
+      return Stack(
+        alignment: Alignment.centerRight,
+        children: [
+          CupertinoTextFormFieldRow(
+            controller: _passwordController,
+            placeholder: 'Password',
+            prefix: const Icon(CupertinoIcons.lock),
+            obscureText: !_isPasswordVisible,
+            validator: (value) {
+              if (value == null || value.isEmpty) {
+                return 'Please enter a password';
+              }
+              if (_isSignUp && value.length < 6) {
+                return 'Password must be at least 6 characters';
+              }
+              return null;
+            },
+            decoration: BoxDecoration(
+              border: Border.all(color: CupertinoColors.systemGrey4),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            padding: const EdgeInsets.all(12),
           ),
-        ),
+          Positioned(
+            right: 10,
+            child: GestureDetector(
+              onTap: _togglePasswordVisibility,
+              child: Icon(
+                _isPasswordVisible ? CupertinoIcons.eye_slash : CupertinoIcons.eye,
+                color: CupertinoColors.systemGrey,
+              ),
+            ),
+          ),
+        ],
       );
     } else {
       return TextFormField(

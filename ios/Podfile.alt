@@ -1,0 +1,114 @@
+# Alternative Podfile configuration that avoids XCFrameworks
+# Use this if the main Podfile still causes issues
+
+platform :ios, '12.0'
+
+# Disable all stats - reduced network traffic
+ENV['COCOAPODS_DISABLE_STATS'] = 'true'
+
+# Force using source code instead of XCFrameworks
+# This helps avoid compiler flags that might not be supported
+ENV['FORCE_STATIC'] = 'true'
+ENV['EXPANDED_CODE_SIGN_IDENTITY'] = ''
+ENV['EXPANDED_CODE_SIGNING_ALLOWED'] = 'NO'
+ENV['OTHER_CFLAGS'] = ''
+
+project 'Runner', {
+  'Debug' => :debug,
+  'Profile' => :release,
+  'Release' => :release,
+}
+
+def flutter_root
+  generated_xcode_build_settings_path = File.expand_path(File.join('..', 'Flutter', 'Generated.xcconfig'), __FILE__)
+  unless File.exist?(generated_xcode_build_settings_path)
+    raise "#{generated_xcode_build_settings_path} must exist. If you're running pod install manually, make sure flutter pub get is executed first"
+  end
+
+  File.foreach(generated_xcode_build_settings_path) do |line|
+    matches = line.match(/FLUTTER_ROOT\=(.*)/)
+    return matches[1].strip if matches
+  end
+  raise "FLUTTER_ROOT not found in #{generated_xcode_build_settings_path}. Try deleting Generated.xcconfig, then run flutter pub get"
+end
+
+require File.expand_path(File.join('packages', 'flutter_tools', 'bin', 'podhelper'), flutter_root)
+
+flutter_ios_podfile_setup
+
+target 'Runner' do
+  use_frameworks!
+  use_modular_headers!
+
+  flutter_install_all_ios_pods File.dirname(File.realpath(__FILE__))
+  target 'RunnerTests' do
+    inherit! :search_paths
+  end
+end
+
+post_install do |installer|
+  # Force-remove any -G flags at several levels
+  installer.generated_projects.each do |project|
+    project.build_configurations.each do |config|
+      # Remove -G flags from all settings
+      config.build_settings.each do |key, value|
+        if value.is_a?(String) && value.include?('-G')
+          config.build_settings[key] = value.gsub(/-G\S*\s?/, '')
+        elsif value.is_a?(Array)
+          config.build_settings[key] = value.map { |item| item.is_a?(String) ? item.gsub(/-G\S*\s?/, '') : item }
+        end
+      end
+    end
+  end
+
+  installer.pods_project.targets.each do |target|
+    flutter_additional_ios_build_settings(target)
+    
+    target.build_configurations.each do |config|
+      # Set deployment target
+      config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '12.0'
+      
+      # Disable bitcode
+      config.build_settings['ENABLE_BITCODE'] = 'NO'
+      
+      # Suppress warnings
+      config.build_settings['GCC_WARN_INHIBIT_ALL_WARNINGS'] = 'YES'
+      config.build_settings['SWIFT_SUPPRESS_WARNINGS'] = 'YES'
+      
+      # Avoid issues with signing
+      config.build_settings['EXPANDED_CODE_SIGN_IDENTITY'] = ""
+      config.build_settings['CODE_SIGNING_REQUIRED'] = "NO"
+      config.build_settings['CODE_SIGNING_ALLOWED'] = "NO"
+      
+      # Clear compiler flags that might cause problems
+      config.build_settings['OTHER_CFLAGS'] = ''
+      config.build_settings['OTHER_CPLUSPLUSFLAGS'] = ''
+      config.build_settings['OTHER_SWIFT_FLAGS'] = ''
+      
+      # Adjust simulator architecture settings if needed
+      if config.name.include?('Debug')
+        if config.name.include?('Simulator')
+          config.build_settings['ONLY_ACTIVE_ARCH'] = 'YES'
+        end
+      end
+    end
+  end
+  
+  # Update project settings file to remove problematic flags
+  installer.pods_project.save
+  
+  # Manually patch all xcconfig files
+  Dir.glob("#{installer.sandbox.root}/**/*.xcconfig").each do |xcconfig_file|
+    lines = File.readlines(xcconfig_file)
+    modified_lines = lines.map do |line|
+      line.gsub(/-G\S*\s?/, '')
+    end
+    
+    if lines != modified_lines
+      File.open(xcconfig_file, 'w') do |file|
+        file.puts(modified_lines)
+      end
+      puts "Patched #{xcconfig_file}"
+    end
+  end
+end

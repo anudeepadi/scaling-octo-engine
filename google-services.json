@@ -1,0 +1,39 @@
+{
+  "project_info": {
+    "project_number": "476436430831",
+    "project_id": "demoec-cea61",
+    "storage_bucket": "demoec-cea61.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:476436430831:android:fb89604990c3e4a73d401a",
+        "android_client_info": {
+          "package_name": "com.example.rcs_app"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "476436430831-e8lip6ejg126pi6ssa3couja667r0c81.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCXrt-wRr05NDshua2-IPQelVsqxa421GU"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "476436430831-e8lip6ejg126pi6ssa3couja667r0c81.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

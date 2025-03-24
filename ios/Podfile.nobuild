@@ -1,0 +1,115 @@
+# Alternative Podfile that avoids ClangStatCache issues
+platform :ios, '12.0'
+
+# Disable stats to improve performance
+ENV['COCOAPODS_DISABLE_STATS'] = 'true'
+
+# Disable the ClangStatCache feature
+ENV['CLANG_STATCACHE_DISABLE'] = 'YES'
+ENV['CLANG_ENABLE_COMPILE_CACHE'] = 'NO'
+
+# Avoid using XCFrameworks as they can cause issues
+ENV['FORCE_STATIC'] = 'true'
+
+project 'Runner', {
+  'Debug' => :debug,
+  'Profile' => :release,
+  'Release' => :release,
+}
+
+def flutter_root
+  generated_xcode_build_settings_path = File.expand_path(File.join('..', 'Flutter', 'Generated.xcconfig'), __FILE__)
+  unless File.exist?(generated_xcode_build_settings_path)
+    raise "#{generated_xcode_build_settings_path} must exist. If you're running pod install manually, make sure flutter pub get is executed first"
+  end
+
+  File.foreach(generated_xcode_build_settings_path) do |line|
+    matches = line.match(/FLUTTER_ROOT\=(.*)/)
+    return matches[1].strip if matches
+  end
+  raise "FLUTTER_ROOT not found in #{generated_xcode_build_settings_path}. Try deleting Generated.xcconfig, then run flutter pub get"
+end
+
+require File.expand_path(File.join('packages', 'flutter_tools', 'bin', 'podhelper'), flutter_root)
+
+flutter_ios_podfile_setup
+
+target 'Runner' do
+  use_frameworks!
+  use_modular_headers!
+  
+  # Force Firebase to use modular headers to avoid conflicts
+  pod 'Firebase/Core', :modular_headers => true
+  pod 'Firebase/Auth', :modular_headers => true
+  pod 'Firebase/Firestore', :modular_headers => true
+  pod 'Firebase/Storage', :modular_headers => true
+  pod 'Firebase/Messaging', :modular_headers => true
+  
+  # Explicitly handle BoringSSL-GRPC to avoid compiler flag issues
+  pod 'BoringSSL-GRPC', :modular_headers => true
+
+  flutter_install_all_ios_pods File.dirname(File.realpath(__FILE__))
+  
+  target 'RunnerTests' do
+    inherit! :search_paths
+  end
+end
+
+post_install do |installer|
+  # Fix for BoringSSL-GRPC -G compiler flag issue
+  installer.pods_project.targets.each do |target|
+    if target.name == 'BoringSSL-GRPC'
+      target.source_build_phase.files.each do |file|
+        if file.settings && file.settings['COMPILER_FLAGS']
+          flags = file.settings['COMPILER_FLAGS'].split
+          flags.reject! { |flag| flag == '-GCC_WARN_INHIBIT_ALL_WARNINGS' }
+          file.settings['COMPILER_FLAGS'] = flags.join(' ')
+        end
+      end
+    end
+  end
+
+  # Run Flutter's build settings hook
+  installer.pods_project.targets.each do |target|
+    flutter_additional_ios_build_settings(target)
+    
+    # Apply additional settings to all targets
+    target.build_configurations.each do |config|
+      # Set deployment target to ensure compatibility
+      config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '12.0'
+      
+      # Allow non-modular includes in framework modules
+      config.build_settings['ALLOW_NON_MODULAR_INCLUDES_IN_FRAMEWORK_MODULES'] = 'YES'
+      
+      # Disable Clang compiler cache
+      config.build_settings['CLANG_STATCACHE_DISABLE'] = 'YES'
+      
+      # Handle architecture issues
+      config.build_settings['ONLY_ACTIVE_ARCH'] = 'NO'
+      
+      # Fix code signing settings
+      config.build_settings['EXPANDED_CODE_SIGN_IDENTITY'] = ""
+      config.build_settings['CODE_SIGNING_REQUIRED'] = "NO"
+      config.build_settings['CODE_SIGNING_ALLOWED'] = "NO"
+      
+      # Fix simulator architecture settings
+      if config.name.include?('Debug')
+        if config.name.include?('Simulator')
+          config.build_settings['ONLY_ACTIVE_ARCH'] = 'YES'
+        end
+      end
+    end
+  end
+  
+  # Manually patch any generated xcconfig files to remove -G flags
+  Dir.glob("#{installer.sandbox.root}/**/*.xcconfig").each do |xcconfig_file|
+    file_content = File.read(xcconfig_file)
+    
+    # Remove any -G flags
+    if file_content.include?('-G')
+      file_content = file_content.gsub(/-G\S*\s?/, '')
+      File.write(xcconfig_file, file_content)
+      puts "Patched #{xcconfig_file}"
+    end
+  end
+end

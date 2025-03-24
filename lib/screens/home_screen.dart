@@ -3,6 +3,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:provider/provider.dart';
 import 'dart:io' show Platform;
 import '../providers/chat_provider.dart';
+import '../providers/auth_provider.dart';
 import '../widgets/chat_message_widget.dart';
 import '../services/media_picker_service.dart';
 import '../services/gif_service.dart';
@@ -10,6 +11,7 @@ import '../models/chat_message.dart';
 import '../models/gemini_quick_reply.dart';
 import '../utils/youtube_helper.dart';
 import '../widgets/platform/ios_message_input.dart';
+import 'profile_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -434,8 +436,19 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  void _navigateToProfile() {
+    Navigator.push(
+      context,
+      Platform.isIOS
+          ? CupertinoPageRoute(builder: (context) => const ProfileScreen())
+          : MaterialPageRoute(builder: (context) => const ProfileScreen()),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    final user = Provider.of<AuthProvider>(context).user;
+    
     final appBar = Platform.isIOS
         ? CupertinoNavigationBar(
             middle: const Text('RCS Demo App'),
@@ -448,6 +461,18 @@ class _HomeScreenState extends State<HomeScreen> {
                 });
               },
             ),
+            trailing: CupertinoButton(
+              padding: EdgeInsets.zero,
+              child: user?.photoURL != null
+                ? CircleAvatar(
+                    radius: 14,
+                    backgroundImage: NetworkImage(user!.photoURL!),
+                    backgroundColor: CupertinoColors.systemGrey5,
+                    onBackgroundImageError: (_, __) {},
+                  )
+                : const Icon(CupertinoIcons.profile_circled),
+              onPressed: _navigateToProfile,
+            ),
           )
         : AppBar(
             title: const Text('RCS Demo App'),
@@ -459,6 +484,19 @@ class _HomeScreenState extends State<HomeScreen> {
                 });
               },
             ),
+            actions: [
+              IconButton(
+                icon: user?.photoURL != null
+                  ? CircleAvatar(
+                      radius: 14,
+                      backgroundImage: NetworkImage(user!.photoURL!),
+                      backgroundColor: Colors.grey[300],
+                      onBackgroundImageError: (_, __) {},
+                    )
+                  : const Icon(Icons.account_circle),
+                onPressed: _navigateToProfile,
+              ),
+            ],
           );
           
     return Platform.isIOS

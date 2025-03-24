@@ -3,6 +3,7 @@ import '../models/chat_message.dart';
 import '../models/quick_reply.dart';
 import '../models/gemini_quick_reply.dart';
 import '../services/bot_service.dart';
+import '../services/firebase_chat_service.dart';
 import 'package:uuid/uuid.dart';
 import 'dart:async';
 import 'dart:math' as math;
@@ -12,6 +13,72 @@ class ChatProvider extends ChangeNotifier {
   List<ChatMessage> get messages => _messages;
   final _uuid = Uuid();
   final BotService _botService = BotService();
+  final FirebaseChatService _firebaseChatService = FirebaseChatService();
+  
+  StreamSubscription? _chatSubscription;
+  bool _isLoadingHistory = false;
+  bool get isLoadingHistory => _isLoadingHistory;
+  String? _error;
+  String? get error => _error;
+
+  ChatProvider() {
+    _loadChatHistory();
+  }
+
+  @override
+  void dispose() {
+    _chatSubscription?.cancel();
+    super.dispose();
+  }
+
+  // Load chat history from Firebase
+  Future<void> _loadChatHistory() async {
+    _isLoadingHistory = true;
+    _error = null;
+    notifyListeners();
+
+    try {
+      // Cancel existing subscription if any
+      await _chatSubscription?.cancel();
+      
+      // Subscribe to chat history stream
+      _chatSubscription = _firebaseChatService.getChatMessages().listen(
+        (chatMessages) {
+          // Replace current messages with loaded history
+          _messages.clear();
+          _messages.addAll(chatMessages);
+          _isLoadingHistory = false;
+          notifyListeners();
+        },
+        onError: (e) {
+          _isLoadingHistory = false;
+          _error = 'Failed to load chat history: ${e.toString()}';
+          notifyListeners();
+        }
+      );
+    } catch (e) {
+      _isLoadingHistory = false;
+      _error = 'Failed to load chat history: ${e.toString()}';
+      notifyListeners();
+    }
+  }
+
+  // Reload chat history (useful after login/logout)
+  void refreshChatHistory() {
+    _loadChatHistory();
+  }
+
+  // Clear all chat history
+  Future<void> clearChatHistory() async {
+    try {
+      await _firebaseChatService.clearChatHistory();
+      _messages.clear();
+      notifyListeners();
+    } catch (e) {
+      _error = 'Failed to clear chat history: ${e.toString()}';
+      notifyListeners();
+    }
+  }
 
   void addTextMessage(String content, {bool isMe = true}) {
     final messageId = _uuid.v4();
@@ -23,8 +90,15 @@ class ChatProvider extends ChangeNotifier {
       type: MessageType.text,
       status: MessageStatus.sent,
     );
+    
+    // Add to local state
     _messages.add(message);
     notifyListeners();
+    
+    // Save to Firebase if authenticated
+    if (_firebaseChatService.userId.isNotEmpty) {
+      _firebaseChatService.saveChatMessage(message);
+    }
 
     if (isMe) {
       _generateBotResponse(content);
@@ -42,8 +116,15 @@ class ChatProvider extends ChangeNotifier {
       mediaUrl: gifUrl,
       status: MessageStatus.sent,
     );
+    
+    // Add to local state
     _messages.add(message);
     notifyListeners();
+    
+    // Save to Firebase if authenticated
+    if (_firebaseChatService.userId.isNotEmpty) {
+      _firebaseChatService.saveChatMessage(message);
+    }
 
     if (isMe) {
       _generateBotResponse('Can you react to this GIF?');
@@ -64,13 +145,25 @@ class ChatProvider extends ChangeNotifier {
       parentMessageId: replyToMessageId,
     );
 
+    // Add to local state
     _messages.add(message);
     notifyListeners();
 
-    await Future.delayed(const Duration(milliseconds: 500));
-    _updateMessageStatus(messageId, MessageStatus.sent);
-    
-    _generateBotResponse(content);
+    try {
+      // Save to Firebase if authenticated
+      if (_firebaseChatService.userId.isNotEmpty) {
+        await _firebaseChatService.saveChatMessage(message);
+      }
+      
+      await Future.delayed(const Duration(milliseconds: 500));
+      _updateMessageStatus(messageId, MessageStatus.sent);
+      
+      _generateBotResponse(content);
+    } catch (e) {
+      _updateMessageStatus(messageId, MessageStatus.failed);
+      _error = 'Failed to send message: ${e.toString()}';
+      notifyListeners();
+    }
   }
 
   Future<void> sendQuickReply(String content) async {
@@ -86,13 +179,25 @@ class ChatProvider extends ChangeNotifier {
       status: MessageStatus.sending,
     );
 
+    // Add to local state
     _messages.add(message);
     notifyListeners();
 
-    await Future.delayed(const Duration(milliseconds: 500));
-    _updateMessageStatus(messageId, MessageStatus.sent);
-    
-    _generateBotResponse(content);
+    try {
+      // Save to Firebase if authenticated
+      if (_firebaseChatService.userId.isNotEmpty) {
+        await _firebaseChatService.saveChatMessage(message);
+      }
+      
+      await Future.delayed(const Duration(milliseconds: 500));
+      _updateMessageStatus(messageId, MessageStatus.sent);
+      
+      _generateBotResponse(content);
+    } catch (e) {
+      _updateMessageStatus(messageId, MessageStatus.failed);
+      _error = 'Failed to send message: ${e.toString()}';
+      notifyListeners();
+    }
   }
 
   Future<void> sendMedia(String mediaPath, MessageType type) async {
@@ -107,14 +212,32 @@ class ChatProvider extends ChangeNotifier {
       status: MessageStatus.sending,
     );
 
+    // Add to local state
     _messages.add(message);
     notifyListeners();
 
-    await Future.delayed(const Duration(seconds: 1));
-    _updateMessageStatus(messageId, MessageStatus.sent);
+    try {
+      // Try to upload and save to Firebase if authenticated
+      if (_firebaseChatService.userId.isNotEmpty) {
+        // For non-local files (e.g. from web), just save the message without uploading
+        if (mediaPath.startsWith('http')) {
+          await _firebaseChatService.saveChatMessage(message);
+        } else {
+          // For local files, upload to Firebase Storage
+          await _firebaseChatService.sendMediaMessage(mediaPath, type);
+        }
+      }
+      
+      await Future.delayed(const Duration(seconds: 1));
+      _updateMessageStatus(messageId, MessageStatus.sent);
 
-    if (type == MessageType.image) {
-      _generateBotResponse('Can you describe this image?');
+      if (type == MessageType.image) {
+        _generateBotResponse('Can you describe this image?');
+      }
+    } catch (e) {
+      _updateMessageStatus(messageId, MessageStatus.failed);
+      _error = 'Failed to send media: ${e.toString()}';
+      notifyListeners();
     }
   }
 
@@ -132,11 +255,29 @@ class ChatProvider extends ChangeNotifier {
       status: MessageStatus.sending,
     );
 
+    // Add to local state
     _messages.add(message);
     notifyListeners();
 
-    await Future.delayed(const Duration(seconds: 1));
-    _updateMessageStatus(messageId, MessageStatus.sent);
+    try {
+      // Try to upload and save to Firebase if authenticated
+      if (_firebaseChatService.userId.isNotEmpty) {
+        // For non-local files (e.g. from web), just save the message without uploading
+        if (filePath.startsWith('http')) {
+          await _firebaseChatService.saveChatMessage(message);
+        } else {
+          // For local files, upload to Firebase Storage
+          await _firebaseChatService.sendFileMessage(filePath);
+        }
+      }
+      
+      await Future.delayed(const Duration(seconds: 1));
+      _updateMessageStatus(messageId, MessageStatus.sent);
+    } catch (e) {
+      _updateMessageStatus(messageId, MessageStatus.failed);
+      _error = 'Failed to send file: ${e.toString()}';
+      notifyListeners();
+    }
   }
 
   void addQuickReplyMessage(List<QuickReply> suggestedReplies) {
@@ -150,8 +291,15 @@ class ChatProvider extends ChangeNotifier {
       suggestedReplies: suggestedReplies,
       status: MessageStatus.sent,
     );
+    
+    // Add to local state
     _messages.add(message);
     notifyListeners();
+    
+    // Save to Firebase if authenticated
+    if (_firebaseChatService.userId.isNotEmpty) {
+      _firebaseChatService.saveChatMessage(message);
+    }
   }
   
   void addGeminiQuickReplyMessage(List<GeminiQuickReply> suggestedReplies) {
@@ -165,8 +313,15 @@ class ChatProvider extends ChangeNotifier {
       suggestedReplies: suggestedReplies,
       status: MessageStatus.sent,
     );
+    
+    // Add to local state
     _messages.add(message);
     notifyListeners();
+    
+    // Save to Firebase if authenticated
+    if (_firebaseChatService.userId.isNotEmpty) {
+      _firebaseChatService.saveChatMessage(message);
+    }
   }
 
   void addReaction(String messageId, String emoji) {
@@ -175,7 +330,7 @@ class ChatProvider extends ChangeNotifier {
       final message = _messages[index];
       final reaction = MessageReaction(
         emoji: emoji,
-        userId: 'current_user',
+        userId: _firebaseChatService.userId.isNotEmpty ? _firebaseChatService.userId : 'current_user',
         timestamp: DateTime.now(),
       );
 
@@ -183,6 +338,43 @@ class ChatProvider extends ChangeNotifier {
       
       _messages[index] = message.copyWith(reactions: updatedReactions);
       notifyListeners();
+      
+      // Save to Firebase if authenticated
+      if (_firebaseChatService.userId.isNotEmpty) {
+        _firebaseChatService.addReaction(messageId, emoji);
+      }
+    }
+  }
+
+  void removeReaction(String messageId, String emoji) {
+    final index = _messages.indexWhere((m) => m.id == messageId);
+    if (index != -1) {
+      final message = _messages[index];
+      final userId = _firebaseChatService.userId.isNotEmpty ? _firebaseChatService.userId : 'current_user';
+      
+      final updatedReactions = List<MessageReaction>.from(message.reactions)
+        ..removeWhere((r) => r.emoji == emoji && r.userId == userId);
+      
+      _messages[index] = message.copyWith(reactions: updatedReactions);
+      notifyListeners();
+      
+      // Update in Firebase if authenticated
+      if (_firebaseChatService.userId.isNotEmpty) {
+        _firebaseChatService.removeReaction(messageId, emoji);
+      }
+    }
+  }
+
+  void deleteMessage(String messageId) {
+    final index = _messages.indexWhere((m) => m.id == messageId);
+    if (index != -1) {
+      _messages.removeAt(index);
+      notifyListeners();
+      
+      // Delete from Firebase if authenticated
+      if (_firebaseChatService.userId.isNotEmpty) {
+        _firebaseChatService.deleteMessage(messageId);
+      }
     }
   }
 
@@ -191,6 +383,11 @@ class ChatProvider extends ChangeNotifier {
     if (index != -1) {
       _messages[index] = _messages[index].copyWith(status: status);
       notifyListeners();
+      
+      // Update in Firebase if authenticated
+      if (_firebaseChatService.userId.isNotEmpty) {
+        _firebaseChatService.saveChatMessage(_messages[index]);
+      }
     }
   }
 
@@ -222,7 +419,13 @@ class ChatProvider extends ChangeNotifier {
       status: MessageStatus.sent,
     );
     
+    // Add to local state
     _messages.add(responseMessage);
+    
+    // Save to Firebase if authenticated
+    if (_firebaseChatService.userId.isNotEmpty) {
+      _firebaseChatService.saveChatMessage(responseMessage);
+    }
     
     // Always generate quick replies to test functionality
     print('Generating quick replies for response');

@@ -1,0 +1,11 @@
+--- FLTTaskStateChannelStreamHandler.h
++++ FLTTaskStateChannelStreamHandler.h
+@@ -9,7 +9,7 @@
+ #import <Flutter/Flutter.h>
+ #endif
+ 
+-#import <Firebase/Firebase.h>
++@import FirebaseStorage;
+ 
+ #import <Foundation/Foundation.h>
+ 

@@ -1,0 +1,16 @@
+post_install do |installer|
+  installer.pods_project.targets.each do |target|
+    flutter_additional_ios_build_settings(target)
+    
+    # Fix module issues
+    target.build_configurations.each do |config|
+      config.build_settings['CLANG_ALLOW_NON_MODULAR_INCLUDES_IN_FRAMEWORK_MODULES'] = 'YES'
+      config.build_settings['CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER'] = 'NO'
+      config.build_settings['SWIFT_VERSION'] = '5.0'
+      
+      # These settings fix some Xcode module cache issues
+      config.build_settings['ONLY_ACTIVE_ARCH'] = 'YES'
+      config.build_settings['ARCHS'] = ''
+    end
+  end
+end

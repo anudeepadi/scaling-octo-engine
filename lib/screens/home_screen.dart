@@ -30,22 +30,22 @@ class _HomeScreenState extends State<HomeScreen> {
   void initState() {
     super.initState();
     _messageController.addListener(_handleTextChange);
-    
+
     // Add test Gemini quick replies for debugging
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final chatProvider = context.read<ChatProvider>();
       print('Adding test Gemini quick replies');
-      
+
       // Add a test message
       chatProvider.addTextMessage('This is a test message from the bot', isMe: false);
-      
+
       // Add test Gemini quick replies
       List<GeminiQuickReply> testReplies = [
         GeminiQuickReply(text: '👍 Test Reply 1', value: 'Test1'),
         GeminiQuickReply(text: '❓ Test Reply 2', value: 'Test2'),
         GeminiQuickReply(text: '🤔 Test Reply 3', value: 'Test3'),
       ];
-      
+
       chatProvider.addGeminiQuickReplyMessage(testReplies);
     });
   }
@@ -83,7 +83,7 @@ class _HomeScreenState extends State<HomeScreen> {
     } else {
       chatProvider.addTextMessage(text);
     }
-    
+
     _messageController.clear();
     _scrollToBottom();
   }
@@ -129,17 +129,17 @@ class _HomeScreenState extends State<HomeScreen> {
                   if (snapshot.connectionState == ConnectionState.waiting) {
                     return const Center(child: CircularProgressIndicator());
                   }
-                  
+
                   if (snapshot.hasError) {
                     return Center(child: Text('Error: ${snapshot.error}'));
                   }
-                  
+
                   final gifPaths = snapshot.data ?? [];
-                  
+
                   if (gifPaths.isEmpty) {
                     return const Center(child: Text('No GIFs found'));
                   }
-                  
+
                   return GridView.builder(
                     gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                       crossAxisCount: 3,
@@ -253,7 +253,7 @@ class _HomeScreenState extends State<HomeScreen> {
       );
     }
   }
-  
+
   Future<void> _pickMediaFromSource(MediaSource source) async {
     final result = await MediaPickerService.pickMedia(
       allowedExtensions: ['jpg', 'jpeg', 'png', 'gif', 'mp4'],
@@ -263,7 +263,7 @@ class _HomeScreenState extends State<HomeScreen> {
     if (result != null && result.files.isNotEmpty) {
       final file = result.files.first;
       final path = file.path;
-      
+
       if (path != null) {
         final chatProvider = context.read<ChatProvider>();
         if (MediaPickerService.isVideoFile(path)) {
@@ -286,73 +286,361 @@ class _HomeScreenState extends State<HomeScreen> {
         children: [
           Material(
             color: Theme.of(context).primaryColor,
-            child: DrawerHeader(
-              decoration: const BoxDecoration(),
-              child: const Center(
-                child: Text(
-                  'Channels',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 24,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ),
-            ),
-          ),
-          Expanded(
-            child: Material(
-              color: Theme.of(context).scaffoldBackgroundColor,
-              child: ListView(
-                padding: const EdgeInsets.symmetric(vertical: 8),
+            child: Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Row(
                 children: [
-                  ListTile(
-                    leading: const SizedBox(
-                      width: 24,
-                      child: Icon(Icons.email),
+                  const Expanded(
+                    child: Text(
+                      'Chat History',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
-                    title: const Text('Email'),
-                    onTap: () {
-                      setState(() => _isDrawerOpen = false);
-                    },
                   ),
-                  ListTile(
-                    leading: const SizedBox(
-                      width: 24,
-                      child: Icon(Icons.chat),
-                    ),
-                    title: const Text('WhatsApp'),
-                    onTap: () {
-                      setState(() => _isDrawerOpen = false);
-                    },
-                  ),
-                  ListTile(
-                    leading: const SizedBox(
-                      width: 24,
-                      child: Icon(Icons.message),
-                    ),
-                    title: const Text('SMS'),
-                    onTap: () {
-                      setState(() => _isDrawerOpen = false);
-                    },
-                  ),
-                  ListTile(
-                    leading: const SizedBox(
-                      width: 24,
-                      child: Icon(Icons.forum),
-                    ),
-                    title: const Text('RCS'),
-                    onTap: () {
-                      setState(() => _isDrawerOpen = false);
-                    },
+                  IconButton(
+                    icon: const Icon(Icons.add, color: Colors.white),
+                    onPressed: _createNewChat,
+                    tooltip: 'New Chat',
                   ),
                 ],
               ),
             ),
           ),
+          Expanded(
+            child: Consumer<ChatProvider>(
+              builder: (context, chatProvider, _) {
+                return ListView.builder(
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  itemCount: chatProvider.conversations.length,
+                  itemBuilder: (context, index) {
+                    final conversation = chatProvider.conversations[index];
+                    final isActive = conversation.id == chatProvider.currentConversationId;
+
+                    return ListTile(
+                      leading: SizedBox(
+                        width: 24,
+                        child: Icon(
+                          Icons.chat_bubble_outline,
+                          color: isActive ? Theme.of(context).primaryColor : null,
+                        ),
+                      ),
+                      title: Text(
+                        conversation.name,
+                        style: TextStyle(
+                          fontWeight: isActive ? FontWeight.bold : FontWeight.normal,
+                          color: isActive ? Theme.of(context).primaryColor : null,
+                        ),
+                      ),
+                      subtitle: conversation.lastMessagePreview != null
+                          ? Text(
+                              conversation.lastMessagePreview!,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Theme.of(context).textTheme.bodySmall?.color,
+                              ),
+                            )
+                          : null,
+                      onTap: () {
+                        // Switch to this conversation
+                        chatProvider.switchConversation(conversation.id);
+                        
+                        // Close the drawer on mobile
+                        setState(() => _isDrawerOpen = false);
+                      },
+                      trailing: isActive
+                          ? IconButton(
+                              icon: const Icon(Icons.more_vert),
+                              onPressed: () => _showConversationOptions(conversation),
+                              iconSize: 20,
+                            )
+                          : null,
+                      selected: isActive,
+                      selectedTileColor: Theme.of(context).colorScheme.primary.withOpacity(0.1),
+                    );
+                  },
+                );
+              },
+            ),
+          ),
         ],
       ),
     );
+  }
+  
+  void _createNewChat() {
+    // Show dialog to create a new chat
+    if (Platform.isIOS) {
+      showCupertinoDialog(
+        context: context,
+        builder: (context) => CupertinoAlertDialog(
+          title: const Text('New Chat'),
+          content: CupertinoTextField(
+            placeholder: 'Enter chat name',
+            controller: TextEditingController(text: 'New Chat'),
+            autofocus: true,
+          ),
+          actions: [
+            CupertinoDialogAction(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Cancel'),
+            ),
+            CupertinoDialogAction(
+              onPressed: () {
+                final controller = context.findAncestorWidgetOfExactType<CupertinoTextField>()?.controller;
+                final name = controller?.text.trim() ?? 'New Chat';
+                
+                if (name.isNotEmpty) {
+                  Provider.of<ChatProvider>(context, listen: false).createNewConversation(name);
+                }
+                
+                Navigator.of(context).pop();
+              },
+              isDefaultAction: true,
+              child: const Text('Create'),
+            ),
+          ],
+        ),
+      );
+    } else {
+      final controller = TextEditingController(text: 'New Chat');
+      
+      showDialog(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('New Chat'),
+          content: TextField(
+            controller: controller,
+            decoration: const InputDecoration(
+              labelText: 'Chat Name',
+            ),
+            autofocus: true,
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () {
+                final name = controller.text.trim();
+                
+                if (name.isNotEmpty) {
+                  Provider.of<ChatProvider>(context, listen: false).createNewConversation(name);
+                }
+                
+                Navigator.of(context).pop();
+              },
+              child: const Text('Create'),
+            ),
+          ],
+        ),
+      );
+    }
+  }
+  
+  void _showConversationOptions(dynamic conversation) {
+    if (Platform.isIOS) {
+      showCupertinoModalPopup(
+        context: context,
+        builder: (context) => CupertinoActionSheet(
+          title: Text(conversation.name),
+          actions: [
+            CupertinoActionSheetAction(
+              onPressed: () {
+                Navigator.pop(context);
+                _renameConversation(conversation);
+              },
+              child: const Text('Rename'),
+            ),
+            CupertinoActionSheetAction(
+              onPressed: () {
+                Navigator.pop(context);
+                _clearConversation();
+              },
+              child: const Text('Clear Chat'),
+            ),
+            CupertinoActionSheetAction(
+              onPressed: () {
+                Navigator.pop(context);
+                _deleteConversation(conversation);
+              },
+              isDestructiveAction: true,
+              child: const Text('Delete'),
+            ),
+          ],
+          cancelButton: CupertinoActionSheetAction(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+        ),
+      );
+    } else {
+      showModalBottomSheet(
+        context: context,
+        builder: (context) => Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.edit),
+              title: const Text('Rename'),
+              onTap: () {
+                Navigator.pop(context);
+                _renameConversation(conversation);
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.clear_all),
+              title: const Text('Clear Chat'),
+              onTap: () {
+                Navigator.pop(context);
+                _clearConversation();
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.delete, color: Colors.red),
+              title: const Text('Delete', style: TextStyle(color: Colors.red)),
+              onTap: () {
+                Navigator.pop(context);
+                _deleteConversation(conversation);
+              },
+            ),
+          ],
+        ),
+      );
+    }
+  }
+  
+  void _renameConversation(dynamic conversation) {
+    final controller = TextEditingController(text: conversation.name);
+    
+    if (Platform.isIOS) {
+      showCupertinoDialog(
+        context: context,
+        builder: (context) => CupertinoAlertDialog(
+          title: const Text('Rename Chat'),
+          content: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 8.0),
+            child: CupertinoTextField(
+              controller: controller,
+              autofocus: true,
+            ),
+          ),
+          actions: [
+            CupertinoDialogAction(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Cancel'),
+            ),
+            CupertinoDialogAction(
+              onPressed: () {
+                final name = controller.text.trim();
+                
+                if (name.isNotEmpty) {
+                  Provider.of<ChatProvider>(context, listen: false)
+                    .renameConversation(conversation.id, name);
+                }
+                
+                Navigator.of(context).pop();
+              },
+              isDefaultAction: true,
+              child: const Text('Rename'),
+            ),
+          ],
+        ),
+      );
+    } else {
+      showDialog(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Rename Chat'),
+          content: TextField(
+            controller: controller,
+            decoration: const InputDecoration(
+              labelText: 'Chat Name',
+            ),
+            autofocus: true,
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () {
+                final name = controller.text.trim();
+                
+                if (name.isNotEmpty) {
+                  Provider.of<ChatProvider>(context, listen: false)
+                    .renameConversation(conversation.id, name);
+                }
+                
+                Navigator.of(context).pop();
+              },
+              child: const Text('Rename'),
+            ),
+          ],
+        ),
+      );
+    }
+  }
+  
+  void _clearConversation() {
+    final chatProvider = Provider.of<ChatProvider>(context, listen: false);
+    chatProvider.clearChatHistory();
+  }
+  
+  void _deleteConversation(dynamic conversation) {
+    if (Platform.isIOS) {
+      showCupertinoDialog(
+        context: context,
+        builder: (context) => CupertinoAlertDialog(
+          title: const Text('Delete Chat'),
+          content: const Text('Are you sure you want to delete this chat? This action cannot be undone.'),
+          actions: [
+            CupertinoDialogAction(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Cancel'),
+            ),
+            CupertinoDialogAction(
+              onPressed: () {
+                Navigator.of(context).pop();
+                Provider.of<ChatProvider>(context, listen: false)
+                  .deleteConversation(conversation.id);
+              },
+              isDestructiveAction: true,
+              child: const Text('Delete'),
+            ),
+          ],
+        ),
+      );
+    } else {
+      showDialog(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Delete Chat'),
+          content: const Text('Are you sure you want to delete this chat? This action cannot be undone.'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+                Provider.of<ChatProvider>(context, listen: false)
+                  .deleteConversation(conversation.id);
+              },
+              style: TextButton.styleFrom(foregroundColor: Colors.red),
+              child: const Text('Delete'),
+            ),
+          ],
+        ),
+      );
+    }
   }
 
   Widget _buildMessageInput() {
@@ -365,7 +653,7 @@ class _HomeScreenState extends State<HomeScreen> {
         isComposing: _isComposing,
       );
     }
-    
+
     // Default Android/Material implementation
     return Container(
       padding: const EdgeInsets.all(8.0),
@@ -447,8 +735,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final user = Provider.of<AuthProvider>(context).user;
-    
+    // Simplified build method without User object
     final appBar = Platform.isIOS
         ? CupertinoNavigationBar(
             middle: const Text('RCS Demo App'),
@@ -463,14 +750,7 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
             trailing: CupertinoButton(
               padding: EdgeInsets.zero,
-              child: user?.photoURL != null
-                ? CircleAvatar(
-                    radius: 14,
-                    backgroundImage: NetworkImage(user!.photoURL!),
-                    backgroundColor: CupertinoColors.systemGrey5,
-                    onBackgroundImageError: (_, __) {},
-                  )
-                : const Icon(CupertinoIcons.profile_circled),
+              child: const Icon(CupertinoIcons.profile_circled),
               onPressed: _navigateToProfile,
             ),
           )
@@ -486,19 +766,12 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
             actions: [
               IconButton(
-                icon: user?.photoURL != null
-                  ? CircleAvatar(
-                      radius: 14,
-                      backgroundImage: NetworkImage(user!.photoURL!),
-                      backgroundColor: Colors.grey[300],
-                      onBackgroundImageError: (_, __) {},
-                    )
-                  : const Icon(Icons.account_circle),
+                icon: const Icon(Icons.account_circle),
                 onPressed: _navigateToProfile,
               ),
             ],
           );
-          
+
     return Platform.isIOS
         ? CupertinoPageScaffold(
             navigationBar: appBar as CupertinoNavigationBar,
@@ -509,7 +782,7 @@ class _HomeScreenState extends State<HomeScreen> {
             body: _buildBody(),
           );
   }
-  
+
   Widget _buildBody() {
     return Material(
       type: MaterialType.transparency,
@@ -536,13 +809,13 @@ class _HomeScreenState extends State<HomeScreen> {
                           }
                         });
                         print('Rendering chat with ${chatProvider.messages.length} messages');
-                          
+
                         // Check for any Gemini quick reply messages
-                        bool hasGeminiReplies = chatProvider.messages.any((msg) => 
+                        bool hasGeminiReplies = chatProvider.messages.any((msg) =>
                           msg.type == MessageType.geminiQuickReply
                         );
                         print('Has Gemini quick replies: $hasGeminiReplies');
-                          
+
                         return ListView.builder(
                           controller: _scrollController,
                           padding: const EdgeInsets.all(8),

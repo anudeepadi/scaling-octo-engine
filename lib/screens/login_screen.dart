@@ -43,7 +43,7 @@ class _LoginScreenState extends State<LoginScreen> {
   Future<void> _submitForm() async {
     if (_formKey.currentState?.validate() ?? false) {
       final authProvider = Provider.of<AuthProvider>(context, listen: false);
-      
+
       bool success;
       if (_isSignUp) {
         success = await authProvider.signUp(
@@ -57,14 +57,14 @@ class _LoginScreenState extends State<LoginScreen> {
           _passwordController.text.trim(),
         );
       }
-      
+
       if (!success && mounted) {
         final errorMessage = authProvider.error ?? 'Authentication failed';
         _showErrorDialog(errorMessage);
       }
     }
   }
-  
+
   void _showErrorDialog(String message) {
     if (Platform.isIOS) {
       showCupertinoDialog(
@@ -100,7 +100,7 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    
+
     return Platform.isIOS
         ? CupertinoPageScaffold(
             child: _buildContent(theme),
@@ -130,6 +130,8 @@ class _LoginScreenState extends State<LoginScreen> {
               _buildSubmitButton(),
               const SizedBox(height: 16),
               _buildToggleButton(),
+              const SizedBox(height: 16),
+              _buildDemoLoginButton(),
               const SizedBox(height: 24),
               Consumer<AuthProvider>(
                 builder: (context, authProvider, _) {
@@ -380,7 +382,7 @@ class _LoginScreenState extends State<LoginScreen> {
     final toggleText = _isSignUp
         ? 'Already have an account? Sign In'
         : 'Don\'t have an account? Sign Up';
-        
+
     if (Platform.isIOS) {
       return CupertinoButton(
         onPressed: _toggleMode,
@@ -390,6 +392,38 @@ class _LoginScreenState extends State<LoginScreen> {
       return TextButton(
         onPressed: _toggleMode,
         child: Text(toggleText),
+      );
+    }
+  }
+  
+  // Simple function to handle demo login
+  void _handleDemoLogin() {
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    // Set authentication state to true (this is a simplified demo approach)
+    authProvider.signIn('demo@example.com', 'password');
+  }
+
+  Widget _buildDemoLoginButton() {
+    if (Platform.isIOS) {
+      return CupertinoButton(
+        onPressed: _handleDemoLogin,
+        color: CupertinoColors.systemGrey5,
+        child: const Text('Continue in Demo Mode'),
+      );
+    } else {
+      return OutlinedButton(
+        onPressed: _handleDemoLogin,
+        style: OutlinedButton.styleFrom(
+          padding: const EdgeInsets.symmetric(vertical: 16),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+          side: BorderSide(color: Theme.of(context).colorScheme.secondary.withOpacity(0.5)),
+        ),
+        child: const Text(
+          'Continue in Demo Mode',
+          style: TextStyle(fontSize: 16),
+        ),
       );
     }
   }

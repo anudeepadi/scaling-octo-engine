@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:provider/provider.dart';
 import 'dart:io' show Platform;
-import 'package:firebase_core/firebase_core.dart';
+// import 'package:firebase_core/firebase_core.dart';
 import 'providers/chat_provider.dart';
 import 'providers/bot_chat_provider.dart';
 import 'providers/channel_provider.dart';
@@ -15,7 +15,10 @@ import 'theme/ios_theme.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp();
+  
+  // Skip Firebase initialization completely
+  print('Running in demo mode without Firebase');
+  
   runApp(const MyApp());
 }
 

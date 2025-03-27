@@ -10,10 +10,17 @@ import '../models/gemini_quick_reply.dart';
 import '../models/link_preview.dart';
 
 class FirebaseChatService {
-  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-  final FirebaseAuth _auth = FirebaseAuth.instance;
-  final FirebaseStorage _storage = FirebaseStorage.instance;
+  final FirebaseFirestore _firestore;
+  final FirebaseAuth _auth;
+  final FirebaseStorage _storage;
   final _uuid = Uuid();
+  
+  FirebaseChatService() : 
+    _firestore = FirebaseFirestore.instance,
+    _auth = FirebaseAuth.instance,
+    _storage = FirebaseStorage.instance {
+    // Constructor body is empty, initialization happens in the initializer list
+  }
 
   User? get currentUser => _auth.currentUser;
   String get userId => currentUser?.uid ?? '';

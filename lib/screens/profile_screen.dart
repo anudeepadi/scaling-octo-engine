@@ -2,8 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:provider/provider.dart';
 import 'dart:io' show File, Platform;
-import 'package:firebase_storage/firebase_storage.dart';
-import 'package:path/path.dart' as path;
 import '../providers/auth_provider.dart';
 import '../providers/chat_provider.dart';
 import '../services/media_picker_service.dart';
@@ -25,19 +23,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
   @override
   void initState() {
     super.initState();
-    _initializeUserData();
-  }
-
-  void _initializeUserData() {
-    final user = Provider.of<AuthProvider>(context, listen: false).user;
-    if (user != null) {
-      _displayNameController.text = user.displayName ?? '';
-      if (user.photoURL != null) {
-        setState(() {
-          _profileImagePath = user.photoURL;
-        });
-      }
-    }
+    // In demo mode, set a default display name
+    _displayNameController.text = 'Demo User';
   }
 
   @override
@@ -56,7 +43,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       if (result != null && result.files.isNotEmpty) {
         final file = result.files.first;
         final path = file.path;
-        
+
         if (path != null) {
           setState(() {
             _profileImagePath = path;
@@ -76,37 +63,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
       });
 
       try {
-        final authProvider = Provider.of<AuthProvider>(context, listen: false);
-        
-        String? photoURL = authProvider.user?.photoURL;
-        
-        // Upload new profile image if changed
-        if (_imageChanged && _profileImagePath != null) {
-          if (_profileImagePath!.startsWith('http')) {
-            // Already a URL, no need to upload
-            photoURL = _profileImagePath;
-          } else {
-            // Local file path, need to upload
-            final file = File(_profileImagePath!);
-            final fileName = path.basename(_profileImagePath!);
-            final storageRef = FirebaseStorage.instance.ref().child('users/${authProvider.userId}/profile/$fileName');
-            
-            final uploadTask = storageRef.putFile(file);
-            final snapshot = await uploadTask.whenComplete(() {});
-            photoURL = await snapshot.ref.getDownloadURL();
-          }
-        }
-        
-        // Update user profile
-        await authProvider.updateUserProfile(
-          displayName: _displayNameController.text.trim(),
-          photoURL: photoURL,
-        );
-        
-        // Refresh chat messages to update sender info
-        final chatProvider = Provider.of<ChatProvider>(context, listen: false);
-        chatProvider.refreshChatHistory();
-        
+        // Simulate updating profile
+        await Future.delayed(const Duration(seconds: 1));
+
         if (mounted) {
           _showSuccessDialog('Profile updated successfully');
         }
@@ -122,7 +81,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   void _signOut() async {
     try {
-      await Provider.of<AuthProvider>(context, listen: false).signOut();
+      final auth = Provider.of<AuthProvider>(context, listen: false);
+      await auth.signOut();
       if (mounted) {
         Navigator.of(context).pop();
       }
@@ -134,7 +94,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   void _clearChatHistory() async {
     try {
       final chatProvider = Provider.of<ChatProvider>(context, listen: false);
-      await chatProvider.clearChatHistory();
+      chatProvider.clearChatHistory();
       if (mounted) {
         _showSuccessDialog('Chat history cleared successfully');
       }
@@ -287,9 +247,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final user = Provider.of<AuthProvider>(context).user;
-    final email = user?.email ?? '';
-    
+    // In demo mode, use a hardcoded email
+    const email = 'demo@example.com';
+
     return Platform.isIOS
         ? CupertinoPageScaffold(
             navigationBar: const CupertinoNavigationBar(

@@ -1,6 +1,8 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_storage/firebase_storage.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../models/chat_message.dart';
 import '../models/firebase_chat_message.dart';
 
@@ -8,6 +10,7 @@ class FirebaseUtils {
   static final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   static final FirebaseAuth _auth = FirebaseAuth.instance;
   static final FirebaseStorage _storage = FirebaseStorage.instance;
+  static final FirebaseMessaging _messaging = FirebaseMessaging.instance;
 
   static String get userId => _auth.currentUser?.uid ?? '';
   static User? get currentUser => _auth.currentUser;
@@ -50,7 +53,7 @@ class FirebaseUtils {
   // Update last activity timestamp for current user
   static Future<void> updateUserLastActive() async {
     if (_auth.currentUser == null) return;
-    
+
     try {
       await _firestore.collection('users').doc(_auth.currentUser!.uid).update({
         'lastActive': FieldValue.serverTimestamp(),
@@ -85,11 +88,11 @@ class FirebaseUtils {
     try {
       final ref = _storage.ref().child('users/$uid/$subPath');
       final ListResult result = await ref.listAll();
-      
+
       for (final item in result.items) {
         await item.delete();
       }
-      
+
       for (final prefix in result.prefixes) {
         final ListResult subResult = await prefix.listAll();
         for (final item in subResult.items) {
@@ -98,6 +101,60 @@ class FirebaseUtils {
       }
     } catch (e) {
       print('Error deleting user storage files: $e');
+    }
+  }
+
+  // Get the current user ID
+  static Future<String?> getCurrentUserId() async {
+    return _auth.currentUser?.uid;
+  }
+
+  // Get the FCM token for push notifications
+  static Future<String?> getFCMToken() async {
+    try {
+      // Try to get the token from preferences first
+      final prefs = await SharedPreferences.getInstance();
+      String? token = prefs.getString('fcm_token');
+      
+      // If not available, request a new one
+      if (token == null || token.isEmpty) {
+        token = await _messaging.getToken();
+        if (token != null) {
+          // Save the token to preferences
+          await prefs.setString('fcm_token', token);
+          
+          // Also save to Firestore if user is authenticated
+          if (_auth.currentUser != null) {
+            await _firestore.collection('users').doc(_auth.currentUser!.uid).update({
+              'fcmToken': token,
+              'tokenUpdatedAt': FieldValue.serverTimestamp(),
+            });
+          }
+        }
+      }
+      
+      return token;
+    } catch (e) {
+      print('Error getting FCM token: $e');
+      return null;
+    }
+  }
+  
+  // Save the FCM token to Firestore
+  static Future<void> saveFCMToken(String token) async {
+    if (_auth.currentUser == null) return;
+    
+    try {
+      await _firestore.collection('users').doc(_auth.currentUser!.uid).update({
+        'fcmToken': token,
+        'tokenUpdatedAt': FieldValue.serverTimestamp(),
+      });
+      
+      // Also save to shared preferences
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('fcm_token', token);
+    } catch (e) {
+      print('Error saving FCM token: $e');
     }
   }
 }

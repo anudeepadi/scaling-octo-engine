@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import '../models/chat_message.dart';
 import '../models/quick_reply.dart';
 import '../models/gemini_quick_reply.dart';
+import '../models/link_preview.dart';
 import '../services/bot_service.dart';
 import 'package:uuid/uuid.dart';
 import 'dart:async';
@@ -27,21 +28,21 @@ class ChatConversation {
 class ChatProvider extends ChangeNotifier {
   final List<ChatMessage> _messages = [];
   List<ChatMessage> get messages => _messages;
-  
+
   // Add list of chat conversations
   final List<ChatConversation> _conversations = [];
   List<ChatConversation> get conversations => _conversations;
-  
+
   // Current active conversation ID
   String? _currentConversationId;
   String? get currentConversationId => _currentConversationId;
-  
+
   final _uuid = Uuid();
   final BotService _botService = BotService();
-  
+
   bool _isLoading = false;
   bool get isLoading => _isLoading;
-  
+
   String? _error;
   String? get error => _error;
 
@@ -49,7 +50,7 @@ class ChatProvider extends ChangeNotifier {
     print('ChatProvider: Initializing in demo mode');
     _initializeDemoConversations();
   }
-  
+
   // Initialize with demo conversations
   void _initializeDemoConversations() {
     // Create a default conversation
@@ -63,7 +64,7 @@ class ChatProvider extends ChangeNotifier {
         lastMessagePreview: null,
       )
     );
-    
+
     // Create some sample conversations
     _conversations.add(
       ChatConversation(
@@ -74,7 +75,7 @@ class ChatProvider extends ChangeNotifier {
         lastMessagePreview: 'Let me help you plan your trip.',
       )
     );
-    
+
     _conversations.add(
       ChatConversation(
         id: _uuid.v4(),
@@ -84,7 +85,7 @@ class ChatProvider extends ChangeNotifier {
         lastMessagePreview: 'Here are some dinner ideas.',
       )
     );
-    
+
     _conversations.add(
       ChatConversation(
         id: _uuid.v4(),
@@ -94,14 +95,14 @@ class ChatProvider extends ChangeNotifier {
         lastMessagePreview: 'Have you tried restarting your device?',
       )
     );
-    
+
     // Set current conversation
     _currentConversationId = defaultConversationId;
-    
+
     // Load demo messages for the current conversation
     _loadDemoMessages();
   }
-  
+
   // Create a new conversation
   void createNewConversation(String name) {
     final newId = _uuid.v4();
@@ -113,16 +114,16 @@ class ChatProvider extends ChangeNotifier {
         messages: [],
       )
     );
-    
+
     // Set as current conversation
     _currentConversationId = newId;
-    
+
     // Clear messages for the new conversation
     _messages.clear();
-    
+
     notifyListeners();
   }
-  
+
   // Switch to a different conversation
   void switchConversation(String conversationId) {
     // Save current messages to the current conversation
@@ -138,29 +139,29 @@ class ChatProvider extends ChangeNotifier {
         );
       }
     }
-    
+
     // Set new current conversation
     _currentConversationId = conversationId;
-    
+
     // Load messages for the selected conversation
     final selectedConversation = _conversations.firstWhere((conv) => conv.id == conversationId);
     _messages.clear();
     _messages.addAll(selectedConversation.messages);
-    
+
     // If conversation is empty, add welcome message
     if (_messages.isEmpty) {
       _loadDemoMessages();
     }
-    
+
     notifyListeners();
   }
-  
+
   // Get message preview text for sidebar
   String _getMessagePreview(ChatMessage message) {
     switch (message.type) {
       case MessageType.text:
-        return message.content.length > 30 
-          ? '${message.content.substring(0, 27)}...' 
+        return message.content.length > 30
+          ? '${message.content.substring(0, 27)}...'
           : message.content;
       case MessageType.image:
         return '📷 Image';
@@ -175,16 +176,18 @@ class ChatProvider extends ChangeNotifier {
       case MessageType.quickReply:
       case MessageType.geminiQuickReply:
         return '💬 Quick Replies';
+      case MessageType.linkPreview:
+        return '🔗 Link';
       default:
         return 'Message';
     }
   }
-  
+
   // Delete a conversation
   void deleteConversation(String conversationId) {
     // Remove the conversation
     _conversations.removeWhere((conv) => conv.id == conversationId);
-    
+
     // If we deleted the current conversation, switch to another one
     if (_currentConversationId == conversationId) {
       if (_conversations.isNotEmpty) {
@@ -196,10 +199,10 @@ class ChatProvider extends ChangeNotifier {
         createNewConversation('New Chat');
       }
     }
-    
+
     notifyListeners();
   }
-  
+
   // Rename a conversation
   void renameConversation(String conversationId, String newName) {
     final index = _conversations.indexWhere((conv) => conv.id == conversationId);
@@ -226,22 +229,22 @@ class ChatProvider extends ChangeNotifier {
       type: MessageType.text,
       status: MessageStatus.sent,
     );
-    
+
     _messages.add(welcomeMessage);
-    
+
     // Add some quick replies
     final quickReplies = [
       QuickReply(text: '👋 Hello!', value: 'Hello'),
       QuickReply(text: '🤔 What can you do?', value: 'What can you do?'),
       QuickReply(text: '🔍 Tell me more', value: 'Tell me more about this app'),
     ];
-    
-    final geminiQuickReplies = quickReplies.map((qr) => 
+
+    final geminiQuickReplies = quickReplies.map((qr) =>
       GeminiQuickReply.fromQuickReply(qr)
     ).toList();
-    
+
     addGeminiQuickReplyMessage(geminiQuickReplies);
-    
+
     notifyListeners();
   }
 
@@ -260,13 +263,13 @@ class ChatProvider extends ChangeNotifier {
       }
     }
   }
-  
+
   // Clear chat history
   void clearChatHistory() {
     if (_currentConversationId != null) {
       // Only clear current conversation
       _messages.clear();
-      
+
       // Update conversation in the list
       final index = _conversations.indexWhere((conv) => conv.id == _currentConversationId);
       if (index >= 0) {
@@ -278,14 +281,28 @@ class ChatProvider extends ChangeNotifier {
           lastMessagePreview: null,
         );
       }
-      
-      // Add welcome message
-      _loadDemoMessages();
+
       notifyListeners();
     }
   }
 
-  void addTextMessage(String content, {bool isMe = true}) {
+  // Update the last message preview in the chat list
+  void _updateLastMessagePreview(String text) {
+    if (_currentConversationId != null) {
+      final index = _conversations.indexWhere((conv) => conv.id == _currentConversationId);
+      if (index >= 0) {
+        _conversations[index] = ChatConversation(
+          id: _conversations[index].id,
+          name: _conversations[index].name,
+          lastMessageTime: DateTime.now(),
+          messages: _conversations[index].messages,
+          lastMessagePreview: text.length > 30 ? '${text.substring(0, 27)}...' : text,
+        );
+      }
+    }
+  }
+
+  void addTextMessage(String content, {bool isMe = true, bool fromDash = false}) {
     final messageId = _uuid.v4();
     final message = ChatMessage(
       id: messageId,
@@ -298,13 +315,14 @@ class ChatProvider extends ChangeNotifier {
 
     // Add to local state
     _messages.add(message);
-    
+
     // Update conversation
     _updateCurrentConversation();
-    
+
     notifyListeners();
 
-    if (isMe) {
+    // Only generate bot response if this is from user and not from Dash service
+    if (isMe && !fromDash) {
       _generateBotResponse(content);
     }
   }
@@ -323,15 +341,44 @@ class ChatProvider extends ChangeNotifier {
 
     // Add to local state
     _messages.add(message);
-    
+
     // Update conversation
     _updateCurrentConversation();
-    
+
     notifyListeners();
 
     if (isMe) {
       _generateBotResponse('Can you react to this GIF?');
     }
+  }
+
+  void addLinkPreviewMessage(String url, {bool isMe = false}) {
+    final messageId = _uuid.v4();
+    
+    // Create a simple link preview
+    final linkPreview = LinkPreview(
+      url: url,
+      title: 'Link Preview',
+      description: url,
+    );
+    
+    final message = ChatMessage(
+      id: messageId,
+      content: url,
+      isMe: isMe,
+      timestamp: DateTime.now(),
+      type: MessageType.linkPreview,
+      linkPreview: linkPreview,
+      status: MessageStatus.sent,
+    );
+
+    // Add to local state
+    _messages.add(message);
+
+    // Update conversation
+    _updateCurrentConversation();
+
+    notifyListeners();
   }
 
   Future<void> sendTextMessage(String content, {String? replyToMessageId}) async {
@@ -350,10 +397,10 @@ class ChatProvider extends ChangeNotifier {
 
     // Add to local state
     _messages.add(message);
-    
+
     // Update conversation
     _updateCurrentConversation();
-    
+
     notifyListeners();
 
     try {
@@ -383,10 +430,10 @@ class ChatProvider extends ChangeNotifier {
 
     // Add to local state
     _messages.add(message);
-    
+
     // Update conversation
     _updateCurrentConversation();
-    
+
     notifyListeners();
 
     try {
@@ -401,12 +448,12 @@ class ChatProvider extends ChangeNotifier {
     }
   }
 
-  Future<void> sendMedia(String mediaPath, MessageType type) async {
+  Future<void> sendMedia(String mediaPath, MessageType type, {bool fromDash = false}) async {
     final messageId = _uuid.v4();
     final message = ChatMessage(
       id: messageId,
       content: mediaPath,
-      isMe: true,
+      isMe: !fromDash,
       timestamp: DateTime.now(),
       type: type,
       mediaUrl: mediaPath,
@@ -415,17 +462,17 @@ class ChatProvider extends ChangeNotifier {
 
     // Add to local state
     _messages.add(message);
-    
+
     // Update conversation
     _updateCurrentConversation();
-    
+
     notifyListeners();
 
     try {
       await Future.delayed(const Duration(seconds: 1));
       _updateMessageStatus(messageId, MessageStatus.sent);
 
-      if (type == MessageType.image) {
+      if (type == MessageType.image && !fromDash) {
         _generateBotResponse('Can you describe this image?');
       }
     } catch (e) {
@@ -451,10 +498,10 @@ class ChatProvider extends ChangeNotifier {
 
     // Add to local state
     _messages.add(message);
-    
+
     // Update conversation
     _updateCurrentConversation();
-    
+
     notifyListeners();
 
     try {
@@ -467,12 +514,12 @@ class ChatProvider extends ChangeNotifier {
     }
   }
 
-  void addQuickReplyMessage(List<QuickReply> suggestedReplies) {
+  void addQuickReplyMessage(List<QuickReply> suggestedReplies, {bool isMe = false}) {
     final messageId = _uuid.v4();
     final message = ChatMessage(
       id: messageId,
       content: '',
-      isMe: false,
+      isMe: isMe,
       timestamp: DateTime.now(),
       type: MessageType.quickReply,
       suggestedReplies: suggestedReplies,
@@ -481,10 +528,10 @@ class ChatProvider extends ChangeNotifier {
 
     // Add to local state
     _messages.add(message);
-    
+
     // Update conversation
     _updateCurrentConversation();
-    
+
     notifyListeners();
   }
 
@@ -502,10 +549,10 @@ class ChatProvider extends ChangeNotifier {
 
     // Add to local state
     _messages.add(message);
-    
+
     // Update conversation
     _updateCurrentConversation();
-    
+
     notifyListeners();
   }
 
@@ -522,10 +569,10 @@ class ChatProvider extends ChangeNotifier {
       final updatedReactions = List<MessageReaction>.from(message.reactions)..add(reaction);
 
       _messages[index] = message.copyWith(reactions: updatedReactions);
-      
+
       // Update conversation
       _updateCurrentConversation();
-      
+
       notifyListeners();
     }
   }
@@ -540,10 +587,10 @@ class ChatProvider extends ChangeNotifier {
         ..removeWhere((r) => r.emoji == emoji && r.userId == userId);
 
       _messages[index] = message.copyWith(reactions: updatedReactions);
-      
+
       // Update conversation
       _updateCurrentConversation();
-      
+
       notifyListeners();
     }
   }
@@ -552,10 +599,10 @@ class ChatProvider extends ChangeNotifier {
     final index = _messages.indexWhere((m) => m.id == messageId);
     if (index != -1) {
       _messages.removeAt(index);
-      
+
       // Update conversation
       _updateCurrentConversation();
-      
+
       notifyListeners();
     }
   }
@@ -564,12 +611,12 @@ class ChatProvider extends ChangeNotifier {
     final index = _messages.indexWhere((m) => m.id == messageId);
     if (index != -1) {
       _messages[index] = _messages[index].copyWith(status: status);
-      
+
       // Update conversation if the status is final
       if (status == MessageStatus.sent || status == MessageStatus.failed) {
         _updateCurrentConversation();
       }
-      
+
       notifyListeners();
     }
   }
@@ -604,7 +651,7 @@ class ChatProvider extends ChangeNotifier {
 
     // Add to local state
     _messages.add(responseMessage);
-    
+
     // Update conversation
     _updateCurrentConversation();
 

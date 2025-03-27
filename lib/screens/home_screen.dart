@@ -4,11 +4,16 @@ import 'package:provider/provider.dart';
 import 'dart:io' show Platform;
 import '../providers/chat_provider.dart';
 import '../providers/auth_provider.dart';
+import '../providers/service_provider.dart';
+import '../providers/dash_chat_provider.dart';
 import '../widgets/chat_message_widget.dart';
+import '../widgets/service_toggle_button.dart';
 import '../services/media_picker_service.dart';
+import '../services/service_manager.dart';
 import '../services/gif_service.dart';
 import '../models/chat_message.dart';
 import '../models/gemini_quick_reply.dart';
+import '../models/quick_reply.dart';
 import '../utils/youtube_helper.dart';
 import '../widgets/platform/ios_message_input.dart';
 import 'profile_screen.dart';
@@ -25,6 +30,9 @@ class _HomeScreenState extends State<HomeScreen> {
   final ScrollController _scrollController = ScrollController();
   bool _isDrawerOpen = false;
   bool _isComposing = false;
+  
+  // Store reference to the provider to avoid context access in dispose
+  late final ServiceProvider _serviceProvider;
 
   @override
   void initState() {
@@ -47,7 +55,36 @@ class _HomeScreenState extends State<HomeScreen> {
       ];
 
       chatProvider.addGeminiQuickReplyMessage(testReplies);
+      
+      // Store the service provider reference for later use
+      _serviceProvider = context.read<ServiceProvider>();
+      _serviceProvider.addListener(_handleServiceChange);
     });
+  }
+  
+  // Called when service changes between Gemini and Dash
+  void _handleServiceChange() {
+    if (!mounted) return; // Check if widget is still mounted
+    
+    if (_serviceProvider.currentService == MessagingService.dash) {
+      // When switching to Dash service, load Dash messages
+      // Use a microtask to ensure we're not in the middle of a build
+      Future.microtask(() {
+        if (mounted) {
+          final dashProvider = context.read<DashChatProvider>();
+          dashProvider.forwardMessagesToChatProvider(context);
+        }
+      });
+    } else {
+      // When switching to Gemini, reload the demo messages
+      // Use a microtask to ensure we're not in the middle of a build
+      Future.microtask(() {
+        if (mounted) {
+          final chatProvider = context.read<ChatProvider>();
+          chatProvider.clearChatHistory();
+        }
+      });
+    }
   }
 
   @override
@@ -55,6 +92,10 @@ class _HomeScreenState extends State<HomeScreen> {
     _messageController.removeListener(_handleTextChange);
     _messageController.dispose();
     _scrollController.dispose();
+    
+    // Remove service change listener using stored reference
+    _serviceProvider.removeListener(_handleServiceChange);
+    
     super.dispose();
   }
 
@@ -77,11 +118,27 @@ class _HomeScreenState extends State<HomeScreen> {
   void _handleSubmitted(String text) {
     if (text.isEmpty) return;
 
-    final chatProvider = context.read<ChatProvider>();
-    if (YouTubeHelper.isValidYouTubeUrl(text)) {
-      chatProvider.sendMedia(text, MessageType.youtube);
+    // Get the current service provider to determine which service to use
+    final serviceProvider = context.read<ServiceProvider>();
+    final currentService = serviceProvider.currentService;
+    
+    if (currentService == MessagingService.gemini) {
+      // Use the existing Gemini service
+      final chatProvider = context.read<ChatProvider>();
+      if (YouTubeHelper.isValidYouTubeUrl(text)) {
+        chatProvider.sendMedia(text, MessageType.youtube);
+      } else {
+        chatProvider.addTextMessage(text);
+      }
     } else {
-      chatProvider.addTextMessage(text);
+      // Use the Dash messaging service
+      final dashChatProvider = context.read<DashChatProvider>();
+      dashChatProvider.sendMessage(text);
+      
+      // Also add the message to the UI via the ChatProvider
+      // This ensures the message appears in the chat immediately
+      final chatProvider = context.read<ChatProvider>();
+      chatProvider.addTextMessage(text, isMe: true);
     }
 
     _messageController.clear();
@@ -735,52 +792,144 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // Simplified build method without User object
-    final appBar = Platform.isIOS
-        ? CupertinoNavigationBar(
-            middle: const Text('RCS Demo App'),
-            leading: CupertinoButton(
-              padding: EdgeInsets.zero,
-              child: Icon(_isDrawerOpen ? CupertinoIcons.sidebar_left : CupertinoIcons.line_horizontal_3),
-              onPressed: () {
-                setState(() {
-                  _isDrawerOpen = !_isDrawerOpen;
-                });
-              },
-            ),
-            trailing: CupertinoButton(
-              padding: EdgeInsets.zero,
-              child: const Icon(CupertinoIcons.profile_circled),
-              onPressed: _navigateToProfile,
-            ),
-          )
-        : AppBar(
-            title: const Text('RCS Demo App'),
-            leading: IconButton(
-              icon: Icon(_isDrawerOpen ? Icons.menu_open : Icons.menu),
-              onPressed: () {
-                setState(() {
-                  _isDrawerOpen = !_isDrawerOpen;
-                });
-              },
-            ),
-            actions: [
-              IconButton(
-                icon: const Icon(Icons.account_circle),
+    // Get current service name to display in the title
+    final serviceProvider = Provider.of<ServiceProvider>(context);
+    final serviceDisplayName = serviceProvider.serviceDisplayName;
+    final isGemini = serviceProvider.currentService == MessagingService.gemini;
+    
+    // Create a simpler app bar without complex widgets
+    if (Platform.isIOS) {
+      return CupertinoPageScaffold(
+        navigationBar: CupertinoNavigationBar(
+          middle: Text(
+            'RCS • $serviceDisplayName',
+            textAlign: TextAlign.center,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(fontSize: 14),
+          ),
+          leading: CupertinoButton(
+            padding: EdgeInsets.zero,
+            child: Icon(_isDrawerOpen ? CupertinoIcons.sidebar_left : CupertinoIcons.line_horizontal_3),
+            onPressed: () {
+              setState(() {
+                _isDrawerOpen = !_isDrawerOpen;
+              });
+            },
+          ),
+          trailing: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Simple service toggle button
+              GestureDetector(
+                onTap: () => serviceProvider.toggleService(),
+                child: Container(
+                  width: 30,
+                  height: 30,
+                  alignment: Alignment.center,
+                  child: Stack(
+                    alignment: Alignment.center,
+                    children: [
+                      Icon(
+                        isGemini ? CupertinoIcons.sparkles : CupertinoIcons.chat_bubble,
+                        color: CupertinoColors.white,
+                        size: 22,
+                      ),
+                      Positioned(
+                        right: 0,
+                        bottom: 0,
+                        child: Container(
+                          decoration: BoxDecoration(
+                            color: isGemini ? Colors.blue : Colors.orange,
+                            shape: BoxShape.circle,
+                            border: Border.all(
+                              color: CupertinoColors.systemBackground,
+                              width: 1,
+                            ),
+                          ),
+                          width: 8,
+                          height: 8,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(width: 4),
+              CupertinoButton(
+                padding: EdgeInsets.zero,
+                child: const Icon(CupertinoIcons.profile_circled, size: 22),
                 onPressed: _navigateToProfile,
               ),
             ],
-          );
-
-    return Platform.isIOS
-        ? CupertinoPageScaffold(
-            navigationBar: appBar as CupertinoNavigationBar,
-            child: _buildBody(),
-          )
-        : Scaffold(
-            appBar: appBar as PreferredSizeWidget,
-            body: _buildBody(),
-          );
+          ),
+        ),
+        child: _buildBody(),
+      );
+    } else {
+      return Scaffold(
+        appBar: AppBar(
+          title: Row(
+            children: [
+              const Text('RCS Demo'),
+              const SizedBox(width: 8),
+              const Text('•'),
+              const SizedBox(width: 8),
+              Text(serviceDisplayName, 
+                style: TextStyle(
+                  fontSize: 16,
+                  color: isGemini ? Colors.blue.shade200 : Colors.orange.shade200,
+                ),
+              ),
+            ],
+          ),
+          leading: IconButton(
+            icon: Icon(_isDrawerOpen ? Icons.menu_open : Icons.menu),
+            onPressed: () {
+              setState(() {
+                _isDrawerOpen = !_isDrawerOpen;
+              });
+            },
+          ),
+          actions: [
+            // Simple service toggle button
+            IconButton(
+              icon: Stack(
+                alignment: Alignment.center,
+                children: [
+                  Icon(
+                    isGemini ? Icons.auto_awesome : Icons.message_rounded,
+                    color: Colors.white,
+                    size: 22,
+                  ),
+                  Positioned(
+                    right: 0,
+                    bottom: 0,
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: isGemini ? Colors.blue : Colors.orange,
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: Theme.of(context).appBarTheme.backgroundColor ?? Colors.black,
+                          width: 1,
+                        ),
+                      ),
+                      width: 8,
+                      height: 8,
+                    ),
+                  ),
+                ],
+              ),
+              onPressed: () => serviceProvider.toggleService(),
+            ),
+            IconButton(
+              icon: const Icon(Icons.account_circle),
+              onPressed: _navigateToProfile,
+            ),
+          ],
+        ),
+        body: _buildBody(),
+      );
+    }
   }
 
   Widget _buildBody() {
@@ -826,7 +975,20 @@ class _HomeScreenState extends State<HomeScreen> {
                               onReplyTap: () => _scrollToBottom(),
                               onReactionAdd: (value) {
                                 if (value.isNotEmpty) {
-                                  chatProvider.sendQuickReply(value);
+                                  // Get the current service provider to determine which service to use
+                                  final serviceProvider = context.read<ServiceProvider>();
+                                  final currentService = serviceProvider.currentService;
+        
+                                  if (currentService == MessagingService.gemini) {
+                                    // Use Gemini service for quick replies
+                                    chatProvider.sendQuickReply(value);
+                                  } else {
+                                    // Use Dash messaging service for quick replies
+                                    final dashChatProvider = context.read<DashChatProvider>();
+                                    dashChatProvider.handleQuickReply(
+                                      QuickReply(text: value, value: value)
+                                    );
+                                  }
                                 }
                                 _scrollToBottom();
                               },

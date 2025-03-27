@@ -8,6 +8,8 @@ import 'providers/bot_chat_provider.dart';
 import 'providers/channel_provider.dart';
 import 'providers/system_chat_provider.dart';
 import 'providers/auth_provider.dart';
+import 'providers/dash_chat_provider.dart';
+import 'providers/service_provider.dart';
 import 'screens/home_screen.dart';
 import 'screens/login_screen.dart';
 import 'theme/app_theme.dart';
@@ -34,6 +36,8 @@ class MyApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => BotChatProvider()),
         ChangeNotifierProvider(create: (_) => ChannelProvider()),
         ChangeNotifierProvider(create: (_) => SystemChatProvider()),
+        ChangeNotifierProvider(create: (_) => DashChatProvider()),
+        ChangeNotifierProvider(create: (_) => ServiceProvider()),
       ],
       child: Consumer<AuthProvider>(
         builder: (context, authProvider, _) {

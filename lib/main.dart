@@ -14,15 +14,32 @@ import 'screens/login_screen.dart';
 import 'theme/app_theme.dart';
 import 'theme/ios_theme.dart';
 
-// Import Firebase only if we're going to use it
-// import 'package:firebase_core/firebase_core.dart';
+// Import Firebase
+import 'package:firebase_core/firebase_core.dart';
+import 'services/firebase_connection_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  
-  // Skip Firebase initialization for now to avoid conflicts
-  print('Running in demo mode without Firebase');
-  
+
+  try {
+    // Initialize Firebase
+    await Firebase.initializeApp();
+    print('Firebase initialized successfully');
+    
+    // Test Firebase connection - but don't block app startup if it fails
+    try {
+      final firebaseConnectionService = FirebaseConnectionService();
+      await firebaseConnectionService.testConnection();
+    } catch (connectionError) {
+      print('Firebase connection test failed: $connectionError');
+      print('Continuing in demo mode');
+    }
+  } catch (e) {
+    // If Firebase initialization fails, log it but don't crash
+    print('Failed to initialize Firebase: $e');
+    print('Running in demo mode without Firebase');
+  }
+
   runApp(const MyApp());
 }
 
@@ -38,12 +55,14 @@ class MyApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => BotChatProvider()),
         ChangeNotifierProvider(create: (_) => ChannelProvider()),
         ChangeNotifierProvider(create: (_) => SystemChatProvider()),
-        // Create DashChatProvider without Firebase for now
+        // Create DashChatProvider with Firebase if available
         ChangeNotifierProvider(create: (_) {
           try {
-            return DashChatProvider.withoutFirebase();
+            // Try to use the Firebase-enabled constructor first
+            return DashChatProvider();
           } catch (e) {
-            print('Error initializing DashChatProvider: $e');
+            print('Error initializing DashChatProvider with Firebase: $e');
+            print('Falling back to demo mode without Firebase');
             return DashChatProvider.withoutFirebase();
           }
         }),

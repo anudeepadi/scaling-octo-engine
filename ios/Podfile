@@ -31,6 +31,13 @@ target 'Runner' do
   use_frameworks!
   use_modular_headers!
 
+  # Force the pod repo to update with specific Firebase versions
+  pod 'Firebase/Firestore', '10.25.0'
+  pod 'Firebase/Auth', '10.25.0'
+  
+  # Add BoringSSL-GRPC with modular headers
+  pod 'BoringSSL-GRPC', :modular_headers => true
+
   flutter_install_all_ios_pods File.dirname(File.realpath(__FILE__))
   target 'RunnerTests' do
     inherit! :search_paths
@@ -38,31 +45,38 @@ target 'Runner' do
 end
 
 post_install do |installer|
-  # Fix for module cache issues
-  `cd ~/Library/Developer/Xcode && mkdir -p DerivedData ModuleCache.noindex SDKStatCaches.noindex`
-  `chmod -R 755 ~/Library/Developer/Xcode/DerivedData ~/Library/Developer/Xcode/ModuleCache.noindex ~/Library/Developer/Xcode/SDKStatCaches.noindex`
-  
+  # Add these lines to avoid deployment target warnings
   installer.pods_project.targets.each do |target|
     flutter_additional_ios_build_settings(target)
-    
-    # Set iOS deployment target for all targets
+
+    # Set deployment target for all pods to iOS 12.0 or above
     target.build_configurations.each do |config|
-      # Ensure minimum iOS version is set
       config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '12.0'
-      
-      # Clear build settings that might cause issues
-      config.build_settings['SWIFT_VERSION'] = '5.0'
-      config.build_settings['ENABLE_USER_SCRIPT_SANDBOXING'] = 'NO'
-      
-      # Fix for Xcode module cache issues
-      config.build_settings['CLANG_ALLOW_NON_MODULAR_INCLUDES_IN_FRAMEWORK_MODULES'] = 'YES'
-      config.build_settings['GCC_PREPROCESSOR_DEFINITIONS'] ||= ['$(inherited)', 'CLANG_ENABLE_MODULES=1']
-      
-      # Add debug information
-      config.build_settings['DEBUG_INFORMATION_FORMAT'] = 'dwarf'
-      
-      # Reduce dependencies on system headers
-      config.build_settings['SYSTEM_HEADER_SEARCH_PATHS'] = '$(inherited)'
+
+      # Workaround for building issues with the latest Xcode
+      config.build_settings['DEAD_CODE_STRIPPING'] = 'YES'
+
+      # Workaround for pod issues with arm64 simulator
+      config.build_settings['EXCLUDED_ARCHS[sdk=iphonesimulator*]'] = 'arm64'
+
+      # Fix for unsupported -G option
+      if config.build_settings['OTHER_CFLAGS']
+        config.build_settings['OTHER_CFLAGS'] = config.build_settings['OTHER_CFLAGS'].reject { |flag| flag == '-G' }
+      end
+      if config.build_settings['OTHER_CPLUSPLUSFLAGS']
+        config.build_settings['OTHER_CPLUSPLUSFLAGS'] = config.build_settings['OTHER_CPLUSPLUSFLAGS'].reject { |flag| flag == '-G' }
+      end
+    end
+    
+    # Additional fix specifically for BoringSSL-GRPC
+    if target.name == 'BoringSSL-GRPC'
+      target.source_build_phase.files.each do |file|
+        if file.settings && file.settings['COMPILER_FLAGS']
+          flags = file.settings['COMPILER_FLAGS'].split
+          flags.reject! { |flag| flag == '-GCC_WARN_INHIBIT_ALL_WARNINGS' }
+          file.settings['COMPILER_FLAGS'] = flags.join(' ')
+        end
+      end
     end
   end
 end

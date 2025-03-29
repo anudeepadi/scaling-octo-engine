@@ -1,156 +1,40 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
-import 'package:firebase_storage/firebase_storage.dart';
-import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/chat_message.dart';
-import '../models/firebase_chat_message.dart';
 
+// Simplified FirebaseUtils that works without Firebase dependencies
 class FirebaseUtils {
-  static final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-  static final FirebaseAuth _auth = FirebaseAuth.instance;
-  static final FirebaseStorage _storage = FirebaseStorage.instance;
-  static final FirebaseMessaging _messaging = FirebaseMessaging.instance;
-
-  static String get userId => _auth.currentUser?.uid ?? '';
-  static User? get currentUser => _auth.currentUser;
-
-  // Create a Firestore document reference for a user's profile
-  static DocumentReference getUserDocRef(String uid) {
-    return _firestore.collection('users').doc(uid);
-  }
-
-  // Create a Firestore collection reference for a user's chat history
-  static CollectionReference getChatHistoryCollectionRef(String uid) {
-    return _firestore.collection('users').doc(uid).collection('chat_history');
-  }
-
-  // Create a storage reference for user media
-  static Reference getUserMediaStorageRef(String uid, String mediaId) {
-    return _storage.ref().child('users/$uid/media/$mediaId');
-  }
-
-  // Create a storage reference for user profile images
-  static Reference getUserProfileImageStorageRef(String uid, String fileName) {
-    return _storage.ref().child('users/$uid/profile/$fileName');
-  }
-
-  // Check if user is authenticated
-  static bool isAuthenticated() {
-    return _auth.currentUser != null;
-  }
-
-  // Get current user display name
-  static String getCurrentUserDisplayName() {
-    return _auth.currentUser?.displayName ?? 'User';
-  }
-
-  // Get current user photo URL
-  static String? getCurrentUserPhotoUrl() {
-    return _auth.currentUser?.photoURL;
-  }
-
-  // Update last activity timestamp for current user
-  static Future<void> updateUserLastActive() async {
-    if (_auth.currentUser == null) return;
-
-    try {
-      await _firestore.collection('users').doc(_auth.currentUser!.uid).update({
-        'lastActive': FieldValue.serverTimestamp(),
-      });
-    } catch (e) {
-      print('Error updating user last active: $e');
-    }
-  }
-
-  // Get timestamp for server time
-  static Timestamp getServerTimestamp() {
-    return Timestamp.now();
-  }
-
-  // Convert ChatMessage to FirebaseChatMessage
-  static FirebaseChatMessage chatMessageToFirebaseMessage(ChatMessage message) {
-    return FirebaseChatMessage.fromChatMessage(
-      message: message,
-      senderId: userId,
-      senderName: getCurrentUserDisplayName(),
-      senderPhotoUrl: getCurrentUserPhotoUrl(),
-    );
-  }
-
-  // Convert FirebaseChatMessage to ChatMessage
-  static ChatMessage firebaseMessageToChatMessage(FirebaseChatMessage message) {
-    return message.toChatMessage(userId);
-  }
-
-  // Delete all files in a user's storage directory
-  static Future<void> deleteUserStorageFiles(String uid, String subPath) async {
-    try {
-      final ref = _storage.ref().child('users/$uid/$subPath');
-      final ListResult result = await ref.listAll();
-
-      for (final item in result.items) {
-        await item.delete();
-      }
-
-      for (final prefix in result.prefixes) {
-        final ListResult subResult = await prefix.listAll();
-        for (final item in subResult.items) {
-          await item.delete();
-        }
-      }
-    } catch (e) {
-      print('Error deleting user storage files: $e');
-    }
-  }
-
-  // Get the current user ID
+  // Get the current user ID - demo implementation
   static Future<String?> getCurrentUserId() async {
-    return _auth.currentUser?.uid;
+    // Return a demo user ID
+    return 'demo_user_id';
   }
 
-  // Get the FCM token for push notifications
+  // Get the FCM token for push notifications - demo implementation
   static Future<String?> getFCMToken() async {
     try {
       // Try to get the token from preferences first
       final prefs = await SharedPreferences.getInstance();
       String? token = prefs.getString('fcm_token');
       
-      // If not available, request a new one
+      // If not available, create a dummy token
       if (token == null || token.isEmpty) {
-        token = await _messaging.getToken();
-        if (token != null) {
-          // Save the token to preferences
-          await prefs.setString('fcm_token', token);
-          
-          // Also save to Firestore if user is authenticated
-          if (_auth.currentUser != null) {
-            await _firestore.collection('users').doc(_auth.currentUser!.uid).update({
-              'fcmToken': token,
-              'tokenUpdatedAt': FieldValue.serverTimestamp(),
-            });
-          }
-        }
+        token = 'demo_fcm_token_${DateTime.now().millisecondsSinceEpoch}';
+        
+        // Save the token to preferences
+        await prefs.setString('fcm_token', token);
       }
       
       return token;
     } catch (e) {
       print('Error getting FCM token: $e');
-      return null;
+      return 'demo_fcm_token_fallback';
     }
   }
   
-  // Save the FCM token to Firestore
+  // Save the FCM token - demo implementation
   static Future<void> saveFCMToken(String token) async {
-    if (_auth.currentUser == null) return;
-    
     try {
-      await _firestore.collection('users').doc(_auth.currentUser!.uid).update({
-        'fcmToken': token,
-        'tokenUpdatedAt': FieldValue.serverTimestamp(),
-      });
-      
-      // Also save to shared preferences
+      // Save to shared preferences
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString('fcm_token', token);
     } catch (e) {

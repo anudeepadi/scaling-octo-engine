@@ -38,36 +38,31 @@ target 'Runner' do
 end
 
 post_install do |installer|
+  # Fix for module cache issues
+  `cd ~/Library/Developer/Xcode && mkdir -p DerivedData ModuleCache.noindex SDKStatCaches.noindex`
+  `chmod -R 755 ~/Library/Developer/Xcode/DerivedData ~/Library/Developer/Xcode/ModuleCache.noindex ~/Library/Developer/Xcode/SDKStatCaches.noindex`
+  
   installer.pods_project.targets.each do |target|
     flutter_additional_ios_build_settings(target)
     
-    # Specifically fix BoringSSL-GRPC -G compiler flag issue
-    if target.name == 'BoringSSL-GRPC'
-      target.source_build_phase.files.each do |file|
-        if file.settings && file.settings['COMPILER_FLAGS']
-          flags = file.settings['COMPILER_FLAGS'].split
-          flags.reject! { |flag| flag == '-GCC_WARN_INHIBIT_ALL_WARNINGS' }
-          file.settings['COMPILER_FLAGS'] = flags.join(' ')
-        end
-      end
-    end
-    
     # Set iOS deployment target for all targets
     target.build_configurations.each do |config|
+      # Ensure minimum iOS version is set
       config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '12.0'
       
-      # Recommended settings for Xcode 14+ compatibility
-      config.build_settings['EXPANDED_CODE_SIGN_IDENTITY'] = ""
-      config.build_settings['CODE_SIGNING_REQUIRED'] = "NO"
-      config.build_settings['CODE_SIGNING_ALLOWED'] = "NO"
+      # Clear build settings that might cause issues
+      config.build_settings['SWIFT_VERSION'] = '5.0'
+      config.build_settings['ENABLE_USER_SCRIPT_SANDBOXING'] = 'NO'
       
       # Fix for Xcode module cache issues
       config.build_settings['CLANG_ALLOW_NON_MODULAR_INCLUDES_IN_FRAMEWORK_MODULES'] = 'YES'
-      config.build_settings['CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER'] = 'NO'
+      config.build_settings['GCC_PREPROCESSOR_DEFINITIONS'] ||= ['$(inherited)', 'CLANG_ENABLE_MODULES=1']
       
-      # Other potential fixes
-      config.build_settings['ONLY_ACTIVE_ARCH'] = 'YES'
-      config.build_settings['DEAD_CODE_STRIPPING'] = 'YES'
+      # Add debug information
+      config.build_settings['DEBUG_INFORMATION_FORMAT'] = 'dwarf'
+      
+      # Reduce dependencies on system headers
+      config.build_settings['SYSTEM_HEADER_SEARCH_PATHS'] = '$(inherited)'
     end
   end
 end

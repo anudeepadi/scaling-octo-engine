@@ -1,38 +1,53 @@
 import 'package:flutter/material.dart';
+import 'dart:async';
 
 class TypingIndicator extends StatefulWidget {
-  const TypingIndicator({Key? key}) : super(key: key);
+  final Color color;
+  final double size;
+  
+  const TypingIndicator({
+    Key? key, 
+    this.color = Colors.grey,
+    this.size = 8.0,
+  }) : super(key: key);
 
   @override
   State<TypingIndicator> createState() => _TypingIndicatorState();
 }
 
-class _TypingIndicatorState extends State<TypingIndicator>
-    with SingleTickerProviderStateMixin {
-  late AnimationController _controller;
-  late List<Animation<double>> _animations;
-
+class _TypingIndicatorState extends State<TypingIndicator> with SingleTickerProviderStateMixin {
+  late List<Timer> _timers;
+  List<double> _opacities = [];
+  final int _dotsCount = 3;
+  
   @override
   void initState() {
     super.initState();
-    _controller = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 1200),
-    )..repeat();
-
-    _animations = List.generate(3, (index) {
-      return Tween<double>(begin: 0, end: 1).animate(
-        CurvedAnimation(
-          parent: _controller,
-          curve: Interval(index * 0.2, 0.6 + index * 0.2, curve: Curves.easeOut),
-        ),
+    
+    // Initialize opacities for each dot
+    _opacities = List.generate(_dotsCount, (_) => 0.4);
+    
+    // Create a timer for each dot to animate it
+    _timers = List.generate(_dotsCount, (index) {
+      return Timer.periodic(
+        Duration(milliseconds: 150 * (index + 1)),
+        (_) {
+          if (mounted) {
+            setState(() {
+              _opacities[index] = _opacities[index] == 1.0 ? 0.4 : 1.0;
+            });
+          }
+        },
       );
     });
   }
-
+  
   @override
   void dispose() {
-    _controller.dispose();
+    // Dispose all timers
+    for (var timer in _timers) {
+      timer.cancel();
+    }
     super.dispose();
   }
 
@@ -40,34 +55,26 @@ class _TypingIndicatorState extends State<TypingIndicator>
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      alignment: Alignment.centerLeft,
-      child: Container(
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: Colors.grey[200],
-          borderRadius: BorderRadius.circular(20),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: List.generate(3, (index) {
-            return AnimatedBuilder(
-              animation: _animations[index],
-              builder: (context, child) {
-                return Container(
-                  margin: const EdgeInsets.symmetric(horizontal: 2),
-                  width: 8,
-                  height: 8,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: Colors.grey.shade600.withOpacity(
-                      0.4 + (_animations[index].value * 0.6),
-                    ),
-                  ),
-                );
-              },
+      decoration: BoxDecoration(
+        color: Colors.grey[200],
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Display each dot with its own opacity
+          ...List.generate(_dotsCount, (index) {
+            return Container(
+              margin: const EdgeInsets.symmetric(horizontal: 2),
+              height: widget.size,
+              width: widget.size,
+              decoration: BoxDecoration(
+                color: widget.color.withOpacity(_opacities[index]),
+                shape: BoxShape.circle,
+              ),
             );
           }),
-        ),
+        ],
       ),
     );
   }

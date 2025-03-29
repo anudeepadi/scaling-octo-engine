@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:provider/provider.dart';
 import 'dart:io' show Platform;
-// import 'package:firebase_core/firebase_core.dart';
 import 'providers/chat_provider.dart';
 import 'providers/bot_chat_provider.dart';
 import 'providers/channel_provider.dart';
@@ -15,10 +14,13 @@ import 'screens/login_screen.dart';
 import 'theme/app_theme.dart';
 import 'theme/ios_theme.dart';
 
+// Import Firebase only if we're going to use it
+// import 'package:firebase_core/firebase_core.dart';
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   
-  // Skip Firebase initialization completely
+  // Skip Firebase initialization for now to avoid conflicts
   print('Running in demo mode without Firebase');
   
   runApp(const MyApp());
@@ -36,7 +38,15 @@ class MyApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => BotChatProvider()),
         ChangeNotifierProvider(create: (_) => ChannelProvider()),
         ChangeNotifierProvider(create: (_) => SystemChatProvider()),
-        ChangeNotifierProvider(create: (_) => DashChatProvider()),
+        // Create DashChatProvider without Firebase for now
+        ChangeNotifierProvider(create: (_) {
+          try {
+            return DashChatProvider.withoutFirebase();
+          } catch (e) {
+            print('Error initializing DashChatProvider: $e');
+            return DashChatProvider.withoutFirebase();
+          }
+        }),
         ChangeNotifierProvider(create: (_) => ServiceProvider()),
       ],
       child: Consumer<AuthProvider>(

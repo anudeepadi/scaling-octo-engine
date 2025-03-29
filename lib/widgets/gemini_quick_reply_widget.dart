@@ -23,12 +23,17 @@ class GeminiQuickReplyWidget extends StatelessWidget {
       print('No quick replies to display');
       return const SizedBox.shrink();
     }
-    
+
     print('Displaying quick replies: ${quickReplies.map((qr) => qr.text).join(', ')}');
 
-    // Use a more contextual style that matches better with chat
+    // Get screen width to properly constrain the widget
+    final screenWidth = MediaQuery.of(context).size.width;
+
+    // Use a simpler layout without ListTile to avoid overflow issues
     return Container(
-      width: double.infinity,
+      width: screenWidth - 16, // Leave 8px margin on each side
+      margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         gradient: LinearGradient(
           colors: [Colors.blue.shade50, Colors.blue.shade100],
@@ -44,11 +49,10 @@ class GeminiQuickReplyWidget extends StatelessWidget {
           ),
         ],
       ),
-      margin: const EdgeInsets.symmetric(vertical: 4, horizontal: 0),
-      padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 8),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // Header
           Row(
             children: [
               Icon(
@@ -67,17 +71,18 @@ class GeminiQuickReplyWidget extends StatelessWidget {
               ),
             ],
           ),
-          const SizedBox(height: 6),
-          // Display quick replies in a wrap for better text flow
+          const SizedBox(height: 8),
+          
+          // Quick Reply buttons
           Wrap(
-            spacing: 6.0,
-            runSpacing: 6.0,
+            spacing: 8.0,
+            runSpacing: 8.0,
             children: quickReplies.map((reply) {
-              if (Platform.isIOS) {
-                return _buildIOSGeminiQuickReply(reply, context, quickReplies.indexOf(reply));
-              } else {
-                return _buildAndroidGeminiQuickReply(reply, context, quickReplies.indexOf(reply));
-              }
+              return _buildQuickReplyButton(
+                context, 
+                reply, 
+                quickReplies.indexOf(reply)
+              );
             }).toList(),
           ),
         ],
@@ -85,54 +90,58 @@ class GeminiQuickReplyWidget extends StatelessWidget {
     );
   }
 
-  Widget _buildIOSGeminiQuickReply(QuickReply reply, BuildContext context, int index) {
-    return _AnimatedQuickReply(
-      index: index,
-      animated: animated,
-      child: CupertinoButton(
-        padding: EdgeInsets.zero,
-        color: CupertinoColors.systemBlue.withOpacity(0.15),
-        borderRadius: BorderRadius.circular(16),
-        minSize: 0,
-        onPressed: () => onReplySelected(reply.value),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-          child: Text(
-            reply.text,
-            style: const TextStyle(
-              color: CupertinoColors.systemBlue,
-              fontSize: 13,
-              fontWeight: FontWeight.w500,
+  Widget _buildQuickReplyButton(BuildContext context, QuickReply reply, int index) {
+    final maxWidth = MediaQuery.of(context).size.width * 0.7;
+
+    if (Platform.isIOS) {
+      return _AnimatedQuickReply(
+        index: index,
+        animated: animated,
+        child: GestureDetector(
+          onTap: () => onReplySelected(reply.value),
+          child: Container(
+            constraints: BoxConstraints(maxWidth: maxWidth),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            decoration: BoxDecoration(
+              color: CupertinoColors.systemBlue.withOpacity(0.15),
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Text(
+              reply.text,
+              style: const TextStyle(
+                color: CupertinoColors.systemBlue,
+                fontSize: 13,
+                fontWeight: FontWeight.w500,
+              ),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
             ),
           ),
         ),
-      ),
-    );
-  }
-
-  Widget _buildAndroidGeminiQuickReply(QuickReply reply, BuildContext context, int index) {
-    // Gemini brand color
-    final geminiBlue = Color(0xFF4285F4);
-    
-    return _AnimatedQuickReply(
-      index: index,
-      animated: animated,
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: () => onReplySelected(reply.value),
-          borderRadius: BorderRadius.circular(16),
-          child: Ink(
-            decoration: BoxDecoration(
-              color: geminiBlue.withOpacity(0.1),
-              border: Border.all(
-                color: geminiBlue.withOpacity(0.3),
-                width: 1,
-              ),
-              borderRadius: BorderRadius.circular(16),
-            ),
+      );
+    } else {
+      // Material design version
+      final geminiBlue = Color(0xFF4285F4);
+      
+      return _AnimatedQuickReply(
+        index: index,
+        animated: animated,
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: () => onReplySelected(reply.value),
+            borderRadius: BorderRadius.circular(16),
             child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              constraints: BoxConstraints(maxWidth: maxWidth),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                color: geminiBlue.withOpacity(0.1),
+                border: Border.all(
+                  color: geminiBlue.withOpacity(0.3),
+                  width: 1,
+                ),
+                borderRadius: BorderRadius.circular(16),
+              ),
               child: Text(
                 reply.text,
                 style: TextStyle(
@@ -140,12 +149,14 @@ class GeminiQuickReplyWidget extends StatelessWidget {
                   fontSize: 13,
                   fontWeight: FontWeight.w500,
                 ),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
               ),
             ),
           ),
         ),
-      ),
-    );
+      );
+    }
   }
 }
 
@@ -166,7 +177,7 @@ class _AnimatedQuickReply extends StatefulWidget {
   State<_AnimatedQuickReply> createState() => _AnimatedQuickReplyState();
 }
 
-class _AnimatedQuickReplyState extends State<_AnimatedQuickReply> 
+class _AnimatedQuickReplyState extends State<_AnimatedQuickReply>
     with SingleTickerProviderStateMixin {
   late AnimationController _controller;
   late Animation<double> _scaleAnimation;
@@ -179,7 +190,7 @@ class _AnimatedQuickReplyState extends State<_AnimatedQuickReply>
       vsync: this,
       duration: const Duration(milliseconds: 400),
     );
-    
+
     // Staggered animation based on index
     Future.delayed(Duration(milliseconds: widget.index * 100), () {
       if (mounted && widget.animated) {
@@ -191,7 +202,7 @@ class _AnimatedQuickReplyState extends State<_AnimatedQuickReply>
       parent: _controller,
       curve: Curves.easeOutBack,
     );
-    
+
     _opacityAnimation = CurvedAnimation(
       parent: _controller,
       curve: Curves.easeIn,

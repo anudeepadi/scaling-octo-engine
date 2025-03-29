@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/chat_message.dart';
 import '../models/quick_reply.dart';
 import '../services/dash_messaging_service.dart';
@@ -9,43 +8,25 @@ import 'chat_provider.dart';
 
 class DashChatProvider extends ChangeNotifier {
   final DashMessagingService _dashService = DashMessagingService();
-  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final dynamic _firestore; // Changed to dynamic to avoid Firebase imports if not needed
   
   bool _isTyping = false;
   bool get isTyping => _isTyping;
   
-  // Constructor to set up Firestore listener
-  DashChatProvider() {
-    _setupMessageListener();
+  // Constructor for use with Firebase
+  // This won't be called in demo mode
+  DashChatProvider() : _firestore = null {
+    print('DashChatProvider: Creating with Firebase disabled');
   }
   
-  // Set up a Firestore listener to receive messages from the Dash server
-  void _setupMessageListener() async {
-    final userId = await FirebaseUtils.getCurrentUserId();
-    if (userId == null) return;
-    
-    // Listen to the user's messages collection
-    _firestore
-        .collection('messages')
-        .doc(userId)
-        .collection('chat')
-        .orderBy('createdAt', descending: true)
-        .limit(50)  // Limit to the most recent 50 messages
-        .snapshots()
-        .listen((snapshot) {
-          // Only process messages that came from the server
-          final serverMessages = snapshot.docs
-              .where((doc) => doc.data()['source'] == 'server')
-              .map((doc) => doc.data())
-              .toList();
-          
-          // Process any new server messages
-          if (serverMessages.isNotEmpty) {
-            _isTyping = false;
-            notifyListeners();
-          }
-        });
+  // Constructor for creating without Firebase
+  factory DashChatProvider.withoutFirebase() {
+    print('DashChatProvider: Creating without Firebase');
+    return DashChatProvider._internal();
   }
+  
+  // Internal constructor
+  DashChatProvider._internal() : _firestore = null;
   
   // Send a message to the Dash messaging server
   Future<bool> sendMessage(String message) async {
@@ -55,9 +36,11 @@ class DashChatProvider extends ChangeNotifier {
     _isTyping = true;
     notifyListeners();
     
-    // Send to Dash Messaging server
-    final String? userId = await FirebaseUtils.getCurrentUserId();
-    if (userId != null) {
+    // In demo mode, just simulate a response
+    try {
+      // Generate a simple user ID
+      final String userId = 'demo_user_${DateTime.now().millisecondsSinceEpoch}';
+      
       final success = await _dashService.sendMessage(
         userId: userId,
         messageText: message,
@@ -70,12 +53,15 @@ class DashChatProvider extends ChangeNotifier {
         return false;
       }
       
+      _isTyping = false;
+      notifyListeners();
       return true;
+    } catch (e) {
+      print('Error sending message: $e');
+      _isTyping = false;
+      notifyListeners();
+      return false;
     }
-    
-    _isTyping = false;
-    notifyListeners();
-    return false;
   }
   
   // Handle quick reply selection
@@ -83,9 +69,11 @@ class DashChatProvider extends ChangeNotifier {
     _isTyping = true;
     notifyListeners();
     
-    // Send to Dash Messaging server
-    final String? userId = await FirebaseUtils.getCurrentUserId();
-    if (userId != null) {
+    // In demo mode, just simulate a response
+    try {
+      // Generate a simple user ID
+      final String userId = 'demo_user_${DateTime.now().millisecondsSinceEpoch}';
+      
       final success = await _dashService.sendMessage(
         userId: userId,
         messageText: reply.value,
@@ -98,79 +86,48 @@ class DashChatProvider extends ChangeNotifier {
         return false;
       }
       
+      _isTyping = false;
+      notifyListeners();
       return true;
+    } catch (e) {
+      print('Error handling quick reply: $e');
+      _isTyping = false;
+      notifyListeners();
+      return false;
     }
-    
-    _isTyping = false;
-    notifyListeners();
-    return false;
   }
   
   // Method to forward messages to ChatProvider for display
-  void forwardMessagesToChatProvider(BuildContext context) async {
-    final userId = await FirebaseUtils.getCurrentUserId();
-    if (userId == null) return;
-    
-    // Get the most recent messages
-    final messagesSnapshot = await _firestore
-        .collection('messages')
-        .doc(userId)
-        .collection('chat')
-        .orderBy('createdAt', descending: false)
-        .limit(20)
-        .get();
-    
-    if (messagesSnapshot.docs.isEmpty) return;
-    
-    // Get the chat provider to forward messages to
+  void forwardMessagesToChatProvider(BuildContext context) {
+    // In demo mode, just create sample messages
     final chatProvider = Provider.of<ChatProvider>(context, listen: false);
     
     // Clear existing messages
     chatProvider.clearChatHistory();
     
-    // Process messages from Dash messaging
-    for (final doc in messagesSnapshot.docs) {
-      final data = doc.data();
-      final isMe = data['source'] == 'client';
-      final content = data['messageBody'] ?? '';
-      final timestamp = data['createdAt'] as int? ?? DateTime.now().millisecondsSinceEpoch;
-      
-      // Check for poll/quick replies
-      if (data['isPoll'] == 'y' || data['isPoll'] == true) {
-        final List<String> answers = (data['answers'] as List<dynamic>?)?.cast<String>() ?? [];
-        if (answers.isNotEmpty) {
-          // Convert to quick replies
-          final List<QuickReply> quickReplies = answers.map((answer) => 
-            QuickReply(text: answer, value: answer)
-          ).toList();
-          
-          // Add message with quick replies
-          chatProvider.addQuickReplyMessage(quickReplies, isMe: false);
-          continue;
-        }
-      }
-      
-      // Process regular messages
-      if (content.isNotEmpty) {
-        // Check message type from content
-        final MessageType type = _determineMessageType(content);
-        
-        // Add to chat provider
-        switch (type) {
-          case MessageType.youtube:
-          case MessageType.gif:
-          case MessageType.image:
-            chatProvider.sendMedia(content, type, fromDash: true);
-            break;
-          case MessageType.linkPreview:
-            chatProvider.addLinkPreviewMessage(content, isMe: isMe);
-            break;
-          default:
-            chatProvider.addTextMessage(content, isMe: isMe, fromDash: true);
-            break;
-        }
-      }
-    }
+    // Create test messages
+    chatProvider.addTextMessage('Welcome to Quitxt! 👋', isMe: false);
+    
+    // Add message with quick replies
+    final List<QuickReply> quickReplies = [
+      QuickReply(text: '👋 Hello!', value: 'Hello!'),
+      QuickReply(text: '🤔 What can you do?', value: 'What can you do?'),
+      QuickReply(text: '🔍 Tell me more', value: 'Tell me more about this app'),
+    ];
+    
+    chatProvider.addMessage(
+      ChatMessage(
+        id: DateTime.now().millisecondsSinceEpoch.toString(),
+        content: 'How can I help you today?',
+        isMe: false,
+        timestamp: DateTime.now(),
+        type: MessageType.geminiQuickReply,
+        suggestedReplies: quickReplies,
+        status: MessageStatus.delivered,
+      )
+    );
+    
+    print('Adding test Gemini quick replies');
   }
   
   // Determine message type based on content

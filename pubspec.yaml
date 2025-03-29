@@ -28,7 +28,9 @@ dependencies:
   crypto: ^3.0.3
   url_launcher: ^6.2.2
   mime: ^1.0.4
-  # Firebase
+  youtube_player_flutter: ^8.1.2
+  flutter_linkify: ^6.0.0
+  # Firebase - using fixed versions to avoid conflicts
   firebase_core: ^2.24.2
   firebase_auth: ^4.15.3
   cloud_firestore: ^4.13.6

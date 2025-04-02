@@ -6,17 +6,19 @@ import '../providers/chat_provider.dart';
 import '../providers/auth_provider.dart';
 import '../providers/service_provider.dart';
 import '../providers/dash_chat_provider.dart';
+import '../providers/chat_mode_provider.dart';
+import '../services/bot_service.dart';
 import '../widgets/chat_message_widget.dart';
 import '../widgets/service_toggle_button.dart';
 import '../services/media_picker_service.dart';
 import '../services/service_manager.dart';
 import '../services/gif_service.dart';
 import '../models/chat_message.dart';
-import '../models/gemini_quick_reply.dart';
 import '../models/quick_reply.dart';
 import '../utils/youtube_helper.dart';
 import '../widgets/platform/ios_message_input.dart';
 import 'profile_screen.dart';
+import 'gemini_chat_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -39,22 +41,13 @@ class _HomeScreenState extends State<HomeScreen> {
     super.initState();
     _messageController.addListener(_handleTextChange);
 
-    // Add test Gemini quick replies for debugging
+    // Initialize with Dash messages only if in Dash mode
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      final chatProvider = context.read<ChatProvider>();
-      print('Adding test Gemini quick replies');
-
-      // Add a test message
-      chatProvider.addTextMessage('This is a test message from the bot', isMe: false);
-
-      // Add test Gemini quick replies
-      List<GeminiQuickReply> testReplies = [
-        GeminiQuickReply(text: '👍 Test Reply 1', value: 'Test1'),
-        GeminiQuickReply(text: '❓ Test Reply 2', value: 'Test2'),
-        GeminiQuickReply(text: '🤔 Test Reply 3', value: 'Test3'),
-      ];
-
-      chatProvider.addGeminiQuickReplyMessage(testReplies);
+      final chatModeProvider = context.read<ChatModeProvider>();
+      if (chatModeProvider.currentMode == ChatMode.dash) {
+        final dashProvider = context.read<DashChatProvider>();
+        dashProvider.forwardMessagesToChatProvider(context);
+      }
       
       // Store the service provider reference for later use
       _serviceProvider = context.read<ServiceProvider>();
@@ -62,26 +55,18 @@ class _HomeScreenState extends State<HomeScreen> {
     });
   }
   
-  // Called when service changes between Gemini and Dash
+  // Called when service changes
   void _handleServiceChange() {
     if (!mounted) return; // Check if widget is still mounted
     
-    if (_serviceProvider.currentService == MessagingService.dash) {
-      // When switching to Dash service, load Dash messages
-      // Use a microtask to ensure we're not in the middle of a build
+    final chatModeProvider = context.read<ChatModeProvider>();
+    
+    // Only forward messages if in Dash mode
+    if (chatModeProvider.currentMode == ChatMode.dash) {
       Future.microtask(() {
         if (mounted) {
           final dashProvider = context.read<DashChatProvider>();
           dashProvider.forwardMessagesToChatProvider(context);
-        }
-      });
-    } else {
-      // When switching to Gemini, reload the demo messages
-      // Use a microtask to ensure we're not in the middle of a build
-      Future.microtask(() {
-        if (mounted) {
-          final chatProvider = context.read<ChatProvider>();
-          chatProvider.clearChatHistory();
         }
       });
     }
@@ -118,31 +103,38 @@ class _HomeScreenState extends State<HomeScreen> {
   void _handleSubmitted(String text) {
     if (text.isEmpty) return;
 
-    // Get the current service provider to determine which service to use
-    final serviceProvider = context.read<ServiceProvider>();
-    final currentService = serviceProvider.currentService;
+    final chatModeProvider = context.read<ChatModeProvider>();
+    final chatProvider = context.read<ChatProvider>();
     
-    if (currentService == MessagingService.gemini) {
-      // Use the existing Gemini service
-      final chatProvider = context.read<ChatProvider>();
-      if (YouTubeHelper.isValidYouTubeUrl(text)) {
-        chatProvider.sendMedia(text, MessageType.youtube);
-      } else {
-        chatProvider.addTextMessage(text);
-      }
-    } else {
-      // Use the Dash messaging service
+    // Add the message to the UI immediately
+    chatProvider.addTextMessage(text, isMe: true);
+
+    if (chatModeProvider.currentMode == ChatMode.dash) {
+      // Use Dash messaging service
       final dashChatProvider = context.read<DashChatProvider>();
       dashChatProvider.sendMessage(text);
-      
-      // Also add the message to the UI via the ChatProvider
-      // This ensures the message appears in the chat immediately
-      final chatProvider = context.read<ChatProvider>();
-      chatProvider.addTextMessage(text, isMe: true);
     }
 
     _messageController.clear();
     _scrollToBottom();
+  }
+
+  // Switch between chat modes
+  void _toggleChatMode() {
+    final chatModeProvider = context.read<ChatModeProvider>();
+    final chatProvider = context.read<ChatProvider>();
+    
+    // Toggle mode
+    chatModeProvider.toggleMode();
+    
+    // Clear messages for the new mode
+    chatProvider.clearChatHistory();
+    
+    // If switching to Dash mode, initialize with Dash messages
+    if (chatModeProvider.isDashMode) {
+      final dashProvider = context.read<DashChatProvider>();
+      dashProvider.forwardMessagesToChatProvider(context);
+    }
   }
 
   Future<void> _pickGif() async {
@@ -795,7 +787,7 @@ class _HomeScreenState extends State<HomeScreen> {
     // Get current service name to display in the title
     final serviceProvider = Provider.of<ServiceProvider>(context);
     final serviceDisplayName = serviceProvider.serviceDisplayName;
-    final isGemini = serviceProvider.currentService == MessagingService.gemini;
+    final chatModeProvider = Provider.of<ChatModeProvider>(context);
     
     // Create a simpler app bar without complex widgets
     if (Platform.isIOS) {
@@ -819,7 +811,19 @@ class _HomeScreenState extends State<HomeScreen> {
           trailing: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              // Simple service toggle button
+              // Chat mode toggle button
+              CupertinoButton(
+                padding: EdgeInsets.zero,
+                child: Icon(
+                  chatModeProvider.isDashMode 
+                      ? CupertinoIcons.cube_box
+                      : CupertinoIcons.chat_bubble_text,
+                  size: 22,
+                ),
+                onPressed: _toggleChatMode,
+              ),
+              const SizedBox(width: 4),
+              // Service toggle button
               GestureDetector(
                 onTap: () => serviceProvider.toggleService(),
                 child: Container(
@@ -830,25 +834,9 @@ class _HomeScreenState extends State<HomeScreen> {
                     alignment: Alignment.center,
                     children: [
                       Icon(
-                        isGemini ? CupertinoIcons.sparkles : CupertinoIcons.chat_bubble,
-                        color: CupertinoColors.white,
+                        Icons.message,
+                        color: Colors.white,
                         size: 22,
-                      ),
-                      Positioned(
-                        right: 0,
-                        bottom: 0,
-                        child: Container(
-                          decoration: BoxDecoration(
-                            color: isGemini ? Colors.blue : Colors.orange,
-                            shape: BoxShape.circle,
-                            border: Border.all(
-                              color: CupertinoColors.systemBackground,
-                              width: 1,
-                            ),
-                          ),
-                          width: 8,
-                          height: 8,
-                        ),
                       ),
                     ],
                   ),
@@ -863,7 +851,7 @@ class _HomeScreenState extends State<HomeScreen> {
             ],
           ),
         ),
-        child: _buildBody(),
+        child: _buildBody(chatModeProvider),
       );
     } else {
       return Scaffold(
@@ -877,7 +865,6 @@ class _HomeScreenState extends State<HomeScreen> {
               Text(serviceDisplayName, 
                 style: TextStyle(
                   fontSize: 16,
-                  color: isGemini ? Colors.blue.shade200 : Colors.orange.shade200,
                 ),
               ),
             ],
@@ -891,31 +878,25 @@ class _HomeScreenState extends State<HomeScreen> {
             },
           ),
           actions: [
-            // Simple service toggle button
+            // Chat mode toggle button
+            IconButton(
+              icon: Icon(
+                chatModeProvider.isDashMode 
+                    ? Icons.view_in_ar_outlined
+                    : Icons.chat_bubble_outline,
+              ),
+              onPressed: _toggleChatMode,
+              tooltip: chatModeProvider.isDashMode ? 'Switch to Gemini' : 'Switch to Dash',
+            ),
+            // Service toggle button
             IconButton(
               icon: Stack(
                 alignment: Alignment.center,
                 children: [
                   Icon(
-                    isGemini ? Icons.auto_awesome : Icons.message_rounded,
+                    Icons.message,
                     color: Colors.white,
                     size: 22,
-                  ),
-                  Positioned(
-                    right: 0,
-                    bottom: 0,
-                    child: Container(
-                      decoration: BoxDecoration(
-                        color: isGemini ? Colors.blue : Colors.orange,
-                        shape: BoxShape.circle,
-                        border: Border.all(
-                          color: Theme.of(context).appBarTheme.backgroundColor ?? Colors.black,
-                          width: 1,
-                        ),
-                      ),
-                      width: 8,
-                      height: 8,
-                    ),
                   ),
                 ],
               ),
@@ -927,83 +908,70 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
           ],
         ),
-        body: _buildBody(),
+        body: _buildBody(chatModeProvider),
       );
     }
   }
 
-  Widget _buildBody() {
+  Widget _buildBody(ChatModeProvider chatModeProvider) {
     return Material(
       type: MaterialType.transparency,
       child: SafeArea(
-        child: Row(
-          children: [
-            AnimatedContainer(
-              duration: const Duration(milliseconds: 300),
-              width: _isDrawerOpen ? 250 : 0,
-              child: _isDrawerOpen ? Material(
-                type: MaterialType.card,
-                child: _buildSidebar(),
-              ) : null,
-            ),
-            Expanded(
-              child: Column(
-                children: [
-                  Expanded(
-                    child: Consumer<ChatProvider>(
-                      builder: (context, chatProvider, child) {
-                        WidgetsBinding.instance.addPostFrameCallback((_) {
-                          if (chatProvider.messages.isNotEmpty) {
-                            _scrollToBottom();
-                          }
-                        });
-                        print('Rendering chat with ${chatProvider.messages.length} messages');
+        child: chatModeProvider.isGeminiMode
+          ? GeminiChatScreen()
+          : Row(
+            children: [
+              AnimatedContainer(
+                duration: const Duration(milliseconds: 300),
+                width: _isDrawerOpen ? 250 : 0,
+                child: _isDrawerOpen ? Material(
+                  type: MaterialType.card,
+                  child: _buildSidebar(),
+                ) : null,
+              ),
+              Expanded(
+                child: Column(
+                  children: [
+                    Expanded(
+                      child: Consumer<ChatProvider>(
+                        builder: (context, chatProvider, child) {
+                          WidgetsBinding.instance.addPostFrameCallback((_) {
+                            if (chatProvider.messages.isNotEmpty) {
+                              _scrollToBottom();
+                            }
+                          });
+                          print('Rendering chat with ${chatProvider.messages.length} messages');
 
-                        // Check for any Gemini quick reply messages
-                        bool hasGeminiReplies = chatProvider.messages.any((msg) =>
-                          msg.type == MessageType.geminiQuickReply
-                        );
-                        print('Has Gemini quick replies: $hasGeminiReplies');
-
-                        return ListView.builder(
-                          controller: _scrollController,
-                          padding: const EdgeInsets.all(8),
-                          itemCount: chatProvider.messages.length,
-                          itemBuilder: (context, index) {
-                            return ChatMessageWidget(
-                              message: chatProvider.messages[index],
-                              onReplyTap: () => _scrollToBottom(),
-                              onReactionAdd: (value) {
-                                if (value.isNotEmpty) {
-                                  // Get the current service provider to determine which service to use
-                                  final serviceProvider = context.read<ServiceProvider>();
-                                  final currentService = serviceProvider.currentService;
-        
-                                  if (currentService == MessagingService.gemini) {
-                                    // Use Gemini service for quick replies
-                                    chatProvider.sendQuickReply(value);
-                                  } else {
-                                    // Use Dash messaging service for quick replies
+                          return ListView.builder(
+                            controller: _scrollController,
+                            padding: const EdgeInsets.all(8),
+                            itemCount: chatProvider.messages.length,
+                            itemBuilder: (context, index) {
+                              return ChatMessageWidget(
+                                message: chatProvider.messages[index],
+                                onReplyTap: () => _scrollToBottom(),
+                                onReactionAdd: (value) {
+                                  if (value.isNotEmpty) {
+                                    // Use the Dash messaging service for quick replies
                                     final dashChatProvider = context.read<DashChatProvider>();
                                     dashChatProvider.handleQuickReply(
                                       QuickReply(text: value, value: value)
                                     );
                                   }
-                                }
-                                _scrollToBottom();
-                              },
-                            );
-                          },
-                        );
-                      },
+                                  _scrollToBottom();
+                                },
+                              );
+                            },
+                          );
+                        },
+                      ),
                     ),
-                  ),
-                  _buildMessageInput(),
-                ],
+                    _buildMessageInput(),
+                  ],
+                ),
               ),
-            ),
-          ],
-        ),
+            ],
+          ),
       ),
     );
   }

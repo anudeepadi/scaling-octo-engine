@@ -1,18 +1,38 @@
 import 'package:flutter/foundation.dart';
+import 'package:firebase_auth/firebase_auth.dart'; // Add Firebase Auth import
 
-// Simplified AuthProvider with no Firebase dependencies
+// Update class to use Firebase Authentication
 class AuthProvider extends ChangeNotifier {
+  final FirebaseAuth _auth = FirebaseAuth.instance; // Get Firebase Auth instance
+  User? _user; // Hold the current Firebase User
+
   bool _isLoading = false;
   String? _error;
-  bool _isAuthenticated = true; // Set to true by default in demo mode
-  
-  bool get isAuthenticated => _isAuthenticated;
+  // Remove default true for isAuthenticated
+  // bool _isAuthenticated = true; 
+
+  bool get isAuthenticated => _user != null; // Check if user object exists
   bool get isLoading => _isLoading;
   String? get error => _error;
-  String get userId => 'demo-user';
+  // Return actual Firebase User ID or a placeholder if null
+  String get userId => _user?.uid ?? 'anonymous'; 
+  // Add currentUser getter
+  User? get currentUser => _user;
 
   AuthProvider() {
-    print('AuthProvider: Initializing in demo mode');
+    // Listen to authentication state changes
+    _auth.authStateChanges().listen(_onAuthStateChanged);
+    // Set initial state
+    _user = _auth.currentUser; 
+    print('AuthProvider: Initializing - User: ${_user?.uid}');
+  }
+
+  // Listener for auth state changes
+  void _onAuthStateChanged(User? user) {
+    _user = user;
+    print('AuthProvider: Auth State Changed - User: ${_user?.uid}');
+    _isLoading = false; // Reset loading state on change
+    notifyListeners();
   }
 
   Future<bool> signIn(String email, String password) async {
@@ -20,14 +40,24 @@ class AuthProvider extends ChangeNotifier {
     _error = null;
     notifyListeners();
     
-    // Simulate network delay
-    await Future.delayed(const Duration(seconds: 1));
-    
-    // Always succeed in demo mode
-    _isAuthenticated = true;
-    _isLoading = false;
-    notifyListeners();
-    return true;
+    try {
+      // Use Firebase sign in
+      await _auth.signInWithEmailAndPassword(email: email, password: password);
+      // _onAuthStateChanged will handle updating state and notifying listeners
+      return true; // Indicate success
+    } on FirebaseAuthException catch (e) {
+      _error = e.message ?? 'Sign in failed.';
+      print('AuthProvider: SignIn Error - ${e.code}: ${e.message}');
+      _isLoading = false;
+      notifyListeners();
+      return false; // Indicate failure
+    } catch (e) {
+      _error = 'An unexpected error occurred during sign in.';
+      print('AuthProvider: SignIn Unexpected Error - $e');
+      _isLoading = false;
+      notifyListeners();
+      return false;
+    }
   }
 
   Future<bool> signUp(String email, String password, String username) async {
@@ -35,37 +65,84 @@ class AuthProvider extends ChangeNotifier {
     _error = null;
     notifyListeners();
     
-    // Simulate network delay
-    await Future.delayed(const Duration(seconds: 1));
-    
-    // Always succeed in demo mode
-    _isAuthenticated = true;
-    _isLoading = false;
-    notifyListeners();
-    return true;
+    try {
+      // Use Firebase sign up
+      UserCredential userCredential = await _auth.createUserWithEmailAndPassword(email: email, password: password);
+      
+      // Optionally update display name (username isn't directly part of standard email/pass signup)
+      // You might store the username in Firestore linked to the userCredential.user.uid
+      // await userCredential.user?.updateDisplayName(username); 
+
+      // _onAuthStateChanged will handle updating state
+      return true; // Indicate success
+    } on FirebaseAuthException catch (e) {
+      _error = e.message ?? 'Sign up failed.';
+       print('AuthProvider: SignUp Error - ${e.code}: ${e.message}');
+      _isLoading = false;
+      notifyListeners();
+      return false; // Indicate failure
+    } catch (e) {
+       _error = 'An unexpected error occurred during sign up.';
+       print('AuthProvider: SignUp Unexpected Error - $e');
+       _isLoading = false;
+       notifyListeners();
+       return false;
+    }
   }
 
   Future<void> signOut() async {
     _isLoading = true;
+    _error = null; // Clear previous errors on sign out attempt
     notifyListeners();
-    
-    // Simulate network delay
-    await Future.delayed(const Duration(seconds: 1));
-    
-    _isAuthenticated = false;
-    _isLoading = false;
-    notifyListeners();
+
+    try {
+      // Use Firebase sign out
+      await _auth.signOut();
+      // _onAuthStateChanged will handle updating state
+    } catch (e) {
+       // Although signOut rarely fails, good practice to catch potential errors
+       _error = 'An unexpected error occurred during sign out.';
+       print('AuthProvider: SignOut Unexpected Error - $e');
+       _isLoading = false; // Ensure loading is false even on error
+       notifyListeners();
+    }
+    // Loading state is reset within _onAuthStateChanged after sign out completes
   }
 
   Future<void> updateUserProfile({String? displayName, String? photoURL}) async {
+    if (_user == null) {
+      _error = "Not signed in.";
+      notifyListeners();
+      return;
+    }
+    
     _isLoading = true;
     _error = null;
     notifyListeners();
     
-    // Simulate network delay
-    await Future.delayed(const Duration(seconds: 1));
-    
-    _isLoading = false;
-    notifyListeners();
+    try {
+      // Use Firebase update profile methods
+      if (displayName != null) {
+        await _user!.updateDisplayName(displayName);
+      }
+      if (photoURL != null) {
+        await _user!.updatePhotoURL(photoURL);
+      }
+      // Reload user data to reflect changes immediately if needed, though not strictly required
+      // await _user!.reload(); 
+      // _user = _auth.currentUser; // Re-assign user if reloaded
+       _isLoading = false;
+       notifyListeners(); // Notify UI of success/loading finished
+    } on FirebaseAuthException catch (e) {
+      _error = e.message ?? 'Profile update failed.';
+      print('AuthProvider: UpdateProfile Error - ${e.code}: ${e.message}');
+      _isLoading = false;
+      notifyListeners();
+    } catch (e) {
+       _error = 'An unexpected error occurred during profile update.';
+       print('AuthProvider: UpdateProfile Unexpected Error - $e');
+       _isLoading = false;
+       notifyListeners();
+    }
   }
 }

@@ -61,19 +61,43 @@ class GeminiQuickReplyWidget extends StatelessWidget {
                 size: 14,
               ),
               const SizedBox(width: 4),
-              Text(
-                "Gemini Suggestions",
-                style: TextStyle(
-                  fontWeight: FontWeight.w500,
-                  color: Colors.blue.shade700,
-                  fontSize: 12,
+              Expanded(
+                child: Text(
+                  "Gemini Suggestions",
+                  style: TextStyle(
+                    fontWeight: FontWeight.w500,
+                    color: Colors.blue.shade700,
+                    fontSize: 12,
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                  maxLines: 1,
                 ),
               ),
             ],
           ),
           const SizedBox(height: 8),
           
-          // Quick Reply buttons
+          // --- Replace Wrap with a horizontally scrolling ListView ---
+          // Constrain the height of the ListView
+          SizedBox(
+            height: 40, // Adjust height as needed for button size + padding
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal, // Make it scroll horizontally
+              itemCount: quickReplies.length,
+              itemBuilder: (context, index) {
+                // Build each button using the existing method
+                return _buildQuickReplyButton(
+                  context, 
+                  quickReplies[index], 
+                  index // Pass index for animation
+                );
+              },
+              separatorBuilder: (context, index) => const SizedBox(width: 8), // Spacing between buttons
+            ),
+          ),
+          // --- End replacement ---
+/* 
+          // Old Wrap widget - commented out
           Wrap(
             spacing: 8.0,
             runSpacing: 8.0,
@@ -85,6 +109,7 @@ class GeminiQuickReplyWidget extends StatelessWidget {
               );
             }).toList(),
           ),
+*/
         ],
       ),
     );

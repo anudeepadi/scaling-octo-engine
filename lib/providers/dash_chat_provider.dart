@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../models/chat_message.dart';
 import '../models/quick_reply.dart';
-import '../models/gemini_quick_reply.dart';
 import '../services/dash_messaging_service.dart';
 import '../utils/firebase_utils.dart';
 import 'chat_provider.dart';
@@ -142,7 +141,7 @@ class DashChatProvider extends ChangeNotifier {
     chatProvider.clearChatHistory();
 
     // Create test messages
-    chatProvider.addTextMessage('Welcome to Quitxt! 👋', isMe: false);
+    chatProvider.addTextMessage('Welcome to Dash Messaging! 👋', isMe: false);
 
     // Add message with quick replies
     final List<QuickReply> quickReplies = [
@@ -151,13 +150,7 @@ class DashChatProvider extends ChangeNotifier {
       QuickReply(text: '🔍 Tell me more', value: 'Tell me more about this app'),
     ];
 
-    // We need to use the appropriate method available in ChatProvider
-    // ChatProvider doesn't have 'addMessage', but it has specific methods for each type
-    chatProvider.addGeminiQuickReplyMessage(
-      quickReplies.map((qr) => GeminiQuickReply.fromQuickReply(qr)).toList()
-    );
-
-    print('Adding test Gemini quick replies');
+    chatProvider.addQuickReplyMessage(quickReplies);
   }
 
   // Determine message type based on content

@@ -5,18 +5,19 @@ import '../../models/chat_message.dart';
 import '../video_player_widget.dart';
 import '../youtube_player_widget.dart';
 import '../quick_reply_widget.dart';
-import '../gemini_quick_reply_widget.dart';
 
 class IosChatMessageWidget extends StatefulWidget {
   final ChatMessage message;
   final VoidCallback? onReplyTap;
   final Function(String)? onReactionAdd;
+  final Function(String)? onQuickReplyTap;
 
   const IosChatMessageWidget({
     Key? key,
     required this.message,
     this.onReplyTap,
     this.onReactionAdd,
+    this.onQuickReplyTap,
   }) : super(key: key);
 
   @override
@@ -123,17 +124,6 @@ class _IosChatMessageWidgetState extends State<IosChatMessageWidget> {
               }
             },
           ) : const SizedBox.shrink();
-      case MessageType.geminiQuickReply:
-        print('iOS Rendering Gemini quick replies');
-        return widget.message.suggestedReplies != null ?
-          GeminiQuickReplyWidget(
-            quickReplies: widget.message.suggestedReplies!,
-            onReplySelected: (value) {
-              if (widget.onReactionAdd != null) {
-                widget.onReactionAdd!(value);
-              }
-            },
-          ) : const SizedBox.shrink();
       default:
         return const SizedBox.shrink();
     }
@@ -141,67 +131,56 @@ class _IosChatMessageWidgetState extends State<IosChatMessageWidget> {
 
   @override
   Widget build(BuildContext context) {
-    // Special debug case - force render Gemini quick replies outside the bubble
-    if (widget.message.type == MessageType.geminiQuickReply) {
-      print('iOS - Rendering Gemini Quick Reply directly, bypassing bubble');
-      return Align(
-        alignment: Alignment.centerLeft,
-        child: Container(
-          constraints: const BoxConstraints(maxWidth: 300),
-          margin: const EdgeInsets.only(left: 8.0, right: 8.0, top: 4.0, bottom: 4.0),
-          child: GeminiQuickReplyWidget(
-            quickReplies: widget.message.suggestedReplies ?? [],
-            onReplySelected: (value) {
-              if (widget.onReactionAdd != null) {
-                widget.onReactionAdd!(value);
-              }
-            },
-          ),
-        ),
-      );
+    // Skip rendering if it's a quick reply message
+    if (widget.message.type == MessageType.quickReply) {
+      return const SizedBox.shrink();
     }
-  
+
     return Align(
       alignment: widget.message.isMe ? Alignment.centerRight : Alignment.centerLeft,
       child: Container(
         margin: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
         decoration: BoxDecoration(
-          color: widget.message.isMe ? CupertinoColors.activeBlue : CupertinoColors.systemGrey5,
-          borderRadius: BorderRadius.circular(16),
-          boxShadow: [
-            BoxShadow(
-              color: CupertinoColors.black.withOpacity(0.05),
-              blurRadius: 3,
-              offset: const Offset(0, 1),
-            ),
-          ],
+          color: widget.message.isMe
+              ? CupertinoColors.activeBlue
+              : CupertinoColors.systemGrey6,
+          borderRadius: BorderRadius.circular(12),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _buildContent(),
-            const SizedBox(height: 4),
-            Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  '${widget.message.timestamp.hour}:${widget.message.timestamp.minute.toString().padLeft(2, '0')}',
-                  style: TextStyle(
-                    fontSize: 10,
-                    color: widget.message.isMe ? CupertinoColors.white.withOpacity(0.7) : CupertinoColors.systemGrey,
-                  ),
-                ),
-                if (widget.message.isMe) ...[
-                  const SizedBox(width: 4),
-                  Icon(
-                    _getStatusIcon(),
-                    size: 12,
-                    color: CupertinoColors.white.withOpacity(0.7),
-                  ),
-                ],
-              ],
+            Text(
+              widget.message.content,
+              style: TextStyle(
+                color: widget.message.isMe
+                    ? CupertinoColors.white
+                    : CupertinoColors.black,
+              ),
             ),
+            if (widget.message.suggestedReplies != null &&
+                widget.message.suggestedReplies!.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.only(top: 8),
+                child: Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: widget.message.suggestedReplies!
+                      .map((reply) => CupertinoButton(
+                            padding: EdgeInsets.zero,
+                            child: Text(
+                              reply.text,
+                              style: TextStyle(
+                                color: widget.message.isMe
+                                    ? CupertinoColors.white
+                                    : CupertinoColors.activeBlue,
+                              ),
+                            ),
+                            onPressed: () => widget.onQuickReplyTap?.call(reply.value),
+                          ))
+                      .toList(),
+                ),
+              ),
           ],
         ),
       ),

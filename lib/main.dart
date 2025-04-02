@@ -9,10 +9,14 @@ import 'providers/system_chat_provider.dart';
 import 'providers/auth_provider.dart';
 import 'providers/dash_chat_provider.dart';
 import 'providers/service_provider.dart';
+import 'providers/chat_mode_provider.dart';
+import 'providers/gemini_chat_provider.dart';
+import 'services/bot_service.dart';
 import 'screens/home_screen.dart';
 import 'screens/login_screen.dart';
 import 'theme/app_theme.dart';
 import 'theme/ios_theme.dart';
+import 'screens/main_screen.dart';
 
 // Import Firebase
 import 'package:firebase_core/firebase_core.dart';
@@ -44,7 +48,7 @@ void main() async {
 }
 
 class MyApp extends StatelessWidget {
-  const MyApp({super.key});
+  const MyApp({Key? key}) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
@@ -55,6 +59,9 @@ class MyApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => BotChatProvider()),
         ChangeNotifierProvider(create: (_) => ChannelProvider()),
         ChangeNotifierProvider(create: (_) => SystemChatProvider()),
+        ChangeNotifierProvider(create: (_) => ChatModeProvider()),
+        ChangeNotifierProvider(create: (_) => GeminiChatProvider()),
+        Provider(create: (_) => BotService()),
         // Create DashChatProvider with Firebase if available
         ChangeNotifierProvider(create: (_) {
           try {

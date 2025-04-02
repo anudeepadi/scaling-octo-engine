@@ -7,67 +7,83 @@ import '../models/link_preview.dart';
 
 class DashMessagingService {
   // Latest Dash messaging server endpoint
-  static const String serverUrl = 'https://dashmessaging-com.ngrok.io/scheduler/mobile-app';
+  static const String _baseUrl = 'https://dashmessaging-com.ngrok.io/scheduler/mobile-app';
+  static const String _messagesEndpoint = '$_baseUrl/messages'; // Add messages endpoint
 
   // Send a message to the Dash messaging server
   Future<bool> sendMessage({
     required String userId,
     required String messageText,
-    required int eventTypeCode, // 1 for regular text, 2 for quick reply
     String? fcmToken,
+    int eventTypeCode = 1,
   }) async {
     try {
-      final timestamp = DateTime.now().millisecondsSinceEpoch;
-      final messageId = 'msg_${timestamp}_${DateTime.now().microsecond}';
+      final timestamp = DateTime.now().millisecondsSinceEpoch ~/ 1000;
+      final messageId = 'msg_${DateTime.now().millisecondsSinceEpoch}';
 
-      // Use a dummy token if none provided (for demo mode)
-      final token = fcmToken ?? 'demo_token_${DateTime.now().millisecondsSinceEpoch}';
-      
-      final Map<String, dynamic> payload = {
-        "userId": userId,
-        "messageText": messageText,
-        "messageTime": timestamp,
-        "messageId": messageId,
-        "eventTypeCode": eventTypeCode,
-        "fcmToken": token,
-      };
+      final response = await http.post(
+        Uri.parse(_baseUrl),
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
+        body: jsonEncode({
+          'userId': userId,
+          'messageText': messageText,
+          'messageTime': timestamp,
+          'messageId': messageId,
+          'eventTypeCode': eventTypeCode,
+          'fcmToken': fcmToken,
+        }),
+      );
 
-      debugPrint('Sending message to Dash server: $payload');
-
-      try {
-        final response = await http.post(
-          Uri.parse(serverUrl),
-          headers: {
-            'Content-Type': 'application/json',
-            'Accept': 'application/json',
-          },
-          body: jsonEncode(payload),
-        );
-
-        debugPrint('Response status: ${response.statusCode}');
-        if (response.body.isNotEmpty) {
-          final shortBody = response.body.length > 100 
-              ? response.body.substring(0, 100) + '...' 
-              : response.body;
-          debugPrint('Response body: $shortBody');
-        }
-
-        if (response.statusCode >= 200 && response.statusCode < 300) {
-          debugPrint('Message sent successfully to Dash server');
-          return true;
-        } else {
-          debugPrint('Failed to send message to Dash server: ${response.statusCode}');
-          // In demo mode, pretend it worked anyway
-          return true;
-        }
-      } catch (e) {
-        debugPrint('Error sending HTTP request to Dash server: $e');
-        // In demo mode, pretend it worked anyway
+      if (response.statusCode == 200) {
+        print('Message sent successfully to Dash server.');
         return true;
+      } else {
+        print('Failed to send message. Status code: ${response.statusCode}');
+        return false;
       }
     } catch (e) {
-      debugPrint('Error sending message to Dash server: $e');
+      print('Error sending message: $e');
       return false;
+    }
+  }
+
+  // Get messages from the server
+  Future<List<ChatMessage>> getMessages({String? userId}) async {
+    try {
+      final queryParams = userId != null ? {'userId': userId} : null;
+      final uri = Uri.parse(_messagesEndpoint).replace(queryParameters: queryParams);
+      
+      print('Fetching messages from: $uri');
+      
+      final response = await http.get(
+        uri,
+        headers: {
+          'Accept': 'application/json',
+        },
+      );
+
+      if (response.statusCode == 200) {
+        final List<dynamic> data = jsonDecode(response.body);
+        print('Received ${data.length} messages from server');
+        
+        return data.map((messageData) {
+          if (messageData is Map<String, dynamic>) {
+            return processServerMessage(messageData);
+          } else {
+            print('Invalid message format: $messageData');
+            return null;
+          }
+        }).whereType<ChatMessage>().toList();
+      } else {
+        print('Failed to fetch messages. Status code: ${response.statusCode}');
+        return [];
+      }
+    } catch (e) {
+      print('Error getting messages: $e');
+      return [];
     }
   }
 
@@ -76,6 +92,7 @@ class DashMessagingService {
     final String messageId = data['serverMessageId'] ?? DateTime.now().millisecondsSinceEpoch.toString();
     final String messageBody = data['messageBody'] ?? '';
     final int timestamp = data['timestamp'] ?? DateTime.now().millisecondsSinceEpoch;
+    final bool isUserMessage = data['isUserMessage'] ?? false;
     
     // Extract quick replies if this is a poll
     List<QuickReply>? suggestedReplies;
@@ -168,7 +185,7 @@ class DashMessagingService {
     return ChatMessage(
       id: messageId,
       content: cleanContent.isEmpty ? mediaUrl ?? '' : cleanContent,
-      isMe: false,
+      isMe: isUserMessage,
       timestamp: DateTime.fromMillisecondsSinceEpoch(timestamp),
       type: type,
       suggestedReplies: suggestedReplies,

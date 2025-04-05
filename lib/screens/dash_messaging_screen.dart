@@ -4,7 +4,7 @@ import 'dart:io' show Platform;
 import '../models/chat_message.dart';
 import '../services/dash_messaging_service.dart';
 import '../providers/auth_provider.dart';
-import '../widgets/message_bubble.dart';
+import '../widgets/chat_message_widget.dart';
 import 'package:provider/provider.dart';
 
 class DashMessagingScreen extends StatefulWidget {
@@ -121,7 +121,7 @@ class _DashMessagingScreenState extends State<DashMessagingScreen> {
                     itemCount: _messages.length,
                     itemBuilder: (context, index) {
                       final message = _messages[index];
-                      return MessageBubble(message: message);
+                      return ChatMessageWidget(message: message);
                     },
                   ),
           ),

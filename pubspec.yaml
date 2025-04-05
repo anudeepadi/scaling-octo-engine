@@ -30,6 +30,7 @@ dependencies:
   mime: ^2.0.0
   youtube_player_flutter: ^9.1.1
   flutter_linkify: ^6.0.0
+  image_picker: ^1.0.7
   # Firebase - using fixed versions to avoid conflicts
   firebase_core: ^2.24.2
   firebase_auth: ^4.15.3

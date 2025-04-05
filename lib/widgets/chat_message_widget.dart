@@ -35,7 +35,8 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
     if (widget.message.type != MessageType.quickReply) {
       return ImprovedMessageItem(
         message: widget.message,
-        onReplySelected: (value) {
+        isMe: widget.message.isMe,
+        onReactionTap: (value) {
           if (widget.onReactionAdd != null) {
             widget.onReactionAdd!(value);
           }

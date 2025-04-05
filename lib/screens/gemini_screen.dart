@@ -4,6 +4,8 @@ import 'dart:io' show Platform;
 import '../models/chat_message.dart';
 import '../providers/auth_provider.dart';
 import 'package:provider/provider.dart';
+import '../services/gemini_service.dart';
+import '../widgets/chat_message_widget.dart';
 
 class GeminiScreen extends StatefulWidget {
   const GeminiScreen({Key? key}) : super(key: key);
@@ -98,7 +100,7 @@ class _GeminiScreenState extends State<GeminiScreen> {
                     itemCount: _messages.length,
                     itemBuilder: (context, index) {
                       final message = _messages[index];
-                      return _buildMessageBubble(message);
+                      return _buildChatMessageWidget(message);
                     },
                   ),
           ),
@@ -108,26 +110,8 @@ class _GeminiScreenState extends State<GeminiScreen> {
     );
   }
 
-  Widget _buildMessageBubble(ChatMessage message) {
-    final isMe = message.isMe;
-    final bubbleColor = isMe ? Colors.blue : Colors.grey[300];
-    final textColor = isMe ? Colors.white : Colors.black;
-
-    return Align(
-      alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
-      child: Container(
-        margin: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
-        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
-        decoration: BoxDecoration(
-          color: bubbleColor,
-          borderRadius: BorderRadius.circular(16),
-        ),
-        child: Text(
-          message.content,
-          style: TextStyle(color: textColor),
-        ),
-      ),
-    );
+  Widget _buildChatMessageWidget(ChatMessage message) {
+    return ChatMessageWidget(message: message);
   }
 
   Widget _buildMessageInput() {

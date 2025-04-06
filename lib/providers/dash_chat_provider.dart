@@ -1,159 +1,258 @@
+import 'dart:async'; // Import async library
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../models/chat_message.dart';
 import '../models/quick_reply.dart';
-import '../services/dash_messaging_service.dart';
+// Remove DashMessagingService import if only used for sending
+// import '../services/dash_messaging_service.dart';
 import '../utils/firebase_utils.dart';
 import 'chat_provider.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import '../services/firebase_connection_service.dart';
+// Remove FirebaseConnectionService import
+// import '../services/firebase_connection_service.dart';
+import 'package:firebase_auth/firebase_auth.dart'; // Add FirebaseAuth import
 
 class DashChatProvider extends ChangeNotifier {
-  final DashMessagingService _dashService = DashMessagingService();
-  final dynamic _firestore; // Will be FirebaseFirestore when available
-  final FirebaseConnectionService? _firebaseService;
+  // Remove DashMessagingService instance if only used for sending
+  // final DashMessagingService _dashService = DashMessagingService();
+  // Ensure _firestore is typed correctly
+  final FirebaseFirestore _firestore;
+  // Remove FirebaseConnectionService instance
+  // final FirebaseConnectionService? _firebaseService;
+  // Add FirebaseAuth instance
+  final FirebaseAuth _auth;
+  ChatProvider? _chatProvider; // Add reference to ChatProvider
+  StreamSubscription? _authSubscription;
+  StreamSubscription? _messageSubscription;
+  User? _currentUser;
 
   bool _isTyping = false;
   bool get isTyping => _isTyping;
 
   // Constructor for use with Firebase
-  DashChatProvider() 
+  DashChatProvider()
       : _firestore = FirebaseFirestore.instance,
-        _firebaseService = FirebaseConnectionService() {
-    print('DashChatProvider: Creating with Firebase enabled');
-    _setupFirebaseListeners();
+        _auth = FirebaseAuth.instance {
+    print('DashChatProvider: Initializing...');
+    // Add null check immediately after initialization
+    if (_auth == null) {
+      print('FATAL ERROR: DashChatProvider._auth is NULL immediately after assignment!');
+      // Optionally throw an error to make it obvious
+      // throw StateError('FirebaseAuth instance is null after initialization.');
+    } else {
+      print('DashChatProvider: _auth initialized successfully.');
+    }
+    _listenToAuthChanges();
   }
 
-  // Constructor for creating without Firebase
-  factory DashChatProvider.withoutFirebase() {
-    print('DashChatProvider: Creating without Firebase');
-    return DashChatProvider._internal();
-  }
-
-  // Internal constructor
-  DashChatProvider._internal() 
-      : _firestore = null,
-        _firebaseService = null;
-        
-  // Setup Firebase message listeners
-  void _setupFirebaseListeners() {
-    try {
-      if (_firestore != null) {
-        print('Setting up Firebase message listeners');
-        // This would set up Firestore listeners in a real implementation
-      }
-    } catch (e) {
-      print('Error setting up Firebase listeners: $e');
+  // Method to link to the ChatProvider instance
+  void setChatProvider(ChatProvider chatProvider) {
+    _chatProvider = chatProvider;
+    print('DashChatProvider: Linked with ChatProvider.');
+    // If user is already logged in when linked, setup listeners immediately
+    if (_currentUser != null) {
+      _setupFirebaseListeners(_currentUser!);
     }
   }
 
-  // Send a message to the Dash messaging server
-  Future<bool> sendMessage(String message) async {
-    if (message.trim().isEmpty) return false;
-
-    // Set typing indicator
-    _isTyping = true;
-    notifyListeners();
-
-    try {
-      // Generate a user ID - in real implementation this would come from Firebase Auth
-      final String userId = 'user_${DateTime.now().millisecondsSinceEpoch}';
-      
-      // If Firebase is available, use the Firebase service
-      if (_firebaseService != null) {
-        print('Sending message via Firebase: $message');
-        final success = await _firebaseService!.sendDashMessage(
-          userId: userId,
-          messageText: message,
-          eventTypeCode: 1, // Regular text message
-        );
-        
-        _isTyping = false;
-        notifyListeners();
-        return success;
+  void _listenToAuthChanges() {
+    _authSubscription = _auth.authStateChanges().listen((User? user) {
+      print('DashChatProvider: Auth state changed. User: ${user?.uid}');
+      if (user == null) {
+        // User logged out
+        _currentUser = null;
+        _messageSubscription?.cancel();
+        _chatProvider?.clearChatHistory(); // Clear messages on logout
+        notifyListeners(); // Notify if provider state depends on auth
       } else {
-        // Fall back to the regular dash service
-        final success = await _dashService.sendMessage(
-          userId: userId,
-          messageText: message,
-          eventTypeCode: 1, // Regular text message
-        );
-
-        _isTyping = false;
-        notifyListeners();
-        return success;
+        // User logged in
+        _currentUser = user;
+        // Only setup listeners if chatProvider is linked
+        if (_chatProvider != null) {
+           _setupFirebaseListeners(user);
+        } else {
+           print('DashChatProvider: User logged in, but ChatProvider not linked yet.');
+        }
+        notifyListeners(); // Notify if provider state depends on auth
       }
-    } catch (e) {
-      print('Error sending message: $e');
-      _isTyping = false;
-      notifyListeners();
-      return false;
-    }
+    });
   }
-
-  // Handle quick reply selection
-  Future<bool> handleQuickReply(QuickReply reply) async {
-    _isTyping = true;
-    notifyListeners();
-
-    try {
-      // Generate a user ID - in real implementation this would come from Firebase Auth
-      final String userId = 'user_${DateTime.now().millisecondsSinceEpoch}';
-      
-      // If Firebase is available, use the Firebase service
-      if (_firebaseService != null) {
-        print('Sending quick reply via Firebase: ${reply.value}');
-        final success = await _firebaseService!.sendDashMessage(
-          userId: userId,
-          messageText: reply.value,
-          eventTypeCode: 2, // Quick reply
-        );
         
-        _isTyping = false;
-        notifyListeners();
-        return success;
-      } else {
-        // Fall back to the regular dash service
-        final success = await _dashService.sendMessage(
-          userId: userId,
-          messageText: reply.value,
-          eventTypeCode: 2, // Quick reply
-        );
+  void _setupFirebaseListeners(User user) {
+    // Cancel any previous message subscription
+    _messageSubscription?.cancel();
+    print('DashChatProvider: Setting up Firestore message listener for user ${user.uid} at /messages/${user.uid}/chat');
 
-        _isTyping = false;
-        notifyListeners();
-        return success;
+    // Use the correct collection path and order field
+    final messageStream = _firestore
+        .collection('messages')
+        .doc(user.uid)
+        .collection('chat')
+        // .orderBy('createdAt', descending: false) // <<< Temporarily remove ordering
+        .snapshots();
+
+    _messageSubscription = messageStream.listen((snapshot) {
+      if (_chatProvider == null) return; // Don't process if chatProvider isn't linked
+
+      print('DashChatProvider: Received ${snapshot.docs.length} messages from Firestore (/chat path).');
+      final messages = snapshot.docs.map((doc) {
+          final data = doc.data(); // Already Map<String, dynamic>
+          
+          // Map fields from the /chat structure
+          final createdAtMillis = data['createdAt'] as int?; // Expecting int milliseconds
+          final timestamp = createdAtMillis != null
+              ? DateTime.fromMillisecondsSinceEpoch(createdAtMillis)
+              : DateTime.now(); // Provide default if createdAt is missing/null
+          
+          final messageContent = data['messageBody'] as String? ?? ''; // Use messageBody
+          final source = data['source'] as String?;
+          final isMe = source != 'server'; // Assume not from 'server' means it's from the user
+          
+          // Default type and status for now, adjust if needed
+          final messageType = MessageType.text;
+          final messageStatus = MessageStatus.delivered; // Since it's read from DB
+
+          // Perform robust mapping
+          return ChatMessage(
+              id: doc.id, // Use Firestore doc ID
+              content: messageContent,
+              isMe: isMe,
+              timestamp: timestamp, 
+              type: messageType,
+              status: messageStatus,
+              // Map other ChatMessage fields if corresponding data exists in Firestore
+              // e.g., quickReplies from 'answers' if isPoll == 'y' ?
+          );
+      }).toList();
+
+      // Update the linked ChatProvider
+      _chatProvider!.setMessages(messages);
+
+    }, onError: (error) {
+      print('DashChatProvider: Error listening to messages (/chat path): $error');
+      // Optionally update ChatProvider with an error state
+    });
+  }
+
+  // Send a message directly to Firestore
+  Future<void> sendMessage(String message) async {
+    final authInstance = FirebaseAuth.instance;
+    final currentUser = authInstance.currentUser; 
+    if (message.trim().isEmpty || currentUser == null) {
+      print('Message empty or user not logged in. Cannot send.');
+      return;
+    }
+    final userId = currentUser.uid;
+    final messageContent = message.trim();
+    
+    // Log the userId being used
+    print('[SendMessage] Using userId: $userId');
+
+    DocumentReference? userDocRef;
+    try {
+      userDocRef = _firestore.collection('messages').doc(userId);
+      
+      print('[SendMessage] Attempting to ensure document exists: ${userDocRef.path}');
+      await userDocRef.set({'_placeholder': FieldValue.serverTimestamp()}, SetOptions(merge: true))
+        .then((_) {
+           print('[SendMessage] .then(): Document set/merge completed.');
+        })
+        .catchError((error, stackTrace) {
+           print('[SendMessage] .catchError() during userDocRef.set(): $error\n$stackTrace');
+           // Re-throw or handle as needed, for now just logging
+           throw error; // Re-throw to be caught by outer catch block if needed
+        });
+      print('[SendMessage] Post-set: Document ensured/created successfully: ${userDocRef.path}'); // Keep this log
+
+      print('[SendMessage] Attempting to add message to subcollection: ${userDocRef.collection("chat").path}');
+      await userDocRef.collection('chat')
+          .add({
+            'messageBody': messageContent,
+            'source': 'user',
+            'createdAt': FieldValue.serverTimestamp(),
+          })
+          .then((docRef) {
+             print('[SendMessage] .then(): Message added successfully with ID: ${docRef.id}');
+          })
+          .catchError((error, stackTrace) {
+             print('[SendMessage] .catchError() during collection.add(): $error\n$stackTrace');
+             throw error; // Re-throw
+          });
+      print('[SendMessage] Post-add: Message added successfully to subcollection.'); // Keep this log
+
+    } catch (e, s) { // Outer catch block remains
+      // Check if userDocRef was assigned to distinguish errors
+      if (userDocRef == null) {
+         print('[SendMessage] Error initializing DocumentReference: $e\n$s');
+      } else if (await userDocRef.get().then((_) => false).catchError((_) => true)) {
+         // Crude check: If getting the doc errors out *after* the set attempt, the set likely failed
+         print('[SendMessage] Error likely during userDocRef.set(): $e\n$s');
+      } else {
+         print('[SendMessage] Error likely during collection.add(): $e\n$s');
       }
-    } catch (e) {
-      print('Error handling quick reply: $e');
-      _isTyping = false;
-      notifyListeners();
-      return false;
+      print('[SendMessage] Outer catch block details: $e\nStack trace:\n$s');
     }
   }
 
-  // Method to forward messages to ChatProvider for display
-  void forwardMessagesToChatProvider(BuildContext context) {
-    // In demo mode, just create sample messages
-    final chatProvider = Provider.of<ChatProvider>(context, listen: false);
+  // Handle quick reply selection by sending a message to Firestore
+  Future<void> handleQuickReply(QuickReply reply) async {
+    final authInstance = FirebaseAuth.instance;
+    final currentUser = authInstance.currentUser;
+    if (reply.value.isEmpty || currentUser == null) {
+       print('Quick reply value empty or user not logged in. Cannot send.');
+      return;
+    }
+    final userId = currentUser.uid;
+    final replyContent = reply.value;
+    
+    // Log the userId being used
+    print('[HandleQuickReply] Using userId: $userId');
 
-    // Clear existing messages
-    chatProvider.clearChatHistory();
+    DocumentReference? userDocRef;
+    try {
+       userDocRef = _firestore.collection('messages').doc(userId);
+       
+       print('[HandleQuickReply] Attempting to ensure document exists: ${userDocRef.path}');
+       await userDocRef.set({'_placeholder': FieldValue.serverTimestamp()}, SetOptions(merge: true))
+          .then((_) {
+             print('[HandleQuickReply] .then(): Document set/merge completed.');
+          })
+          .catchError((error, stackTrace) {
+             print('[HandleQuickReply] .catchError() during userDocRef.set(): $error\n$stackTrace');
+             throw error; // Re-throw
+          });
+       print('[HandleQuickReply] Post-set: Document ensured/created successfully: ${userDocRef.path}'); // Keep
 
-    // Create test messages
-    chatProvider.addTextMessage('Welcome to Dash Messaging! 👋', isMe: false);
+       print('[HandleQuickReply] Attempting to add quick reply to subcollection: ${userDocRef.collection("chat").path}');
+       await userDocRef.collection('chat')
+           .add({
+             'messageBody': replyContent,
+             'source': 'user',
+             'createdAt': FieldValue.serverTimestamp(),
+           })
+           .then((docRef) {
+             print('[HandleQuickReply] .then(): Quick reply added successfully with ID: ${docRef.id}');
+           })
+           .catchError((error, stackTrace) {
+             print('[HandleQuickReply] .catchError() during collection.add(): $error\n$stackTrace');
+             throw error; // Re-throw
+           });
+       print('[HandleQuickReply] Post-add: Quick reply added successfully to subcollection.'); // Keep
 
-    // Add message with quick replies
-    final List<QuickReply> quickReplies = [
-      QuickReply(text: '👋 Hello!', value: 'Hello!'),
-      QuickReply(text: '🤔 What can you do?', value: 'What can you do?'),
-      QuickReply(text: '🔍 Tell me more', value: 'Tell me more about this app'),
-    ];
-
-    chatProvider.addQuickReplyMessage(quickReplies);
+    } catch (e, s) { // Outer catch block remains
+      // Check if userDocRef was assigned to distinguish errors
+      if (userDocRef == null) {
+         print('[HandleQuickReply] Error initializing DocumentReference: $e\n$s');
+      } else if (await userDocRef.get().then((_) => false).catchError((_) => true)) {
+         print('[HandleQuickReply] Error likely during userDocRef.set(): $e\n$s');
+      } else {
+         print('[HandleQuickReply] Error likely during collection.add(): $e\n$s');
+      }
+      print('[HandleQuickReply] Outer catch block details: $e\nStack trace:\n$s');
+    }
   }
 
-  // Determine message type based on content
+  // Determine message type based on content (This seems like display logic, maybe belongs elsewhere?)
   MessageType _determineMessageType(String content) {
     // Check for YouTube links
     if (content.contains('youtube.com/') || content.contains('youtu.be/')) {
@@ -190,4 +289,24 @@ class DashChatProvider extends ChangeNotifier {
            text.contains('http://') ||
            text.contains('https://');
   }
+
+  @override
+  void dispose() {
+    print('DashChatProvider: Disposing...');
+    _authSubscription?.cancel();
+    _messageSubscription?.cancel();
+    super.dispose();
+  }
+
+  // Remove constructors for withoutFirebase if demo mode is not needed
+  /*
+  factory DashChatProvider.withoutFirebase() {
+    print('DashChatProvider: Creating without Firebase (DEMO MODE)');
+    return DashChatProvider._internal();
+  }
+
+  DashChatProvider._internal() 
+      : _firestore = FirebaseFirestore.instance,
+        _auth = FirebaseAuth.instance;
+  */
 }

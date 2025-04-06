@@ -1,4 +1,4 @@
-package com.example.rcs_demo_app
+package edu.utsa.quitxtmobile
 
 import io.flutter.embedding.android.FlutterActivity
 

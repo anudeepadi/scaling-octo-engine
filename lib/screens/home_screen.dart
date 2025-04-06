@@ -41,13 +41,25 @@ class _HomeScreenState extends State<HomeScreen> {
     super.initState();
     _messageController.addListener(_handleTextChange);
 
-    // Initialize with Dash messages only if in Dash mode
+    // Link DashChatProvider to ChatProvider
+    // Needs to be done after the first build potentially, using addPostFrameCallback
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) { // Check if widget is still mounted
+         final chatProvider = context.read<ChatProvider>();
+         final dashProvider = context.read<DashChatProvider>();
+         dashProvider.setChatProvider(chatProvider); 
+         print('HomeScreen: Linked DashChatProvider and ChatProvider.');
+      }
+
+      // Initialize with Dash messages only if in Dash mode
+      // This logic might need adjustment now that DashProvider listens directly
+      /*
       final chatModeProvider = context.read<ChatModeProvider>();
       if (chatModeProvider.currentMode == ChatMode.dash) {
         final dashProvider = context.read<DashChatProvider>();
-        dashProvider.forwardMessagesToChatProvider(context);
+        // dashProvider.forwardMessagesToChatProvider(context); // Removed
       }
+      */
       
       // Store the service provider reference for later use
       _serviceProvider = context.read<ServiceProvider>();
@@ -62,14 +74,17 @@ class _HomeScreenState extends State<HomeScreen> {
     final chatModeProvider = context.read<ChatModeProvider>();
     
     // Only forward messages if in Dash mode
+    // This logic is likely obsolete now as DashProvider updates ChatProvider directly
+    /*
     if (chatModeProvider.currentMode == ChatMode.dash) {
       Future.microtask(() {
         if (mounted) {
           final dashProvider = context.read<DashChatProvider>();
-          dashProvider.forwardMessagesToChatProvider(context);
+          // dashProvider.forwardMessagesToChatProvider(context); // Removed
         }
       });
     }
+    */
   }
 
   @override
@@ -131,10 +146,14 @@ class _HomeScreenState extends State<HomeScreen> {
     chatProvider.clearChatHistory();
     
     // If switching to Dash mode, initialize with Dash messages
+    // This logic is no longer needed as DashProvider handles updates via listeners
+    /*
     if (chatModeProvider.isDashMode) {
       final dashProvider = context.read<DashChatProvider>();
-      dashProvider.forwardMessagesToChatProvider(context);
+      // The method was removed
+      // dashProvider.forwardMessagesToChatProvider(context);
     }
+    */
   }
 
   Future<void> _pickGif() async {

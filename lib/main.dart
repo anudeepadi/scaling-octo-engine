@@ -64,14 +64,16 @@ class MyApp extends StatelessWidget {
         Provider(create: (_) => BotService()),
         // Create DashChatProvider with Firebase if available
         ChangeNotifierProvider(create: (_) {
-          try {
+          // Remove the try-catch and the fallback
+          // try {
             // Try to use the Firebase-enabled constructor first
             return DashChatProvider();
-          } catch (e) {
+          /* } catch (e) {
             print('Error initializing DashChatProvider with Firebase: $e');
             print('Falling back to demo mode without Firebase');
-            return DashChatProvider.withoutFirebase();
-          }
+            // The withoutFirebase constructor was removed
+            // return DashChatProvider.withoutFirebase(); 
+          } */
         }),
         ChangeNotifierProvider(create: (_) => ServiceProvider()),
       ],

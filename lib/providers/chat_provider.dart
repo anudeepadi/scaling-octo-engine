@@ -183,6 +183,26 @@ class ChatProvider extends ChangeNotifier {
     }
   }
 
+  // Add a method to set the entire list of messages
+  void setMessages(List<ChatMessage> messages) {
+    _messages.clear();
+    _messages.addAll(messages);
+    // Ensure the last message preview is updated if needed
+    if (_currentConversationId != null) {
+      final currentIndex = _conversations.indexWhere((conv) => conv.id == _currentConversationId);
+      if (currentIndex >= 0) {
+        _conversations[currentIndex] = ChatConversation(
+          id: _conversations[currentIndex].id,
+          name: _conversations[currentIndex].name,
+          lastMessageTime: _messages.isNotEmpty ? _messages.last.timestamp : _conversations[currentIndex].lastMessageTime,
+          messages: List.from(_messages), // Ensure conversation has the new messages
+          lastMessagePreview: _messages.isNotEmpty ? _getMessagePreview(_messages.last) : null,
+        );
+      }
+    }
+    notifyListeners();
+  }
+
   // Clear chat history
   void clearChatHistory() {
     _messages.clear();

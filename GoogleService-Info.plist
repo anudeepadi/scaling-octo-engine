@@ -2,18 +2,24 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+	<key>CLIENT_ID</key>
+	<string>560333483278-1dihc2h1inbto21q0uddqttt3600fsrm.apps.googleusercontent.com</string>
+	<key>REVERSED_CLIENT_ID</key>
+	<string>com.googleusercontent.apps.560333483278-1dihc2h1inbto21q0uddqttt3600fsrm</string>
+	<key>ANDROID_CLIENT_ID</key>
+	<string>560333483278-ofcn6hvm6nieh9vljgt6hqmbiq1ert0f.apps.googleusercontent.com</string>
 	<key>API_KEY</key>
-	<string>AIzaSyCr8skdeIGEOegb_pkeE1wyhunLTLVAyfE</string>
+	<string>AIzaSyC3U2IV08Nh_pfs3VVpyn8GE1tG7qLwJrA</string>
 	<key>GCM_SENDER_ID</key>
-	<string>476436430831</string>
+	<string>560333483278</string>
 	<key>PLIST_VERSION</key>
 	<string>1</string>
 	<key>BUNDLE_ID</key>
-	<string>com.example.rcsDemoApp</string>
+	<string>edu.utsa.quitxtmobile</string>
 	<key>PROJECT_ID</key>
-	<string>demoec-cea61</string>
+	<string>quitxtmobile</string>
 	<key>STORAGE_BUCKET</key>
-	<string>demoec-cea61.firebasestorage.app</string>
+	<string>quitxtmobile.firebasestorage.app</string>
 	<key>IS_ADS_ENABLED</key>
 	<false></false>
 	<key>IS_ANALYTICS_ENABLED</key>
@@ -25,6 +31,8 @@
 	<key>IS_SIGNIN_ENABLED</key>
 	<true></true>
 	<key>GOOGLE_APP_ID</key>
-	<string>1:476436430831:ios:3e9760e96cdfbead3d401a</string>
+	<string>1:560333483278:ios:05dfdea509de9518b8fb5f</string>
+	<key>DATABASE_URL</key>
+	<string>https://quitxtmobile-default-rtdb.firebaseio.com</string>
 </dict>
 </plist>

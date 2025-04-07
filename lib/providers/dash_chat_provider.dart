@@ -98,11 +98,17 @@ class DashChatProvider extends ChangeNotifier {
       final messages = snapshot.docs.map((doc) {
           final data = doc.data(); // Already Map<String, dynamic>
           
-          // Map fields from the /chat structure
-          final createdAtMillis = data['createdAt'] as int?; // Expecting int milliseconds
-          final timestamp = createdAtMillis != null
-              ? DateTime.fromMillisecondsSinceEpoch(createdAtMillis)
-              : DateTime.now(); // Provide default if createdAt is missing/null
+          // --- Correctly handle Firestore Timestamp --- 
+          final createdAtData = data['createdAt'];
+          DateTime timestamp;
+          if (createdAtData is Timestamp) {
+              timestamp = createdAtData.toDate(); // Convert Firestore Timestamp to DateTime
+          } else {
+              // Fallback or error handling if it's not a Timestamp (or null)
+              print('Warning: createdAt field is not a Firestore Timestamp or is null.');
+              timestamp = DateTime.now(); // Default to now or handle as error
+          }
+          // --- End of Timestamp handling --- 
           
           final messageContent = data['messageBody'] as String? ?? ''; // Use messageBody
           final source = data['source'] as String?;

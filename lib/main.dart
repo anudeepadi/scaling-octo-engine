@@ -20,6 +20,7 @@ import 'screens/main_screen.dart';
 
 // Import Firebase
 import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'services/firebase_connection_service.dart';
 
 void main() async {
@@ -29,6 +30,10 @@ void main() async {
     // Initialize Firebase
     await Firebase.initializeApp();
     print('Firebase initialized successfully');
+    
+    // Request FCM token
+    final fcmToken = await FirebaseMessaging.instance.getToken();
+    print('FCM Token: $fcmToken');
     
     // Test Firebase connection - but don't block app startup if it fails
     try {

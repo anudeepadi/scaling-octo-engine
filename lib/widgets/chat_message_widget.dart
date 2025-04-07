@@ -4,7 +4,7 @@ import 'package:video_player/video_player.dart';
 import 'package:chewie/chewie.dart';
 import 'package:flutter_linkify/flutter_linkify.dart';
 import 'package:url_launcher/url_launcher.dart';
-import 'package:cached_network_image/cached_network_image.dart';
+// import 'package:cached_network_image/cached_network_image.dart';
 import '../models/chat_message.dart';
 import '../models/quick_reply.dart';
 import 'video_player_widget.dart';
@@ -104,27 +104,43 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
           // Display the tappable thumbnail
           GestureDetector(
             onTap: () => _launchURL(firstUrl), // Launch the found URL
-            child: CachedNetworkImage(
-              imageUrl: thumbnailUrl,
-              placeholder: (context, url) => Container(
-                  height: 150, // Adjusted placeholder size
-                  width: double.infinity,
-                  color: Colors.grey[300],
-                  child: const Center(child: CircularProgressIndicator())),
-              errorWidget: (context, url, error) => Container(
-                  height: 150, // Adjusted error placeholder size
-                  width: double.infinity,
-                  color: Colors.grey[300],
-                  child: const Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(Icons.error),
-                      SizedBox(height: 4),
-                      Text('Tap to open link', style: TextStyle(fontSize: 12)),
-                    ],
-                  )),
+            child: Image.network(
+              thumbnailUrl,
+              height: 150, // Maintain approximate size
+              width: double.infinity,
               fit: BoxFit.cover,
-              width: double.infinity, // Make thumbnail take available width
+              // Basic placeholder/error handling for Image.network
+              loadingBuilder: (context, child, loadingProgress) {
+                if (loadingProgress == null) return child; // Image loaded
+                return Container(
+                  height: 150,
+                  width: double.infinity,
+                  color: Colors.grey[300],
+                  child: Center(
+                    child: CircularProgressIndicator(
+                      value: loadingProgress.expectedTotalBytes != null
+                          ? loadingProgress.cumulativeBytesLoaded /
+                              loadingProgress.expectedTotalBytes!
+                          : null,
+                    ),
+                  ),
+                );
+              },
+              errorBuilder: (context, error, stackTrace) {
+                print("Image.network Error loading $thumbnailUrl: $error"); // Add error logging
+                return Container(
+                    height: 150,
+                    width: double.infinity,
+                    color: Colors.grey[300],
+                    child: const Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.error),
+                        SizedBox(height: 4),
+                        Text('Tap to open link', style: TextStyle(fontSize: 12)),
+                      ],
+                    ));
+              },
             ),
           ),
           // Display text after the URL if any

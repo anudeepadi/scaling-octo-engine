@@ -85,6 +85,11 @@ class DashChatProvider extends ChangeNotifier {
   void _setupFirebaseListeners(User user) {
     // Cancel any previous message subscription
     _messageSubscription?.cancel();
+
+    // <<< Clear existing messages BEFORE setting up new listener >>>
+    _chatProvider?.clearChatHistory();
+    print('DashChatProvider: Cleared chat history before setting up new listener.');
+
     final userId = user.uid;
     final collectionPath = 'messages/$userId/messages'; // Corrected path
     print('DashChatProvider: Setting up Firestore message listener for user $userId at /$collectionPath');

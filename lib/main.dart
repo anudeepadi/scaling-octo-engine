@@ -67,18 +67,20 @@ class MyApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => ChatModeProvider()),
         ChangeNotifierProvider(create: (_) => GeminiChatProvider()),
         Provider(create: (_) => BotService()),
-        // Create DashChatProvider with Firebase if available
         ChangeNotifierProvider(create: (_) {
-          // Remove the try-catch and the fallback
-          // try {
-            // Try to use the Firebase-enabled constructor first
-            return DashChatProvider();
-          /* } catch (e) {
-            print('Error initializing DashChatProvider with Firebase: $e');
-            print('Falling back to demo mode without Firebase');
-            // The withoutFirebase constructor was removed
-            // return DashChatProvider.withoutFirebase(); 
-          } */
+          final dashChatProvider = DashChatProvider();
+          // Initialize ServerMessageService when user is authenticated
+          final authProvider = AuthProvider();
+          if (authProvider.isAuthenticated) {
+            final userId = authProvider.currentUser?.uid ?? '';
+            final fcmToken = FirebaseMessaging.instance.getToken();
+            fcmToken.then((token) {
+              if (token != null) {
+                dashChatProvider.initializeServerService(userId, token);
+              }
+            });
+          }
+          return dashChatProvider;
         }),
         ChangeNotifierProvider(create: (_) => ServiceProvider()),
       ],

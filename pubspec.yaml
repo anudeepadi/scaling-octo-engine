@@ -33,7 +33,7 @@ dependencies:
   image_picker: ^1.0.7
   # Firebase - using fixed versions to avoid conflicts
   firebase_core: ^2.24.2
-  firebase_auth: ^4.15.3
+  firebase_auth: ^4.16.0
   cloud_firestore: ^4.13.6
   firebase_messaging: ^14.7.10
   firebase_storage: ^11.5.6

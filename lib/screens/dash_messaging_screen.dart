@@ -226,9 +226,13 @@ class _DashMessagingScreenState extends State<DashMessagingScreen> {
                   final data = doc.data() as Map<String, dynamic>;
                   final timestamp = data['timestamp'] as Timestamp?;
 
+                  // Determine content based on sender
+                  final isServerMessage = data['source'] == 'server';
+                  final content = data[isServerMessage ? 'messageBody' : 'content'] ?? '';
+
                   return ChatMessage(
                     id: doc.id,
-                    content: data['content'] ?? '',
+                    content: content, // Use the determined content
                     isMe: data['senderId'] == _currentUser?.uid, // Check if message is from current user
                     timestamp: timestamp?.toDate() ?? DateTime.now(), // Handle null timestamp
                     type: data.containsKey('type') && data['type'] is int

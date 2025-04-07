@@ -11,6 +11,9 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 // Remove FirebaseConnectionService import
 // import '../services/firebase_connection_service.dart';
 import 'package:firebase_auth/firebase_auth.dart'; // Add FirebaseAuth import
+import 'package:flutter/foundation.dart';
+import 'package:uuid/uuid.dart';
+import '../services/server_message_service.dart';
 
 class DashChatProvider extends ChangeNotifier {
   // Remove DashMessagingService instance if only used for sending
@@ -23,8 +26,9 @@ class DashChatProvider extends ChangeNotifier {
   final FirebaseAuth _auth;
   ChatProvider? _chatProvider; // Add reference to ChatProvider
   StreamSubscription? _authSubscription;
-  StreamSubscription? _messageSubscription;
+  StreamSubscription<QuerySnapshot>? _messageSubscription;
   User? _currentUser;
+  ServerMessageService? _serverMessageService;
 
   bool _isTyping = false;
   bool get isTyping => _isTyping;
@@ -140,6 +144,14 @@ class DashChatProvider extends ChangeNotifier {
     });
   }
 
+  // Initialize the server message service
+  void initializeServerService(String userId, String fcmToken) {
+    _serverMessageService = ServerMessageService(
+      userId: userId,
+      fcmToken: fcmToken,
+    );
+  }
+
   // Send a message directly to Firestore
   Future<void> sendMessage(String message) async {
     final authInstance = FirebaseAuth.instance;
@@ -165,33 +177,46 @@ class DashChatProvider extends ChangeNotifier {
         })
         .catchError((error, stackTrace) {
            print('[SendMessage] .catchError() during userDocRef.set(): $error\n$stackTrace');
-           // Re-throw or handle as needed, for now just logging
-           throw error; // Re-throw to be caught by outer catch block if needed
+           throw error;
         });
-      print('[SendMessage] Post-set: Document ensured/created successfully: ${userDocRef.path}'); // Keep this log
+      print('[SendMessage] Post-set: Document ensured/created successfully: ${userDocRef.path}');
 
+      // Generate a unique message ID
+      final messageId = const Uuid().v4();
+      
       print('[SendMessage] Attempting to add message to subcollection: ${userDocRef.collection("chat").path}');
       await userDocRef.collection('chat')
-          .add({
+          .doc(messageId)
+          .set({
             'messageBody': messageContent,
             'source': 'user',
             'createdAt': FieldValue.serverTimestamp(),
+            'eventTypeCode': 1, // Regular message
           })
-          .then((docRef) {
-             print('[SendMessage] .then(): Message added successfully with ID: ${docRef.id}');
+          .then((_) {
+             print('[SendMessage] .then(): Message added successfully with ID: $messageId');
           })
           .catchError((error, stackTrace) {
              print('[SendMessage] .catchError() during collection.add(): $error\n$stackTrace');
-             throw error; // Re-throw
+             throw error;
           });
-      print('[SendMessage] Post-add: Message added successfully to subcollection.'); // Keep this log
+      print('[SendMessage] Post-add: Message added successfully to subcollection.');
 
-    } catch (e, s) { // Outer catch block remains
-      // Check if userDocRef was assigned to distinguish errors
+      // Process the message using ServerMessageService
+      if (_serverMessageService != null) {
+        await _serverMessageService!.processMessage(
+          messageText: messageContent,
+          messageId: messageId,
+          eventTypeCode: 1,
+        );
+      } else {
+        print('Warning: ServerMessageService not initialized');
+      }
+
+    } catch (e, s) {
       if (userDocRef == null) {
          print('[SendMessage] Error initializing DocumentReference: $e\n$s');
       } else if (await userDocRef.get().then((_) => false).catchError((_) => true)) {
-         // Crude check: If getting the doc errors out *after* the set attempt, the set likely failed
          print('[SendMessage] Error likely during userDocRef.set(): $e\n$s');
       } else {
          print('[SendMessage] Error likely during collection.add(): $e\n$s');
@@ -211,7 +236,6 @@ class DashChatProvider extends ChangeNotifier {
     final userId = currentUser.uid;
     final replyContent = reply.value;
     
-    // Log the userId being used
     print('[HandleQuickReply] Using userId: $userId');
 
     DocumentReference? userDocRef;
@@ -225,28 +249,43 @@ class DashChatProvider extends ChangeNotifier {
           })
           .catchError((error, stackTrace) {
              print('[HandleQuickReply] .catchError() during userDocRef.set(): $error\n$stackTrace');
-             throw error; // Re-throw
+             throw error;
           });
-       print('[HandleQuickReply] Post-set: Document ensured/created successfully: ${userDocRef.path}'); // Keep
+       print('[HandleQuickReply] Post-set: Document ensured/created successfully: ${userDocRef.path}');
+
+       // Generate a unique message ID
+       final messageId = const Uuid().v4();
 
        print('[HandleQuickReply] Attempting to add quick reply to subcollection: ${userDocRef.collection("chat").path}');
        await userDocRef.collection('chat')
-           .add({
+           .doc(messageId)
+           .set({
              'messageBody': replyContent,
              'source': 'user',
              'createdAt': FieldValue.serverTimestamp(),
+             'eventTypeCode': 2, // Quick reply
            })
-           .then((docRef) {
-             print('[HandleQuickReply] .then(): Quick reply added successfully with ID: ${docRef.id}');
+           .then((_) {
+             print('[HandleQuickReply] .then(): Quick reply added successfully with ID: $messageId');
            })
            .catchError((error, stackTrace) {
              print('[HandleQuickReply] .catchError() during collection.add(): $error\n$stackTrace');
-             throw error; // Re-throw
+             throw error;
            });
-       print('[HandleQuickReply] Post-add: Quick reply added successfully to subcollection.'); // Keep
+       print('[HandleQuickReply] Post-add: Quick reply added successfully to subcollection.');
 
-    } catch (e, s) { // Outer catch block remains
-      // Check if userDocRef was assigned to distinguish errors
+       // Process the quick reply using ServerMessageService
+       if (_serverMessageService != null) {
+         await _serverMessageService!.processMessage(
+           messageText: replyContent,
+           messageId: messageId,
+           eventTypeCode: 2,
+         );
+       } else {
+         print('Warning: ServerMessageService not initialized');
+       }
+
+    } catch (e, s) {
       if (userDocRef == null) {
          print('[HandleQuickReply] Error initializing DocumentReference: $e\n$s');
       } else if (await userDocRef.get().then((_) => false).catchError((_) => true)) {

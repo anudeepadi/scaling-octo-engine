@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart'; // Import Provider
 // Remove Cupertino import if not used elsewhere
 // import 'package:flutter/cupertino.dart';
 // Remove Platform import if not used elsewhere
@@ -6,6 +7,8 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart'; // Add Firestore import
 import 'package:firebase_auth/firebase_auth.dart'; // Add Auth import
 import '../models/chat_message.dart';
+import '../models/quick_reply.dart'; // Import the QuickReply model
+import '../providers/dash_chat_provider.dart'; // Import DashChatProvider
 // Remove DashMessagingService import
 // import '../services/dash_messaging_service.dart';
 // Remove AuthProvider import if not used elsewhere after changes
@@ -179,6 +182,9 @@ class _DashMessagingScreenState extends State<DashMessagingScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // Get the DashChatProvider instance
+    final dashChatProvider = Provider.of<DashChatProvider>(context, listen: false);
+
     // Potentially get user again if Auth state changes? Or rely on initial state.
     _currentUser = _auth.currentUser;
     if (_currentUser == null) {
@@ -230,11 +236,19 @@ class _DashMessagingScreenState extends State<DashMessagingScreen> {
                   final isServerMessage = data['source'] == 'server';
                   final content = data[isServerMessage ? 'messageBody' : 'content'] ?? '';
 
+                  // Extract quick replies (answers)
+                  List<QuickReply>? suggestedReplies;
+                  if (data.containsKey('answers') && data['answers'] is List) {
+                    final answers = List<String>.from(data['answers']);
+                    suggestedReplies = answers.map((text) => QuickReply(text: text, value: text)).toList();
+                  }
+
                   return ChatMessage(
                     id: doc.id,
                     content: content, // Use the determined content
                     isMe: data['senderId'] == _currentUser?.uid, // Check if message is from current user
                     timestamp: timestamp?.toDate() ?? DateTime.now(), // Handle null timestamp
+                    suggestedReplies: suggestedReplies, // Assign extracted replies
                     type: data.containsKey('type') && data['type'] is int
                           ? MessageType.values[data['type']]
                           : MessageType.text, // Default or handle error
@@ -253,7 +267,21 @@ class _DashMessagingScreenState extends State<DashMessagingScreen> {
                   itemCount: messages.length,
                   itemBuilder: (context, index) {
                     final message = messages[index];
-                    return ChatMessageWidget(message: message);
+                    return ChatMessageWidget(
+                      message: message,
+                      // Pass the handleQuickReply function from the provider
+                      onQuickReplyTap: (replyValue) {
+                        // Find the QuickReply object corresponding to the value
+                        final selectedReply = message.suggestedReplies?.firstWhere(
+                          (qr) => qr.value == replyValue,
+                          // Return a dummy or handle error if not found (shouldn't happen)
+                          orElse: () => QuickReply(text: replyValue, value: replyValue),
+                        );
+                        if (selectedReply != null) {
+                          dashChatProvider.handleQuickReply(selectedReply);
+                        }
+                      },
+                    );
                   },
                 );
               },

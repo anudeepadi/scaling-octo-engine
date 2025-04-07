@@ -85,42 +85,53 @@ class DashChatProvider extends ChangeNotifier {
   void _setupFirebaseListeners(User user) {
     // Cancel any previous message subscription
     _messageSubscription?.cancel();
-    print('DashChatProvider: Setting up Firestore message listener for user ${user.uid} at /messages/${user.uid}/chat');
+    final userId = user.uid;
+    final collectionPath = 'messages/$userId/messages'; // Corrected path
+    print('DashChatProvider: Setting up Firestore message listener for user $userId at /$collectionPath');
 
-    // Use the correct collection path and order field
-    final messageStream = _firestore
-        .collection('messages')
-        .doc(user.uid)
-        .collection('chat')
-        // .orderBy('createdAt', descending: false) // <<< Temporarily remove ordering
-        .snapshots();
-
-    _messageSubscription = messageStream.listen((snapshot) {
+    _messageSubscription = _firestore
+        .collection(collectionPath) // Use the corrected path variable
+        .orderBy('timestamp', descending: false) // Order by timestamp
+        .snapshots()
+        .listen((snapshot) {
       if (_chatProvider == null) return; // Don't process if chatProvider isn't linked
 
-      print('DashChatProvider: Received ${snapshot.docs.length} messages from Firestore (/chat path).');
+      print('DashChatProvider: Received ${snapshot.docs.length} messages from Firestore (/$collectionPath).');
       final messages = snapshot.docs.map((doc) {
           final data = doc.data(); // Already Map<String, dynamic>
           
           // --- Correctly handle Firestore Timestamp --- 
-          final createdAtData = data['createdAt'];
+          final timestampData = data['timestamp']; // Check for 'timestamp'
           DateTime timestamp;
-          if (createdAtData is Timestamp) {
-              timestamp = createdAtData.toDate(); // Convert Firestore Timestamp to DateTime
+          if (timestampData is Timestamp) {
+              timestamp = timestampData.toDate(); // Convert Firestore Timestamp to DateTime
           } else {
               // Fallback or error handling if it's not a Timestamp (or null)
-              print('Warning: createdAt field is not a Firestore Timestamp or is null.');
+              print('Warning: timestamp field is not a Firestore Timestamp or is null for doc ${doc.id}.');
               timestamp = DateTime.now(); // Default to now or handle as error
           }
           // --- End of Timestamp handling --- 
           
-          final messageContent = data['messageBody'] as String? ?? ''; // Use messageBody
+          final messageContent = data['messageBody'] as String? ?? data['content'] as String? ?? ''; // Check both fields
           final source = data['source'] as String?;
-          final isMe = source != 'server'; // Assume not from 'server' means it's from the user
+          final senderId = data['senderId'] as String?;
+          // Determine isMe based on senderId matching current user, or lack of 'server' source
+          final isMe = (senderId != null && senderId == _currentUser?.uid) || (source == null && senderId == null); 
+
+          // Extract quick replies (answers)
+          List<QuickReply>? suggestedReplies;
+          if (data.containsKey('answers') && data['answers'] is List) {
+            final answers = List<String>.from(data['answers']);
+            suggestedReplies = answers.map((text) => QuickReply(text: text, value: text)).toList();
+          }
           
-          // Default type and status for now, adjust if needed
-          final messageType = MessageType.text;
-          final messageStatus = MessageStatus.delivered; // Since it's read from DB
+          // Determine type and status based on available data
+          final messageType = data.containsKey('type') && data['type'] is int
+                ? MessageType.values[data['type']]
+                : MessageType.text;
+          final messageStatus = data.containsKey('status') && data['status'] is int
+                ? MessageStatus.values[data['status']]
+                : (isMe ? MessageStatus.sent : MessageStatus.delivered); // Sensible defaults
 
           // Perform robust mapping
           return ChatMessage(
@@ -128,10 +139,10 @@ class DashChatProvider extends ChangeNotifier {
               content: messageContent,
               isMe: isMe,
               timestamp: timestamp, 
+              suggestedReplies: suggestedReplies, // Include replies
               type: messageType,
               status: messageStatus,
               // Map other ChatMessage fields if corresponding data exists in Firestore
-              // e.g., quickReplies from 'answers' if isPoll == 'y' ?
           );
       }).toList();
 
@@ -139,7 +150,7 @@ class DashChatProvider extends ChangeNotifier {
       _chatProvider!.setMessages(messages);
 
     }, onError: (error) {
-      print('DashChatProvider: Error listening to messages (/chat path): $error');
+      print('DashChatProvider: Error listening to messages (/$collectionPath): $error');
       // Optionally update ChatProvider with an error state
     });
   }
@@ -184,14 +195,16 @@ class DashChatProvider extends ChangeNotifier {
       // Generate a unique message ID
       final messageId = const Uuid().v4();
       
-      print('[SendMessage] Attempting to add message to subcollection: ${userDocRef.collection("chat").path}');
-      await userDocRef.collection('chat')
+      print('[SendMessage] Attempting to add message to subcollection: ${userDocRef.collection("messages").path}');
+      await userDocRef.collection('messages')
           .doc(messageId)
           .set({
-            'messageBody': messageContent,
-            'source': 'user',
-            'createdAt': FieldValue.serverTimestamp(),
-            'eventTypeCode': 1, // Regular message
+            'content': messageContent,
+            'senderId': userId,
+            'timestamp': FieldValue.serverTimestamp(),
+            'type': MessageType.text.index,
+            'status': MessageStatus.sending.index,
+            'eventTypeCode': 1,
           })
           .then((_) {
              print('[SendMessage] .then(): Message added successfully with ID: $messageId');
@@ -243,57 +256,39 @@ class DashChatProvider extends ChangeNotifier {
        userDocRef = _firestore.collection('messages').doc(userId);
        
        print('[HandleQuickReply] Attempting to ensure document exists: ${userDocRef.path}');
-       await userDocRef.set({'_placeholder': FieldValue.serverTimestamp()}, SetOptions(merge: true))
-          .then((_) {
-             print('[HandleQuickReply] .then(): Document set/merge completed.');
-          })
-          .catchError((error, stackTrace) {
-             print('[HandleQuickReply] .catchError() during userDocRef.set(): $error\n$stackTrace');
-             throw error;
+       await userDocRef.set({'_placeholder': FieldValue.serverTimestamp()}, SetOptions(merge: true));
+       // No need for .then/.catchError here if using await
+       print('[HandleQuickReply] Document set/merge completed.');
+
+       // Generate a unique message ID for the reply
+       final replyMessageId = const Uuid().v4();
+
+       print('[HandleQuickReply] Attempting to add reply message to subcollection: ${userDocRef.collection("messages").path}'); // Use messages path
+       await userDocRef.collection('messages') // Use messages path
+          .doc(replyMessageId)
+          .set({
+            'content': replyContent, // Use 'content' for user replies
+            'senderId': userId,
+            'timestamp': FieldValue.serverTimestamp(), // Use 'timestamp'
+            'type': MessageType.text.index,
+            'status': MessageStatus.sending.index,
+            'eventTypeCode': 2, // Quick reply event type
           });
-       print('[HandleQuickReply] Post-set: Document ensured/created successfully: ${userDocRef.path}');
-
-       // Generate a unique message ID
-       final messageId = const Uuid().v4();
-
-       print('[HandleQuickReply] Attempting to add quick reply to subcollection: ${userDocRef.collection("chat").path}');
-       await userDocRef.collection('chat')
-           .doc(messageId)
-           .set({
-             'messageBody': replyContent,
-             'source': 'user',
-             'createdAt': FieldValue.serverTimestamp(),
-             'eventTypeCode': 2, // Quick reply
-           })
-           .then((_) {
-             print('[HandleQuickReply] .then(): Quick reply added successfully with ID: $messageId');
-           })
-           .catchError((error, stackTrace) {
-             print('[HandleQuickReply] .catchError() during collection.add(): $error\n$stackTrace');
-             throw error;
-           });
-       print('[HandleQuickReply] Post-add: Quick reply added successfully to subcollection.');
+       print('[HandleQuickReply] Reply message added successfully with ID: $replyMessageId');
 
        // Process the quick reply using ServerMessageService
        if (_serverMessageService != null) {
          await _serverMessageService!.processMessage(
            messageText: replyContent,
-           messageId: messageId,
-           eventTypeCode: 2,
+           messageId: replyMessageId,
+           eventTypeCode: 2, // Quick reply event type
          );
        } else {
-         print('Warning: ServerMessageService not initialized');
+         print('Warning: ServerMessageService not initialized for quick reply processing');
        }
 
     } catch (e, s) {
-      if (userDocRef == null) {
-         print('[HandleQuickReply] Error initializing DocumentReference: $e\n$s');
-      } else if (await userDocRef.get().then((_) => false).catchError((_) => true)) {
-         print('[HandleQuickReply] Error likely during userDocRef.set(): $e\n$s');
-      } else {
-         print('[HandleQuickReply] Error likely during collection.add(): $e\n$s');
-      }
-      print('[HandleQuickReply] Outer catch block details: $e\nStack trace:\n$s');
+      print('[HandleQuickReply] Error: $e\n$s');
     }
   }
 

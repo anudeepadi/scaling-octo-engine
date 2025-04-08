@@ -269,18 +269,6 @@ class _DashMessagingScreenState extends State<DashMessagingScreen> {
                     final message = messages[index];
                     return ChatMessageWidget(
                       message: message,
-                      // Pass the handleQuickReply function from the provider
-                      onQuickReplyTap: (replyValue) {
-                        // Find the QuickReply object corresponding to the value
-                        final selectedReply = message.suggestedReplies?.firstWhere(
-                          (qr) => qr.value == replyValue,
-                          // Return a dummy or handle error if not found (shouldn't happen)
-                          orElse: () => QuickReply(text: replyValue, value: replyValue),
-                        );
-                        if (selectedReply != null) {
-                          dashChatProvider.handleQuickReply(selectedReply);
-                        }
-                      },
                     );
                   },
                 );

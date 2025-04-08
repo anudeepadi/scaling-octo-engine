@@ -29,9 +29,11 @@ class DashChatProvider extends ChangeNotifier {
   StreamSubscription<QuerySnapshot>? _messageSubscription;
   User? _currentUser;
   ServerMessageService? _serverMessageService;
+  bool _isServerServiceInitialized = false; // Add this field
 
   bool _isTyping = false;
   bool get isTyping => _isTyping;
+  bool get isServerServiceInitialized => _isServerServiceInitialized; // Add this getter
 
   // Constructor for use with Firebase
   DashChatProvider()
@@ -65,8 +67,9 @@ class DashChatProvider extends ChangeNotifier {
       if (user == null) {
         // User logged out
         _currentUser = null;
-        _messageSubscription?.cancel();
-        _chatProvider?.clearChatHistory(); // Clear messages on logout
+        // _messageSubscription?.cancel(); // Moved cancellation to clearOnLogout
+        // _chatProvider?.clearChatHistory(); // Moved clearing to clearOnLogout (via proxy provider call)
+        // clearOnLogout(); // Let the proxy provider call this
         notifyListeners(); // Notify if provider state depends on auth
       } else {
         // User logged in
@@ -103,7 +106,8 @@ class DashChatProvider extends ChangeNotifier {
 
       print('DashChatProvider: Received ${snapshot.docs.length} messages from Firestore (/$collectionPath).');
       final messages = snapshot.docs.map((doc) {
-          final data = doc.data(); // Already Map<String, dynamic>
+          print('\n[QuickReplyDebug] Processing doc ID: ${doc.id}'); // Log Doc ID
+          final data = doc.data(); 
           
           // --- Correctly handle Firestore Timestamp --- 
           final timestampData = data['timestamp']; // Check for 'timestamp'
@@ -122,14 +126,58 @@ class DashChatProvider extends ChangeNotifier {
           final senderId = data['senderId'] as String?;
           // Determine isMe based on senderId matching current user, or lack of 'server' source
           final isMe = (senderId != null && senderId == _currentUser?.uid) || (source == null && senderId == null); 
+          print('[QuickReplyDebug] isMe: $isMe (senderId: $senderId, source: $source)'); // Log isMe calculation
+          print('[QuickReplyDebug] Message Content: "$messageContent"'); // Log Content
 
-          // Extract quick replies (answers)
           List<QuickReply>? suggestedReplies;
+          List<String>? answersFromData;
+          // Extract existing quick replies (answers) first
           if (data.containsKey('answers') && data['answers'] is List) {
-            final answers = List<String>.from(data['answers']);
-            suggestedReplies = answers.map((text) => QuickReply(text: text, value: text)).toList();
+            answersFromData = List<String>.from(data['answers']);
+            print("[QuickReplyDebug] Found 'answers' field: $answersFromData"); // Use double quotes
+            if (answersFromData.isNotEmpty) { 
+               suggestedReplies = answersFromData.map((text) => QuickReply(text: text, value: text)).toList();
+               print("[QuickReplyDebug] Created suggestedReplies from 'answers' field: ${suggestedReplies?.length ?? 0} replies"); // Use double quotes
+            }
+          } else {
+             print("[QuickReplyDebug] 'answers' field not found or not a List."); // Use double quotes
           }
+
+          // ---- Add keyword-based quick replies if message is from server and no 'answers' were provided ----
+          final shouldCheckKeywords = !isMe && (suggestedReplies == null || suggestedReplies.isEmpty);
+          print('[QuickReplyDebug] Should check keywords? $shouldCheckKeywords (!isMe: ${!isMe}, repliesEmpty: ${(suggestedReplies == null || suggestedReplies.isEmpty)}) ');
+          if (shouldCheckKeywords) {
+            final messageContentLower = messageContent.toLowerCase();
+            final List<Map<String, List<String>>> keywordGroups = [
+              {'keywords': ['hello', 'hi'], 'replies': ['hello', 'hi']},
+              {'keywords': ['how', 'help'], 'replies': ['how', 'help']},
+              {'keywords': ['why', 'reason'], 'replies': ['why', 'reason']},
+              {'keywords': ['smoke', 'cigarette'], 'replies': ['smoke', 'cigarette']},
+              {'keywords': ['drink', 'alcohol'], 'replies': ['drink', 'alcohol']},
+            ];
+
+            bool keywordMatchFound = false; // Flag to track if any keyword matched
+            for (var group in keywordGroups) {
+              bool matchFoundInGroup = group['keywords']!.any((keyword) => messageContentLower.contains(keyword));
+              if (matchFoundInGroup) {
+                 print('[QuickReplyDebug] Keyword match found in group: ${group['keywords']}'); // Log which group matched
+                 suggestedReplies = group['replies']!
+                    .map((replyText) => QuickReply(text: replyText, value: replyText))
+                    .toList();
+                 keywordMatchFound = true;
+                 break; 
+              }
+            }
+            if (!keywordMatchFound) {
+                 print('[QuickReplyDebug] No keyword match found in message content.');
+            }
+          } else if (!isMe) {
+             print("[QuickReplyDebug] Not checking keywords because replies already exist from 'answers' field."); // Use double quotes
+          }
+          // ---- End of keyword-based quick replies ----
           
+          print('[QuickReplyDebug] Final suggestedReplies count: ${suggestedReplies?.length ?? 0}'); // Log final reply count
+
           // Determine type and status based on available data
           final messageType = data.containsKey('type') && data['type'] is int
                 ? MessageType.values[data['type']]
@@ -144,7 +192,7 @@ class DashChatProvider extends ChangeNotifier {
               content: messageContent,
               isMe: isMe,
               timestamp: timestamp, 
-              suggestedReplies: suggestedReplies, // Include replies
+              suggestedReplies: suggestedReplies, // Include replies (either from 'answers' or keywords)
               type: messageType,
               status: messageStatus,
               // Map other ChatMessage fields if corresponding data exists in Firestore
@@ -162,10 +210,27 @@ class DashChatProvider extends ChangeNotifier {
 
   // Initialize the server message service
   void initializeServerService(String userId, String fcmToken) {
+    print('[DashChatProvider] Initializing ServerMessageService for user $userId'); // Added log
     _serverMessageService = ServerMessageService(
       userId: userId,
       fcmToken: fcmToken,
     );
+    _isServerServiceInitialized = true; // Set flag
+    print('[DashChatProvider] ServerMessageService Initialized. Flag set: $_isServerServiceInitialized'); // Added log
+    notifyListeners(); // Notify potentially interested listeners
+  }
+
+  // Add the clearOnLogout method
+  void clearOnLogout() {
+    print('[DashChatProvider] Clearing state on logout.');
+    _messageSubscription?.cancel();
+    _messageSubscription = null; // Ensure it's null after cancelling
+    _serverMessageService = null; // Clear the service instance
+    _isServerServiceInitialized = false; // Reset the flag
+    // Note: _chatProvider?.clearChatHistory() is likely handled by ChatProvider itself
+    // listening to AuthProvider or called separately. Avoid duplicate clears.
+    print('[DashChatProvider] State cleared. Subscription cancelled: ${_messageSubscription == null}, Service cleared: ${_serverMessageService == null}, Flag reset: $_isServerServiceInitialized');
+    notifyListeners(); // Notify listeners about the state change
   }
 
   // Send a message directly to Firestore
@@ -245,31 +310,32 @@ class DashChatProvider extends ChangeNotifier {
 
   // Handle quick reply selection by sending a message to Firestore
   Future<void> handleQuickReply(QuickReply reply) async {
+    print("[HandleQuickReply] Method called with reply: text='${reply.text}', value='${reply.value}'"); // Log entry and reply
+    
     final authInstance = FirebaseAuth.instance;
     final currentUser = authInstance.currentUser;
     if (reply.value.isEmpty || currentUser == null) {
-       print('Quick reply value empty or user not logged in. Cannot send.');
+       print('[HandleQuickReply] Error: Reply value empty or user not logged in. Cannot send.');
       return;
     }
     final userId = currentUser.uid;
     final replyContent = reply.value;
     
-    print('[HandleQuickReply] Using userId: $userId');
+    print('[HandleQuickReply] Using userId: $userId, Reply Content: "$replyContent"');
 
     DocumentReference? userDocRef;
+    final replyMessageId = const Uuid().v4(); // Generate ID early for logging
+    print('[HandleQuickReply] Generated Reply Message ID: $replyMessageId');
+
     try {
        userDocRef = _firestore.collection('messages').doc(userId);
-       
-       print('[HandleQuickReply] Attempting to ensure document exists: ${userDocRef.path}');
-       await userDocRef.set({'_placeholder': FieldValue.serverTimestamp()}, SetOptions(merge: true));
-       // No need for .then/.catchError here if using await
-       print('[HandleQuickReply] Document set/merge completed.');
+       final messageSubcollectionPath = userDocRef.collection("messages").path;
+       print('[HandleQuickReply] User doc path: ${userDocRef.path}');
+       print('[HandleQuickReply] Message subcollection path: $messageSubcollectionPath');
 
-       // Generate a unique message ID for the reply
-       final replyMessageId = const Uuid().v4();
-
-       print('[HandleQuickReply] Attempting to add reply message to subcollection: ${userDocRef.collection("messages").path}'); // Use messages path
-       await userDocRef.collection('messages') // Use messages path
+       // --- Firestore Write --- 
+       print('[HandleQuickReply] Attempting to add reply message to Firestore...');
+       await userDocRef.collection('messages') 
           .doc(replyMessageId)
           .set({
             'content': replyContent, // Use 'content' for user replies
@@ -277,23 +343,29 @@ class DashChatProvider extends ChangeNotifier {
             'timestamp': FieldValue.serverTimestamp(), // Use 'timestamp'
             'type': MessageType.text.index,
             'status': MessageStatus.sending.index,
-            'eventTypeCode': 2, // Quick reply event type
+            'eventTypeCode': 1, // Change eventTypeCode from 2 to 1
           });
-       print('[HandleQuickReply] Reply message added successfully with ID: $replyMessageId');
+       print('[HandleQuickReply] Successfully added reply message to Firestore (ID: $replyMessageId).');
 
-       // Process the quick reply using ServerMessageService
+       // --- Server Processing --- 
        if (_serverMessageService != null) {
+         print('[HandleQuickReply] Attempting to process reply message via ServerMessageService...');
          await _serverMessageService!.processMessage(
            messageText: replyContent,
            messageId: replyMessageId,
-           eventTypeCode: 2, // Quick reply event type
+           eventTypeCode: 1, // Change eventTypeCode from 2 to 1
          );
+         print('[HandleQuickReply] Successfully processed reply message via ServerMessageService.');
        } else {
-         print('Warning: ServerMessageService not initialized for quick reply processing');
+         print('[HandleQuickReply] Warning: ServerMessageService not initialized, cannot process quick reply.');
        }
 
+       print('[HandleQuickReply] Method completed successfully.');
+
     } catch (e, s) {
-      print('[HandleQuickReply] Error: $e\n$s');
+      print('[HandleQuickReply] !!! ERROR occurred !!!');
+      print('[HandleQuickReply] Error details: $e');
+      print('[HandleQuickReply] Stack trace:\n$s');
     }
   }
 

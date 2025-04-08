@@ -67,22 +67,37 @@ class MyApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => ChatModeProvider()),
         ChangeNotifierProvider(create: (_) => GeminiChatProvider()),
         Provider(create: (_) => BotService()),
-        ChangeNotifierProvider(create: (_) {
-          final dashChatProvider = DashChatProvider();
-          // Initialize ServerMessageService when user is authenticated
-          final authProvider = AuthProvider();
-          if (authProvider.isAuthenticated) {
-            final userId = authProvider.currentUser?.uid ?? '';
-            final fcmToken = FirebaseMessaging.instance.getToken();
-            fcmToken.then((token) {
-              if (token != null) {
-                dashChatProvider.initializeServerService(userId, token);
-              }
-            });
-          }
-          return dashChatProvider;
-        }),
         ChangeNotifierProvider(create: (_) => ServiceProvider()),
+
+        ChangeNotifierProxyProvider<AuthProvider, DashChatProvider>(
+          create: (_) => DashChatProvider(),
+          update: (_, authProvider, previousDashChatProvider) {
+            final dashChatProvider = previousDashChatProvider ?? DashChatProvider();
+
+            if (authProvider.isAuthenticated && !dashChatProvider.isServerServiceInitialized) {
+              final userId = authProvider.currentUser?.uid;
+              if (userId != null) {
+                FirebaseMessaging.instance.getToken().then((token) {
+                  if (token != null) {
+                    print('Attempting to initialize Server Service for user: $userId with token: $token');
+                    dashChatProvider.initializeServerService(userId, token);
+                  } else {
+                     print('Failed to get FCM token for user: $userId');
+                  }
+                }).catchError((error) {
+                   print('Error getting FCM token or initializing server service for user $userId: $error');
+                });
+              } else {
+                 print('Cannot initialize Server Service: User ID is null even though authenticated.');
+              }
+            } else if (!authProvider.isAuthenticated) {
+               dashChatProvider.clearOnLogout();
+               print('User logged out, cleared DashChatProvider state.');
+            }
+
+            return dashChatProvider;
+          },
+        ),
       ],
       child: Consumer<AuthProvider>(
         builder: (context, authProvider, _) {

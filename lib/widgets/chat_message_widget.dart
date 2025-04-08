@@ -4,9 +4,10 @@ import 'package:video_player/video_player.dart';
 import 'package:chewie/chewie.dart';
 import 'package:flutter_linkify/flutter_linkify.dart';
 import 'package:url_launcher/url_launcher.dart';
-// import 'package:cached_network_image/cached_network_image.dart';
+import 'package:provider/provider.dart';
 import '../models/chat_message.dart';
 import '../models/quick_reply.dart';
+import '../providers/dash_chat_provider.dart';
 import 'video_player_widget.dart';
 import 'youtube_player_widget.dart';
 import 'platform/ios_chat_message_widget.dart';
@@ -17,14 +18,12 @@ class ChatMessageWidget extends StatefulWidget {
   final ChatMessage message;
   final VoidCallback? onReplyTap;
   final Function(String)? onReactionAdd;
-  final Function(String)? onQuickReplyTap;
 
   const ChatMessageWidget({
     Key? key,
     required this.message,
     this.onReplyTap,
     this.onReactionAdd,
-    this.onQuickReplyTap,
   }) : super(key: key);
 
   @override
@@ -213,7 +212,11 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
                   runSpacing: 8,
                   children: widget.message.suggestedReplies!
                       .map((reply) => TextButton(
-                            onPressed: () => widget.onQuickReplyTap?.call(reply.value),
+                            onPressed: () {
+                              print("[ChatMessageWidget] Quick Reply Button Tapped! Reply: ${reply.value}");
+                              final dashChatProvider = Provider.of<DashChatProvider>(context, listen: false);
+                              dashChatProvider.handleQuickReply(reply);
+                            },
                             child: Text(reply.text),
                             style: TextButton.styleFrom(
                               foregroundColor: Theme.of(context).colorScheme.primary, // Text color

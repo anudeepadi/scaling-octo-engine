@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/chat_provider.dart';
-import '../widgets/chat_bubble.dart';
+import '../widgets/chat_message_widget.dart';
 import '../services/media_picker_service.dart';
 import '../models/chat_message.dart';
 import '../utils/youtube_helper.dart';
@@ -308,22 +308,24 @@ class _ChatScreenState extends State<ChatScreen> {
           Expanded(
             child: Consumer<ChatProvider>(
               builder: (context, chatProvider, child) {
+                if (chatProvider.messages.isEmpty) {
+                  return const Center(child: Text('No messages yet.'));
+                }
                 return ListView.builder(
                   controller: _scrollController,
                   padding: const EdgeInsets.all(8),
                   itemCount: chatProvider.messages.length,
                   itemBuilder: (context, index) {
                     final message = chatProvider.messages[index];
-                    return ChatBubble(
+                    return ChatMessageWidget(
+                      key: ValueKey(message.id),
                       message: message,
                       onReplyTap: () {
                         setState(() => _replyToMessageId = message.id);
                       },
                       onReactionAdd: (emoji) {
-                        chatProvider.addReaction(message.id, emoji);
-                      },
-                      onThreadTap: () {
-                        // Implement thread view navigation
+                        final chatProviderInstance = context.read<ChatProvider>();
+                        chatProviderInstance.addReaction(message.id, emoji);
                       },
                     );
                   },

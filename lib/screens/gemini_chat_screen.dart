@@ -31,11 +31,24 @@ class _GeminiChatScreenState extends State<GeminiChatScreen> {
 
   @override
   Widget build(BuildContext context) {
+    print('[GeminiChatScreen] Build method called.');
     return Consumer<GeminiChatProvider>(
       builder: (context, geminiChatProvider, child) {
+        print('[GeminiChatScreen] Consumer builder running. Message count from provider: ${geminiChatProvider.messages.length}');
         return Column(
           children: [
-            Expanded(
+            // --- Add Temporary Debug Text --- 
+            Container(
+              color: Colors.amber.withOpacity(0.5),
+              padding: const EdgeInsets.all(4),
+              child: Text(
+                 "DEBUG: Provider Msg Count: ${geminiChatProvider.messages.length}", 
+                 style: const TextStyle(fontSize: 10, color: Colors.black)
+              ),
+            ),
+            // --- End Debug Text ---
+            // Use Flexible instead of Expanded to see if layout calculation changes
+            Flexible(
               child: _buildMessageList(geminiChatProvider),
             ),
             if (geminiChatProvider.isLoading)
@@ -51,32 +64,67 @@ class _GeminiChatScreenState extends State<GeminiChatScreen> {
   }
 
   Widget _buildMessageList(GeminiChatProvider provider) {
+    // Schedule scroll after build AND layout
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (_scrollController.hasClients) {
-        _scrollController.animateTo(
-          _scrollController.position.maxScrollExtent,
-          duration: const Duration(milliseconds: 300),
-          curve: Curves.easeOut,
-        );
+      if (_scrollController.hasClients && _scrollController.position.hasContentDimensions) {
+        // Use a short delay to give layout a chance to fully settle
+        Future.delayed(const Duration(milliseconds: 50), () {
+           if (_scrollController.hasClients) { // Check again after delay
+               final targetScroll = _scrollController.position.maxScrollExtent;
+               print("[GeminiChatScreen.Scroll] Scrolling to: $targetScroll");
+              _scrollController.animateTo(
+                targetScroll,
+                duration: const Duration(milliseconds: 300),
+                curve: Curves.easeOut,
+              );
+           }
+        });
       }
     });
 
+    print("[GeminiChatScreen._buildMessageList] ListView itemCount: ${provider.messages.length}"); // Add log here
     return ListView.builder(
       controller: _scrollController,
       padding: const EdgeInsets.all(8.0),
       itemCount: provider.messages.length,
       itemBuilder: (context, index) {
         final message = provider.messages[index];
+        print('[GeminiChatScreen.itemBuilder] Building item index: $index, Message ID: ${message.id}, Content: "${message.content.substring(0, (message.content.length > 20 ? 20 : message.content.length))}..."');
         
+        // --- REMOVE Temporary Text widget --- 
+        // return Container(
+        //    key: ValueKey(message.id), // Keep the key
+        //    alignment: message.isMe ? Alignment.centerRight : Alignment.centerLeft,
+        //    padding: const EdgeInsets.all(8.0),
+        //    child: Container(
+        //      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        //      color: message.isMe ? Colors.blue[100] : Colors.grey[300],
+        //      child: Text(
+        //         "${message.isMe ? 'Me:' : 'Gemini:'} ${message.content}", 
+        //         style: const TextStyle(color: Colors.black)
+        //      ),
+        //    )
+        // );
+        // --- End REMOVE ---
+
+        // --- RESTORE Original complex widget logic --- 
         // Handle quick reply messages separately
         if (message.type == MessageType.quickReply) {
+          // Note: _buildQuickReplies itself might need a key if issues persist
           return _buildQuickReplies(message.quickReplies ?? [], provider);
         }
         
-        // Use platform-specific message widget
+        // Use platform-specific message widget with unique keys
         return Platform.isIOS
-            ? IosChatMessageWidget(message: message)
-            : ChatMessageWidget(message: message);
+            ? IosChatMessageWidget(
+                key: ValueKey(message.id), // Add key
+                message: message
+              )
+            : ChatMessageWidget(
+                key: ValueKey(message.id), // Add key
+                message: message
+              );
+         // --- End RESTORE ---
       },
     );
   }

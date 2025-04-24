@@ -4,61 +4,91 @@ import 'package:http/http.dart' as http;
 import '../models/quick_reply.dart';
 
 class GeminiService {
-  // This would typically be stored securely or obtained from environment
-  static const String _apiKey = 'YOUR_GEMINI_API_KEY';
-  static const String _baseUrl = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent';
+  // IMPORTANT: Replace with your new, valid API key securely!
+  // DO NOT COMMIT THIS KEY TO VERSION CONTROL
+  static const String _apiKey = 'AIzaSyCODVjQ7aIyDAcHXXW3XBiB9quiPwznocs'; 
+  // static const String _baseUrl_OLD = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent';
+  static const String _modelName = 'gemini-1.5-flash'; // Use the confirmed working model
+  static const String _baseUrl = 'https://generativelanguage.googleapis.com/v1beta/models/$_modelName:generateContent';
   
-  // Simulated response to avoid actual API calls during development
+  // Actual API call implementation
   Future<String> generateResponse(String prompt) async {
-    // For demo purposes, we'll return mock responses
-    print('GeminiService: Generating response for: $prompt');
-    
-    // Simulate network delay
-    await Future.delayed(const Duration(seconds: 1));
-    
-    // Return mock responses based on prompt content
-    if (prompt.toLowerCase().contains('hello') || 
-        prompt.toLowerCase().contains('hi')) {
-      return "Hello! How can I assist you today?";
-    } else if (prompt.toLowerCase().contains('joke')) {
-      return "Why don't scientists trust atoms? Because they make up everything!";
-    } else if (prompt.toLowerCase().contains('weather')) {
-      return "I don't have access to real-time weather data, but I'd be happy to chat about something else!";
-    } else if (prompt.toLowerCase().contains('name')) {
-      return "I'm Gemini, a large language model from Google AI.";
-    } else {
-      return "That's an interesting question. I'm a language model designed to be helpful, harmless, and honest in my responses.";
+    print('[GeminiService] Generating response for: "$prompt"');
+
+    if (_apiKey == 'YOUR_GEMINI_API_KEY') {
+       print('[GeminiService] ERROR: API Key is placeholder!');
+       return "ERROR: API Key not set in GeminiService."; // Return error if key missing
     }
-    
-    // Actual API implementation would look like this:
-    /*
-    final url = '$_baseUrl?key=$_apiKey';
-    final response = await http.post(
-      Uri.parse(url),
-      headers: {'Content-Type': 'application/json'},
-      body: jsonEncode({
-        'contents': [{'role': 'user', 'parts': [{'text': prompt}]}],
-        'generationConfig': {
-          'temperature': 0.7,
-          'topK': 40,
-          'topP': 0.95,
-          'maxOutputTokens': 1024,
-        },
-      }),
-    );
-    
-    if (response.statusCode == 200) {
-      final jsonResponse = jsonDecode(response.body);
-      return jsonResponse['candidates'][0]['content']['parts'][0]['text'];
-    } else {
-      throw Exception('Failed to generate response: ${response.body}');
+
+    final url = Uri.parse('$_baseUrl?key=$_apiKey');
+    final requestBody = jsonEncode({
+      "contents": [
+        {
+          "parts": [
+            {"text": prompt.trim()}
+          ]
+        }
+      ],
+      // Optional: Add generationConfig if needed
+      // "generationConfig": { ... } 
+    });
+
+    print("[GeminiService] Calling API: $url");
+    // print("[GeminiService] Request Body: $requestBody"); // Optional: Log body if needed
+
+    try {
+      final response = await http.post(
+        url,
+        headers: {'Content-Type': 'application/json'},
+        body: requestBody,
+      );
+
+      print("[GeminiService] API Response Status: ${response.statusCode}");
+      // print("[GeminiService] API Response Body: ${response.body}"); // Optional: Log full body if needed
+
+      if (response.statusCode == 200) {
+        final decodedResponse = jsonDecode(response.body);
+        final candidates = decodedResponse['candidates'] as List<dynamic>?;
+        if (candidates != null && candidates.isNotEmpty) {
+           final content = candidates[0]['content'] as Map<String, dynamic>?;
+           if (content != null) {
+              final parts = content['parts'] as List<dynamic>?;
+              if (parts != null && parts.isNotEmpty) {
+                 final text = parts[0]['text'] as String?;
+                 if (text != null) {
+                    print('[GeminiService] Extracted text: "${text.substring(0, (text.length > 50 ? 50 : text.length))}..."');
+                    return text; // Success
+                 } 
+              }
+           }
+        }
+        // Handle blocked response or missing data
+        final promptFeedback = decodedResponse['promptFeedback'] as Map<String, dynamic>?;
+         if (promptFeedback != null && promptFeedback['blockReason'] != null) {
+            final reason = promptFeedback['blockReason'];
+            print('[GeminiService] Response blocked: $reason');
+            return "Response blocked due to: $reason"; // Return info about blocking
+         } else {
+           print('[GeminiService] Error: Could not extract valid candidate text from response.');
+           throw Exception('Could not extract valid candidate text from API response.');
+         }
+      } else {
+        print('[GeminiService] API Error ${response.statusCode}: ${response.body}');
+        throw Exception('API Error: ${response.statusCode}\n${response.body}');
+      }
+    } catch (e) {
+      print('[GeminiService] Error during API call: $e');
+      // Consider returning a user-friendly error message instead of rethrowing
+      return "Error communicating with Gemini: $e"; 
+      // throw Exception('Failed to generate response: $e'); // Or rethrow if caller handles it
     }
-    */
   }
-  
+
   // Get suggested quick replies based on the conversation context
+  // TODO: Implement actual API call for suggested replies if needed, or keep mock?
   Future<List<QuickReply>> getSuggestedReplies(String lastMessage) async {
     // For demo purposes, return predefined quick replies
+    print('[GeminiService] Generating mock suggested replies for: "$lastMessage"');
     await Future.delayed(const Duration(milliseconds: 500));
     
     if (lastMessage.toLowerCase().contains('hello') || 

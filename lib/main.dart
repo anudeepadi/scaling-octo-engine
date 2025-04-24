@@ -14,9 +14,10 @@ import 'providers/gemini_chat_provider.dart';
 import 'services/bot_service.dart';
 import 'screens/home_screen.dart';
 import 'screens/login_screen.dart';
+import 'screens/main_screen.dart';
+import 'screens/simple_gemini_tester.dart';
 import 'theme/app_theme.dart';
 import 'theme/ios_theme.dart';
-import 'screens/main_screen.dart';
 
 // Import Firebase
 import 'package:firebase_core/firebase_core.dart';

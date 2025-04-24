@@ -84,9 +84,9 @@ class ServerMessageService {
         responseText = "Are you sure you want to leave the Quitxt program?";
         options = ["Yes, EXIT", "No, stay", "Remind me later"];
       } else {
-        // Keep default 'I don't understand' for unmapped regular messages
-        responseText = "I don't understand '$messageText'. Try 'help' or 'hi'.";
-        options = ["Help", "Hi", "What can you do?"];
+        // Default response for unmapped regular messages: Suggest Gemini
+        responseText = "The protocol doesn't recognize '$messageText'. If you want, you can chat with Gemini, a state-of-the-art ChatGPT-style model from Google.";
+        options = ["Chat with Gemini", "Help"]; // Use a distinct text for the button
       }
     } else if (eventTypeCode == 2) { // Quick reply
       // Handle specific quick replies

@@ -13,6 +13,7 @@ import 'youtube_player_widget.dart';
 import 'platform/ios_chat_message_widget.dart';
 import 'quick_reply_widget.dart';
 import 'improved_message_item.dart';
+import '../providers/chat_mode_provider.dart';
 
 class ChatMessageWidget extends StatefulWidget {
   final ChatMessage message;
@@ -355,9 +356,29 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
                   children: widget.message.suggestedReplies!
                       .map((reply) => TextButton(
                             onPressed: () {
-                              print("[ChatMessageWidget] Quick Reply Button Tapped! Reply: ${reply.value}");
-                              final dashChatProvider = Provider.of<DashChatProvider>(context, listen: false);
-                              dashChatProvider.handleQuickReply(reply);
+                              print("[ChatMessageWidget] Quick Reply Button Tapped! Reply Text: ${reply.text}, Value: ${reply.value}");
+                              // Check if this is the Gemini switch button
+                              if (reply.text == "Chat with Gemini") {
+                                print("[ChatMessageWidget] Switching to Gemini Mode...");
+                                // Get providers
+                                final chatModeProvider = context.read<ChatModeProvider>();
+                                final chatProvider = context.read<DashChatProvider>();
+                                
+                                // Switch mode
+                                chatModeProvider.setMode(ChatMode.gemini);
+                                
+                                // Clear history of the generic provider (which HomeScreen uses for Dash)
+                                // chatProvider.clearChatHistory(); // Optional: Decide if you want to clear history on switch
+
+                                // Optionally add a message indicating the switch? 
+                                // chatProvider.addTextMessage("Switched to Gemini mode.", isMe: false);
+
+                              } else {
+                                // Otherwise, handle as a normal Dash quick reply
+                                print("[ChatMessageWidget] Handling as normal Dash quick reply.");
+                                final dashChatProvider = Provider.of<DashChatProvider>(context, listen: false);
+                                dashChatProvider.handleQuickReply(reply);
+                              }
                             },
                             child: Text(reply.text),
                             style: TextButton.styleFrom(

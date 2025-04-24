@@ -37,16 +37,6 @@ class _GeminiChatScreenState extends State<GeminiChatScreen> {
         print('[GeminiChatScreen] Consumer builder running. Message count from provider: ${geminiChatProvider.messages.length}');
         return Column(
           children: [
-            // --- Add Temporary Debug Text --- 
-            Container(
-              color: Colors.amber.withOpacity(0.5),
-              padding: const EdgeInsets.all(4),
-              child: Text(
-                 "DEBUG: Provider Msg Count: ${geminiChatProvider.messages.length}", 
-                 style: const TextStyle(fontSize: 10, color: Colors.black)
-              ),
-            ),
-            // --- End Debug Text ---
             // Use Flexible instead of Expanded to see if layout calculation changes
             Flexible(
               child: _buildMessageList(geminiChatProvider),
@@ -142,11 +132,15 @@ class _GeminiChatScreenState extends State<GeminiChatScreen> {
             padding: const EdgeInsets.symmetric(horizontal: 4.0),
             child: CupertinoButton(
               padding: const EdgeInsets.symmetric(horizontal: 16.0),
-              color: CupertinoColors.systemBlue.withOpacity(0.8),
+              color: CupertinoColors.systemGrey5,
               borderRadius: BorderRadius.circular(20),
               child: Text(
                 reply.text,
-                style: const TextStyle(fontSize: 14),
+                style: const TextStyle(
+                  fontSize: 14,
+                  color: CupertinoColors.activeBlue,
+                  fontWeight: FontWeight.w500
+                ),
               ),
               onPressed: () {
                 provider.sendMessage(reply.value);

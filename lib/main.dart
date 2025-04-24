@@ -107,16 +107,14 @@ class MyApp extends StatelessWidget {
                   title: 'RCS Demo App',
                   debugShowCheckedModeBanner: false,
                   theme: IosTheme.lightTheme,
-                  darkTheme: IosTheme.darkTheme,
-                  themeMode: ThemeMode.system,
+                  themeMode: ThemeMode.light,
                   home: authProvider.isAuthenticated ? const HomeScreen() : const LoginScreen(),
                 )
               : MaterialApp(
                   title: 'RCS Demo App',
                   debugShowCheckedModeBanner: false,
                   theme: AppTheme.lightTheme,
-                  darkTheme: AppTheme.darkTheme,
-                  themeMode: ThemeMode.system,
+                  themeMode: ThemeMode.light,
                   home: authProvider.isAuthenticated ? const HomeScreen() : const LoginScreen(),
                 );
           return app;

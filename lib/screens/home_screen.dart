@@ -887,9 +887,13 @@ class _HomeScreenState extends State<HomeScreen> {
               const SizedBox(width: 8),
               const Text('•'),
               const SizedBox(width: 8),
-              Text(serviceDisplayName, 
-                style: TextStyle(
-                  fontSize: 16,
+              Expanded(
+                child: Text(serviceDisplayName, 
+                  style: TextStyle(
+                    fontSize: 16,
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                  maxLines: 1,
                 ),
               ),
             ],

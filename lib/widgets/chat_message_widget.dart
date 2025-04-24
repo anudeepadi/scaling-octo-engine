@@ -4,9 +4,10 @@ import 'package:video_player/video_player.dart';
 import 'package:chewie/chewie.dart';
 import 'package:flutter_linkify/flutter_linkify.dart';
 import 'package:url_launcher/url_launcher.dart';
-import 'package:cached_network_image/cached_network_image.dart';
+import 'package:provider/provider.dart';
 import '../models/chat_message.dart';
 import '../models/quick_reply.dart';
+import '../providers/dash_chat_provider.dart';
 import 'video_player_widget.dart';
 import 'youtube_player_widget.dart';
 import 'platform/ios_chat_message_widget.dart';
@@ -17,14 +18,12 @@ class ChatMessageWidget extends StatefulWidget {
   final ChatMessage message;
   final VoidCallback? onReplyTap;
   final Function(String)? onReactionAdd;
-  final Function(String)? onQuickReplyTap;
 
   const ChatMessageWidget({
     Key? key,
     required this.message,
     this.onReplyTap,
     this.onReactionAdd,
-    this.onQuickReplyTap,
   }) : super(key: key);
 
   @override
@@ -45,6 +44,23 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
       }
     }
     return null;
+  }
+
+  // Helper function to check if a URL points to a known image/gif type
+  bool _isImageUrl(String url) {
+    final lowerUrl = url.toLowerCase();
+    return lowerUrl.endsWith('.jpg') ||
+           lowerUrl.endsWith('.jpeg') ||
+           lowerUrl.endsWith('.png') ||
+           lowerUrl.endsWith('.webp') ||
+           lowerUrl.endsWith('.gif');
+  }
+
+  // Helper function to check if content is a local asset path
+  bool _isLocalAssetGif(String content) {
+     // Add trim() to handle potential leading/trailing whitespace
+     final trimmedContent = content.trim();
+     return trimmedContent.startsWith('assets/') && trimmedContent.toLowerCase().endsWith('.gif');
   }
 
   // Helper to launch URL
@@ -68,8 +84,34 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
     print("ChatMessageWidget (${widget.message.id}): Building content. isMe=${widget.message.isMe}");
     print("ChatMessageWidget (${widget.message.id}): Raw content = '${widget.message.content}'");
 
-    // Regex to find the first http/https URL in the string
-    // This regex is simple and might catch false positives, but good for common URLs
+    // --- Check for Local Asset GIF First --- 
+    if (_isLocalAssetGif(widget.message.content)) {
+       print("ChatMessageWidget (${widget.message.id}): Entered _isLocalAssetGif block."); // Confirm entry
+       try {
+          return Image.asset(
+             widget.message.content.trim(), // Use trimmed content here too
+             height: 150, // Adjust size as needed
+             fit: BoxFit.contain, // Or BoxFit.cover
+             errorBuilder: (context, error, stackTrace) {
+                print("Image.asset Error loading ${widget.message.content}: $error");
+                return Container(
+                   height: 150,
+                   color: Colors.grey[300],
+                   child: const Center(
+                      child: Icon(Icons.error, color: Colors.red)
+                   )
+                );
+             },
+          );
+       } catch (e) {
+           print("ChatMessageWidget (${widget.message.id}): EXCEPTION loading asset ${widget.message.content}: $e");
+           // Fallback or error display if exception occurs during asset loading
+           return Text("[Error loading asset: ${widget.message.content}]", style: const TextStyle(color: Colors.red));
+       }
+    }
+    // --- End Local Asset GIF Check --- 
+
+    // --- Network URL Processing --- 
     final urlRegex = RegExp(
       r'https?://(?:[a-zA-Z]|[0-9]|[$-_@.&+]|[!*\(\),]|(?:%[0-9a-fA-F][0-9a-fA-F]))+',
       caseSensitive: false,
@@ -104,27 +146,43 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
           // Display the tappable thumbnail
           GestureDetector(
             onTap: () => _launchURL(firstUrl), // Launch the found URL
-            child: CachedNetworkImage(
-              imageUrl: thumbnailUrl,
-              placeholder: (context, url) => Container(
-                  height: 150, // Adjusted placeholder size
-                  width: double.infinity,
-                  color: Colors.grey[300],
-                  child: const Center(child: CircularProgressIndicator())),
-              errorWidget: (context, url, error) => Container(
-                  height: 150, // Adjusted error placeholder size
-                  width: double.infinity,
-                  color: Colors.grey[300],
-                  child: const Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(Icons.error),
-                      SizedBox(height: 4),
-                      Text('Tap to open link', style: TextStyle(fontSize: 12)),
-                    ],
-                  )),
+            child: Image.network(
+              thumbnailUrl,
+              height: 150, // Maintain approximate size
+              width: double.infinity,
               fit: BoxFit.cover,
-              width: double.infinity, // Make thumbnail take available width
+              // Basic placeholder/error handling for Image.network
+              loadingBuilder: (context, child, loadingProgress) {
+                if (loadingProgress == null) return child; // Image loaded
+                return Container(
+                  height: 150,
+                  width: double.infinity,
+                  color: Colors.grey[300],
+                  child: Center(
+                    child: CircularProgressIndicator(
+                      value: loadingProgress.expectedTotalBytes != null
+                          ? loadingProgress.cumulativeBytesLoaded /
+                              loadingProgress.expectedTotalBytes!
+                          : null,
+                    ),
+                  ),
+                );
+              },
+              errorBuilder: (context, error, stackTrace) {
+                print("Image.network Error loading $thumbnailUrl: $error"); // Add error logging
+                return Container(
+                    height: 150,
+                    width: double.infinity,
+                    color: Colors.grey[300],
+                    child: const Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.error),
+                        SizedBox(height: 4),
+                        Text('Tap to open link', style: TextStyle(fontSize: 12)),
+                      ],
+                    ));
+              },
             ),
           ),
           // Display text after the URL if any
@@ -143,23 +201,122 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
         ],
       );
     } else {
-      // Default: Use Linkify for the whole message if no YouTube link found or error
-      return Linkify(
-        onOpen: (link) => _launchURL(link.url),
-        text: widget.message.content,
-        style: TextStyle(
-          color: widget.message.isMe
-              ? Theme.of(context).colorScheme.onPrimary
-              : Theme.of(context).colorScheme.onSurface,
-        ),
-        linkStyle: TextStyle(
-          color: widget.message.isMe
-              ? Theme.of(context).colorScheme.onPrimary // Or a different color for links
-              : Theme.of(context).colorScheme.primary, // Usually primary color for links
-          decoration: TextDecoration.underline,
-        ),
-      );
+      // --- Add Image/GIF Handling --- 
+      if (firstUrl != null && _isImageUrl(firstUrl) && match != null) {
+        // It's an image/GIF URL
+        print("ChatMessageWidget (${widget.message.id}): Identified as Network Image/GIF URL.");
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Display text before the URL if any
+            if (match.start > 0)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 4.0),
+                child: Text(
+                  widget.message.content.substring(0, match.start).trimRight(),
+                  style: TextStyle(
+                    color: widget.message.isMe
+                        ? Theme.of(context).colorScheme.onPrimary
+                        : Theme.of(context).colorScheme.onSurface,
+                  ),
+                ),
+              ),
+            // Display the tappable thumbnail
+            GestureDetector(
+              onTap: () => _launchURL(firstUrl), // Launch the found URL
+              child: Image.network(
+                firstUrl,
+                height: 150, // Maintain approximate size
+                width: double.infinity,
+                fit: BoxFit.cover,
+                // Basic placeholder/error handling for Image.network
+                loadingBuilder: (context, child, loadingProgress) {
+                  if (loadingProgress == null) return child; // Image loaded
+                  return Container(
+                    height: 150,
+                    width: double.infinity,
+                    color: Colors.grey[300],
+                    child: Center(
+                      child: CircularProgressIndicator(
+                        value: loadingProgress.expectedTotalBytes != null
+                            ? loadingProgress.cumulativeBytesLoaded /
+                                loadingProgress.expectedTotalBytes!
+                            : null,
+                      ),
+                    ),
+                  );
+                },
+                errorBuilder: (context, error, stackTrace) {
+                  print("Image.network Error loading $firstUrl: $error"); // Add error logging
+                  return Container(
+                      height: 150,
+                      width: double.infinity,
+                      color: Colors.grey[300],
+                      child: const Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.error),
+                          SizedBox(height: 4),
+                          Text('Tap to open link', style: TextStyle(fontSize: 12)),
+                        ],
+                      ));
+                },
+              ),
+            ),
+            // Display text after the URL if any
+            if (match.end < widget.message.content.length)
+              Padding(
+                padding: const EdgeInsets.only(top: 4.0),
+                child: Text(
+                  widget.message.content.substring(match.end).trimLeft(),
+                  style: TextStyle(
+                    color: widget.message.isMe
+                        ? Theme.of(context).colorScheme.onPrimary
+                        : Theme.of(context).colorScheme.onSurface,
+                  ),
+                ),
+              ),
+          ],
+        );
+      } else {
+        // --- End Image/GIF Handling ---
+        // Default: Use Linkify for the whole message if no YouTube/Image/GIF/Asset found or error
+        print("ChatMessageWidget (${widget.message.id}): Falling back to Linkify.");
+        return Linkify(
+          onOpen: (link) => _launchURL(link.url),
+          text: widget.message.content,
+          style: TextStyle(
+            color: widget.message.isMe
+                ? Theme.of(context).colorScheme.onPrimary
+                : Theme.of(context).colorScheme.onSurface,
+          ),
+          linkStyle: TextStyle(
+            color: widget.message.isMe
+                ? Theme.of(context).colorScheme.onPrimary // Or a different color for links
+                : Theme.of(context).colorScheme.primary, // Usually primary color for links
+            decoration: TextDecoration.underline,
+          ),
+        );
+      }
     }
+    // This part should ideally not be reached if all cases (local, yt, net img, linkify) are handled
+    // Return Linkify as a final safety net
+    // print("ChatMessageWidget (${widget.message.id}): Reached unexpected end, using Linkify.");
+    // return Linkify(
+    //    onOpen: (link) => _launchURL(link.url),
+    //    text: widget.message.content,
+    //    style: TextStyle(
+    //       color: widget.message.isMe
+    //          ? Theme.of(context).colorScheme.onPrimary
+    //          : Theme.of(context).colorScheme.onSurface,
+    //    ),
+    //    linkStyle: TextStyle(
+    //       color: widget.message.isMe
+    //          ? Theme.of(context).colorScheme.onPrimary
+    //          : Theme.of(context).colorScheme.primary,
+    //       decoration: TextDecoration.underline,
+    //    ),
+    // );
   }
 
   @override
@@ -197,7 +354,11 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
                   runSpacing: 8,
                   children: widget.message.suggestedReplies!
                       .map((reply) => TextButton(
-                            onPressed: () => widget.onQuickReplyTap?.call(reply.value),
+                            onPressed: () {
+                              print("[ChatMessageWidget] Quick Reply Button Tapped! Reply: ${reply.value}");
+                              final dashChatProvider = Provider.of<DashChatProvider>(context, listen: false);
+                              dashChatProvider.handleQuickReply(reply);
+                            },
                             child: Text(reply.text),
                             style: TextButton.styleFrom(
                               foregroundColor: Theme.of(context).colorScheme.primary, // Text color

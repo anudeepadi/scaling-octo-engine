@@ -7,6 +7,7 @@ import '../providers/auth_provider.dart';
 import '../providers/service_provider.dart';
 import '../providers/dash_chat_provider.dart';
 import '../providers/chat_mode_provider.dart';
+import '../providers/gemini_chat_provider.dart';
 import '../services/bot_service.dart';
 import '../widgets/chat_message_widget.dart';
 import '../widgets/service_toggle_button.dart';
@@ -120,14 +121,19 @@ class _HomeScreenState extends State<HomeScreen> {
 
     final chatModeProvider = context.read<ChatModeProvider>();
     final chatProvider = context.read<ChatProvider>();
+    final dashChatProvider = context.read<DashChatProvider>();
+    final geminiChatProvider = context.read<GeminiChatProvider>();
     
-    // Add the message to the UI immediately
+    // Add the user's message to the UI immediately
     chatProvider.addTextMessage(text, isMe: true);
 
+    // Send message using the provider for the current mode
     if (chatModeProvider.currentMode == ChatMode.dash) {
-      // Use Dash messaging service
-      final dashChatProvider = context.read<DashChatProvider>();
-      dashChatProvider.sendMessage(text);
+      print("[HandleSubmit] Sending message via DashChatProvider.");
+      dashChatProvider.sendMessage(text); // Sends to Dash backend/simulation
+    } else if (chatModeProvider.currentMode == ChatMode.gemini) {
+      print("[HandleSubmit] Sending message via GeminiChatProvider.");
+      geminiChatProvider.sendMessage(text); // Sends to Gemini API service
     }
 
     _messageController.clear();

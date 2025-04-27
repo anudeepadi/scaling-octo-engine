@@ -90,95 +90,31 @@ class _DashMessagingScreenState extends State<DashMessagingScreen> {
     final messageText = _messageController.text.trim();
     if (messageText.isEmpty || _currentUser == null) return;
 
-    final userId = _currentUser!.uid;
     _messageController.clear();
 
-    // No need to add locally, StreamBuilder will update
-    /*
-    setState(() {
-      _messages.add(ChatMessage(
-        id: DateTime.now().millisecondsSinceEpoch.toString(),
-        content: messageText,
-        isMe: true,
-        timestamp: DateTime.now(),
-        type: MessageType.text,
-        status: MessageStatus.sending,
-      ));
-      _messageController.clear();
-    });
-    */
+    // Use DashChatProvider to send message instead of directly adding to Firestore
+    // This fixes the double message issue
+    final dashChatProvider = Provider.of<DashChatProvider>(context, listen: false);
+    dashChatProvider.sendMessage(messageText);
+  }
 
-    // Scroll immediately after clearing text field
-    // _scrollToBottom(); // This might scroll before the message appears via stream
-
-    try {
-      // Send to Firestore
-      await _firestore
-          .collection('messages')
-          .doc(userId)
-          .collection('messages')
-          .add({
-        'content': messageText,
-        'senderId': userId, // Identify the sender
-        'timestamp': FieldValue.serverTimestamp(), // Use server timestamp
-        'type': MessageType.text.index, // Assuming MessageType is an enum
-        'status': MessageStatus.sent.index // Assuming MessageStatus is an enum
-        // Add other fields if needed by your ChatMessage model/widget
-      });
-
-      // Don't need manual status update or reload
-      /*
-      if (success) {
-        setState(() {
-          _messages.last.status = MessageStatus.delivered;
-        });
-        await _loadMessages(); // Reload messages to get server response
+  void _scrollToBottom({bool isDelayed = false}) {
+    if (_scrollController.hasClients) {
+      final scrollToTask = () {
+        _scrollController.animateTo(
+          _scrollController.position.maxScrollExtent,
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeOut,
+        );
+      };
+      
+      if (isDelayed) {
+        Future.delayed(const Duration(milliseconds: 100), scrollToTask);
       } else {
-        setState(() {
-          _messages.last.status = MessageStatus.error;
-        });
+        scrollToTask();
       }
-      */
-    } catch (e) {
-      print('Error sending message to Firestore: $e');
-      // Optionally show error to user
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error sending message: $e')),
-      );
-      // Don't need manual status update
-      /*
-      setState(() {
-        _messages.last.status = MessageStatus.error;
-      });
-      */
     }
   }
-
-  // Add optional delay for scrolling to allow list to rebuild
-  void _scrollToBottom({bool isDelayed = false}) {
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (_scrollController.hasClients) {
-        if(isDelayed) {
-           Future.delayed(const Duration(milliseconds: 100), () {
-             if (_scrollController.hasClients) {
-                _scrollController.animateTo(
-                  _scrollController.position.maxScrollExtent,
-                  duration: const Duration(milliseconds: 300),
-                  curve: Curves.easeOut,
-                );
-             }
-           });
-        } else {
-            _scrollController.animateTo(
-              _scrollController.position.maxScrollExtent,
-              duration: const Duration(milliseconds: 300),
-              curve: Curves.easeOut,
-            );
-        }
-      }
-    });
-  }
-
 
   @override
   Widget build(BuildContext context) {

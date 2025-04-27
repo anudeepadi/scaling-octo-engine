@@ -125,14 +125,13 @@ class DashChatProvider extends ChangeNotifier {
     final userId = _currentUser!.uid;
     
     try {
-      // Add message to local chat UI
-      if (_chatProvider != null) {
-        _chatProvider!.addTextMessage(messageContent, isMe: true);
-      }
-      
       // Special command to load sample test data
       if (messageContent.toLowerCase() == '#test' || messageContent.toLowerCase() == '#sample') {
+        print('[DashChatProvider] Detected test command. Processing test data...');
+        // Add message to local chat UI first
         if (_chatProvider != null) {
+          _chatProvider!.addTextMessage(messageContent, isMe: true);
+          
           final context = ContextHolder.currentContext;
           final localizations = context != null 
               ? AppLocalizations.of(context) 
@@ -141,8 +140,15 @@ class DashChatProvider extends ChangeNotifier {
           final loadingMessage = localizations?.translate('loading_sample') ?? 'Loading sample test messages...';
           _chatProvider!.addTextMessage(loadingMessage, isMe: false);
         }
+        
+        // Process sample test data
         await _dashService.processSampleTestData();
         return;
+      }
+      
+      // Add message to local chat UI
+      if (_chatProvider != null) {
+        _chatProvider!.addTextMessage(messageContent, isMe: true);
       }
       
       // If in demo mode or testing, simulate response

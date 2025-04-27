@@ -121,6 +121,13 @@ class DashMessagingService {
       throw Exception('User ID or FCM token is null');
     }
     
+    // Handle special test command to load sample data
+    if (text.toLowerCase() == '#test' || text.toLowerCase() == '#sample') {
+      print('Processing sample test data command...');
+      await processSampleTestData();
+      return true;
+    }
+    
     final timestamp = DateTime.now().millisecondsSinceEpoch ~/ 1000;
     final messageId = _uuid.v4();
     
@@ -317,6 +324,7 @@ class DashMessagingService {
   
   // Send all test messages in sequence (useful for testing)
   Future<void> sendTestMessages() async {
+    print("Sending test messages sequence...");
     // Message 1: YouTube video
     final youtubeMessage = ChatMessage(
       id: '0a1b2c3d-4e5f-6a7b-8c9d-0e1f2a3b4c5d',
@@ -383,6 +391,7 @@ class DashMessagingService {
   
   // Process sample test data in the format provided
   Future<void> processSampleTestData() async {
+    print("Processing sample test data...");
     // Sample data structure matching the expected server format
     final sampleData = {
       "sentMessages": [
@@ -439,10 +448,34 @@ class DashMessagingService {
       ]
     };
 
-    // Process each expected response with a delay between them
-    for (final response in sampleData['expectedResponses'] as List<dynamic>) {
-      await Future.delayed(const Duration(milliseconds: 1000));
-      handlePushNotification(response as Map<String, dynamic>);
+    try {
+      // First, add an acknowledgment message
+      final ackMessage = ChatMessage(
+        id: 'ack-${DateTime.now().millisecondsSinceEpoch}',
+        content: 'Loading sample test messages...',
+        timestamp: DateTime.now(),
+        isMe: false,
+        type: MessageType.text,
+      );
+      _messageStreamController.add(ackMessage);
+      
+      // Allow UI to update
+      await Future.delayed(const Duration(milliseconds: 500));
+        
+      // Process each expected response with a delay between them
+      for (final response in sampleData['expectedResponses'] as List<dynamic>) {
+        await Future.delayed(const Duration(milliseconds: 1000));
+        try {
+          handlePushNotification(response as Map<String, dynamic>);
+          print("Processed test message: ${response['messageBody']}");
+        } catch (e) {
+          print("Error processing test message: $e");
+        }
+      }
+      
+      print("Sample test data processing completed.");
+    } catch (e) {
+      print("Error in processSampleTestData: $e");
     }
   }
   

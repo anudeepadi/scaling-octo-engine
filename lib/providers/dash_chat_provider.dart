@@ -146,10 +146,8 @@ class DashChatProvider extends ChangeNotifier {
         return;
       }
       
-      // Add message to local chat UI
-      if (_chatProvider != null) {
-        _chatProvider!.addTextMessage(messageContent, isMe: true);
-      }
+      // Important: ChatProvider adds the message to UI automatically in HomeScreen's _handleSubmitted,
+      // so we don't need to add it again here to avoid duplication
       
       // If in demo mode or testing, simulate response
       if (!_dashService.isInitialized) {
@@ -176,10 +174,6 @@ class DashChatProvider extends ChangeNotifier {
     } catch (e) {
       print('Error in DashChatProvider.sendMessage: $e');
       // On error, use simulation as fallback
-      if (_chatProvider != null) {
-        // Make sure the message is added to UI if it failed earlier
-        _chatProvider!.addTextMessage(messageContent, isMe: true);
-      }
       await _dashService.simulateServerResponse(messageContent);
     }
   }
@@ -199,26 +193,21 @@ class DashChatProvider extends ChangeNotifier {
         _chatProvider!.addTextMessage(reply.text, isMe: true);
       }
       
-      // If in demo mode or testing, simulate response
-      if (!_dashService.isInitialized) {
-        print('DashMessagingService not initialized. Using simulation mode.');
-        await _dashService.simulateServerResponse(reply.text);
-        return;
-      }
+      // Process the quick reply response directly through simulation
+      // This ensures consistent behavior for the demo scenarios
+      await _dashService.simulateServerResponse(reply.value);
       
-      // Send the quick reply to the server
-      final success = await _dashService.sendQuickReply(reply.value, reply.text);
-      if (success) {
-        print('Quick reply sent successfully to server');
-      } else {
-        print('Failed to send quick reply to server');
-        // If server send failed, simulate response in demo mode
-        await _dashService.simulateServerResponse(reply.text);
+      // If server is initialized and we're not in demo mode, also send to server
+      if (_dashService.isInitialized) {
+        final success = await _dashService.sendQuickReply(reply.value, reply.text);
+        if (success) {
+          print('Quick reply sent successfully to server');
+        } else {
+          print('Failed to send quick reply to server');
+        }
       }
     } catch (e) {
-      print('Error sending quick reply: $e');
-      // On error, use simulation as fallback
-      await _dashService.simulateServerResponse(reply.text);
+      print('Error handling quick reply: $e');
     }
   }
 

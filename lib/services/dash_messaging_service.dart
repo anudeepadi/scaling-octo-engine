@@ -15,7 +15,7 @@ class DashMessagingService {
   DashMessagingService._internal();
 
   // Server host URL (configurable)
-  String _hostUrl = "https://dashmessaging-com.ngrok.io";
+  String _hostUrl = "https://f2f4-3-17-141-5.ngrok-free.app";
   String get hostUrl => _hostUrl;
   
   // User information
@@ -45,6 +45,14 @@ class DashMessagingService {
     print('DashMessagingService initialized for user: $userId');
     print('Using host URL: $_hostUrl');
     print('FCM Token: $fcmToken');
+    
+    // Try to authenticate with the server
+    final authenticated = await _authenticateWithServer(userId);
+    if (authenticated) {
+      print('Successfully authenticated with the server');
+    } else {
+      print('Failed to authenticate with the server, using simulation mode');
+    }
     
     // Send a test message to the server to check connection
     await testConnection();
@@ -88,7 +96,7 @@ class DashMessagingService {
     }
     
     try {
-      final endpoint = '$_hostUrl/scheduler/test-connection';
+      final endpoint = '$_hostUrl/api/test-connection';
       final response = await http.get(
         Uri.parse(endpoint),
         headers: {
@@ -107,6 +115,36 @@ class DashMessagingService {
       }
     } catch (e) {
       print('Connection test error: $e');
+      return false;
+    }
+  }
+
+  // Authenticate with the server
+  Future<bool> _authenticateWithServer(String userId) async {
+    try {
+      final loginEndpoint = '$_hostUrl/login';
+      
+      print('Trying to authenticate with server: $loginEndpoint');
+      
+      final response = await http.post(
+        Uri.parse(loginEndpoint),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'email': '$userId@example.com', // Using userId as email for demo
+          'password': 'defaultPassword123', // Using a default password for demo
+        }),
+      ).timeout(const Duration(seconds: 10));
+      
+      if (response.statusCode == 200) {
+        print('Authentication successful');
+        // Save any auth tokens if needed
+        return true;
+      } else {
+        print('Authentication failed. Status: ${response.statusCode}, Body: ${response.body}');
+        return false;
+      }
+    } catch (e) {
+      print('Authentication error: $e');
       return false;
     }
   }
@@ -137,7 +175,7 @@ class DashMessagingService {
     }
     
     try {
-      final endpoint = '$_hostUrl/scheduler/mobile-app';
+      final endpoint = '$_hostUrl/api/messages';
       final payload = {
         'userId': _userId,
         'messageId': messageId,
@@ -264,8 +302,21 @@ class DashMessagingService {
     // Add a small delay to simulate network latency
     await Future.delayed(const Duration(milliseconds: 800));
     
+    // Add server URL info message
+    final serverInfoMessage = ChatMessage(
+      id: _uuid.v4(),
+      content: 'Using server: $_hostUrl',
+      timestamp: DateTime.now(),
+      isMe: false,
+      type: MessageType.text,
+    );
+    _messageStreamController.add(serverInfoMessage);
+    await Future.delayed(const Duration(milliseconds: 400));
+    
     // Determine which mock response to send based on the user message
-    if (userMessage.toLowerCase().contains('hello') || userMessage.toLowerCase().contains('hi')) {
+    if (userMessage.toLowerCase().contains('hello') ||
+        userMessage.toLowerCase().contains('hi') ||
+        userMessage.toLowerCase().contains('ready to quit')) {
       // YouTube link message
       final youtubeMessage = ChatMessage(
         id: '0a1b2c3d-4e5f-6a7b-8c9d-0e1f2a3b4c5d',
@@ -276,7 +327,7 @@ class DashMessagingService {
       );
       _messageStreamController.add(youtubeMessage);
     } 
-    else if (userMessage.toLowerCase().contains('deactivate')) {
+    else if (userMessage.toLowerCase().contains('#deactivate')) {
       // GIF link message
       final gifMessage = ChatMessage(
         id: '1b2c3d4e-5f6a-7b8c-9d0e-1f2a3b4c5d6e',
@@ -287,7 +338,7 @@ class DashMessagingService {
       );
       _messageStreamController.add(gifMessage);
     }
-    else if (userMessage.toLowerCase().contains('benefit') || userMessage.contains('appeal')) {
+    else if (userMessage == 'Better Health') {
       // Poll message with buttons
       final pollMessage = ChatMessage(
         id: '2c3d4e5f-6a7b-8c9d-0e1f-2a3b4c5d6e7f',
@@ -314,7 +365,7 @@ class DashMessagingService {
       );
       _messageStreamController.add(quickReplyMessage);
     }
-    else if (userMessage.toLowerCase().contains('more') || userMessage.toLowerCase().contains('tell')) {
+    else if (userMessage == 'Tell me more') {
       // Another GIF link message
       final anotherGifMessage = ChatMessage(
         id: '3d4e5f6a-7b8c-9d0e-1f2a-3b4c5d6e7f8a',
@@ -326,8 +377,31 @@ class DashMessagingService {
       _messageStreamController.add(anotherGifMessage);
     }
     else {
-      // Default response with all test messages in sequence
-      await sendTestMessages();
+      // For any other message, show a default response asking for more specific input
+      final defaultMessage = ChatMessage(
+        id: _uuid.v4(),
+        content: 'I\'m not sure how to respond to that. Try one of these options:',
+        timestamp: DateTime.now(),
+        isMe: false,
+        type: MessageType.text,
+      );
+      _messageStreamController.add(defaultMessage);
+      
+      // Add quick reply buttons for standard options
+      await Future.delayed(const Duration(milliseconds: 200));
+      final quickReplyMessage = ChatMessage(
+        id: _uuid.v4(),
+        content: '',
+        timestamp: DateTime.now(),
+        isMe: false,
+        type: MessageType.quickReply,
+        suggestedReplies: [
+          QuickReply(text: 'Hello, I\'m ready to quit!', value: 'Hello, I\'m ready to quit!'),
+          QuickReply(text: '#deactivate', value: '#deactivate'),
+          QuickReply(text: 'Tell me more', value: 'Tell me more'),
+        ],
+      );
+      _messageStreamController.add(quickReplyMessage);
     }
   }
   

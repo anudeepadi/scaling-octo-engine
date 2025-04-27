@@ -133,6 +133,14 @@ class _DashMessagingScreenState extends State<DashMessagingScreen> {
               dashChatProvider.sendMessage('#test');
             },
           ),
+          // Add action to update server URL
+          IconButton(
+            icon: const Icon(Icons.cloud_sync),
+            tooltip: 'Update server URL',
+            onPressed: () {
+              _showServerUrlDialog(context, dashChatProvider);
+            },
+          ),
         ],
       ),
       body: Column(
@@ -234,5 +242,63 @@ class _DashMessagingScreenState extends State<DashMessagingScreen> {
     _messageController.dispose();
     _scrollController.dispose();
     super.dispose();
+  }
+
+  // Method to show dialog for updating server URL
+  void _showServerUrlDialog(BuildContext context, DashChatProvider provider) {
+    final TextEditingController urlController = TextEditingController();
+    urlController.text = "https://f2f4-3-17-141-5.ngrok-free.app";
+    
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Update Server URL'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: urlController,
+              decoration: const InputDecoration(
+                labelText: 'Server URL',
+                hintText: 'Enter server URL',
+              ),
+            ),
+            const SizedBox(height: 16),
+            const Text('Current server: ngrok endpoint'),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () async {
+              final newUrl = urlController.text.trim();
+              if (newUrl.isNotEmpty) {
+                try {
+                  Navigator.pop(context);
+                  // Show loading indicator
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Updating server URL...')),
+                  );
+                  
+                  await provider.updateHostUrl(newUrl);
+                  
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Server URL updated successfully')),
+                  );
+                } catch (e) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Error updating server URL: $e')),
+                  );
+                }
+              }
+            },
+            child: const Text('Update'),
+          ),
+        ],
+      ),
+    );
   }
 } 

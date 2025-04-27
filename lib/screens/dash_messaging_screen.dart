@@ -27,11 +27,8 @@ class DashMessagingScreen extends StatefulWidget {
 class _DashMessagingScreenState extends State<DashMessagingScreen> {
   final TextEditingController _messageController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
-  // Remove DashMessagingService instance
-  // final DashMessagingService _messagingService = DashMessagingService();
-  // Remove local message list and loading state
-  // List<ChatMessage> _messages = [];
-  // bool _isLoading = false;
+  // Add flag to prevent double message sending
+  bool _isSendingMessage = false;
 
   // Add Firebase instances
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
@@ -44,8 +41,6 @@ class _DashMessagingScreenState extends State<DashMessagingScreen> {
     super.initState();
     _currentUser = _auth.currentUser;
     _setupMessageStream();
-    // Remove manual load
-    // _loadMessages();
   }
 
   void _setupMessageStream() {
@@ -64,38 +59,32 @@ class _DashMessagingScreenState extends State<DashMessagingScreen> {
     }
   }
 
-  // Remove _loadMessages function
-  /*
-  Future<void> _loadMessages() async {
-    setState(() {
-      _isLoading = true;
-    });
-
-    try {
-      final messages = await _messagingService.getMessages();
-      setState(() {
-        _messages = messages;
-        _isLoading = false;
-      });
-    } catch (e) {
-      print('Error loading messages: $e');
-      setState(() {
-        _isLoading = false;
-      });
-    }
-  }
-  */
-
   Future<void> _sendMessage() async {
+    // Guard against double message sending
+    if (_isSendingMessage) {
+      print("Already sending a message, ignoring duplicate send request");
+      return;
+    }
+    
     final messageText = _messageController.text.trim();
     if (messageText.isEmpty || _currentUser == null) return;
+    
+    // Set flag to prevent double sending
+    _isSendingMessage = true;
+    
+    try {
+      _messageController.clear();
 
-    _messageController.clear();
-
-    // Use DashChatProvider to send message instead of directly adding to Firestore
-    // This fixes the double message issue
-    final dashChatProvider = Provider.of<DashChatProvider>(context, listen: false);
-    dashChatProvider.sendMessage(messageText);
+      // Use DashChatProvider to send message instead of directly adding to Firestore
+      // This fixes the double message issue
+      final dashChatProvider = Provider.of<DashChatProvider>(context, listen: false);
+      await dashChatProvider.sendMessage(messageText);
+    } catch (e) {
+      print("Error sending message: $e");
+    } finally {
+      // Reset flag when done
+      _isSendingMessage = false;
+    }
   }
 
   void _scrollToBottom({bool isDelayed = false}) {
@@ -135,15 +124,16 @@ class _DashMessagingScreenState extends State<DashMessagingScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Dash Messaging'),
-        // Remove refresh action
-        /*
         actions: [
+          // Add action to trigger test messages
           IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: _loadMessages,
+            icon: const Icon(Icons.science),
+            tooltip: 'Load test messages',
+            onPressed: () {
+              dashChatProvider.sendMessage('#test');
+            },
           ),
         ],
-        */
       ),
       body: Column(
         children: [
@@ -156,7 +146,7 @@ class _DashMessagingScreenState extends State<DashMessagingScreen> {
                   return const Center(child: CircularProgressIndicator());
                 }
                 if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-                  return const Center(child: Text('No messages yet.'));
+                  return const Center(child: Text('No messages yet. Try sending "#test" to see sample messages.'));
                 }
                 if (snapshot.hasError) {
                   print("Firestore Stream Error: ${snapshot.error}");
@@ -220,7 +210,7 @@ class _DashMessagingScreenState extends State<DashMessagingScreen> {
                   child: TextField(
                     controller: _messageController,
                     decoration: const InputDecoration(
-                      hintText: 'Type a message...',
+                      hintText: 'Type a message... (try "#test" for sample messages)',
                       border: OutlineInputBorder(),
                     ),
                     onSubmitted: (_) => _sendMessage(),

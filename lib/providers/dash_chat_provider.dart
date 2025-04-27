@@ -141,7 +141,7 @@ class DashChatProvider extends ChangeNotifier {
           _chatProvider!.addTextMessage(loadingMessage, isMe: false);
         }
         
-        // Process sample test data
+        // Process sample test data via direct method call (no server)
         await _dashService.processSampleTestData();
         return;
       }
@@ -159,17 +159,27 @@ class DashChatProvider extends ChangeNotifier {
       }
       
       // Send message to the server via DashMessagingService
-      final success = await _dashService.sendMessage(messageContent);
-      if (success) {
-        print('Message sent successfully to server');
-      } else {
-        print('Failed to send message to server');
-        // If server send failed, simulate response in demo mode
+      try {
+        final success = await _dashService.sendMessage(messageContent);
+        if (success) {
+          print('Message sent successfully to server');
+        } else {
+          print('Failed to send message to server');
+          // If server send failed, simulate response in demo mode
+          await _dashService.simulateServerResponse(messageContent);
+        }
+      } catch (e) {
+        print('Error sending message to server: $e');
+        // On error, use simulation as fallback
         await _dashService.simulateServerResponse(messageContent);
       }
     } catch (e) {
-      print('Error sending message: $e');
+      print('Error in DashChatProvider.sendMessage: $e');
       // On error, use simulation as fallback
+      if (_chatProvider != null) {
+        // Make sure the message is added to UI if it failed earlier
+        _chatProvider!.addTextMessage(messageContent, isMe: true);
+      }
       await _dashService.simulateServerResponse(messageContent);
     }
   }

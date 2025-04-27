@@ -14,6 +14,7 @@ import 'platform/ios_chat_message_widget.dart';
 import 'quick_reply_widget.dart';
 import 'improved_message_item.dart';
 import '../providers/chat_mode_provider.dart';
+import '../providers/chat_provider.dart';
 
 class ChatMessageWidget extends StatefulWidget {
   final ChatMessage message;
@@ -139,8 +140,8 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
                 widget.message.content.substring(0, match.start).trimRight(),
                 style: TextStyle(
                   color: widget.message.isMe
-                      ? Theme.of(context).colorScheme.onPrimary
-                      : Theme.of(context).colorScheme.onSurface,
+                      ? Colors.black87 // Dark text on light grey
+                      : Colors.white, // White text on dark grey
                 ),
               ),
             ),
@@ -194,8 +195,8 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
                 widget.message.content.substring(match.end).trimLeft(),
                 style: TextStyle(
                   color: widget.message.isMe
-                      ? Theme.of(context).colorScheme.onPrimary
-                      : Theme.of(context).colorScheme.onSurface,
+                      ? Colors.black87 // Dark text on light grey
+                      : Colors.white, // White text on dark grey
                 ),
               ),
             ),
@@ -217,8 +218,8 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
                   widget.message.content.substring(0, match.start).trimRight(),
                   style: TextStyle(
                     color: widget.message.isMe
-                        ? Theme.of(context).colorScheme.onPrimary
-                        : Theme.of(context).colorScheme.onSurface,
+                        ? Colors.black87 // Dark text on light grey
+                        : Colors.white, // White text on dark grey
                   ),
                 ),
               ),
@@ -272,8 +273,8 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
                   widget.message.content.substring(match.end).trimLeft(),
                   style: TextStyle(
                     color: widget.message.isMe
-                        ? Theme.of(context).colorScheme.onPrimary
-                        : Theme.of(context).colorScheme.onSurface,
+                        ? Colors.black87 // Dark text on light grey
+                        : Colors.white, // White text on dark grey
                   ),
                 ),
               ),
@@ -288,13 +289,13 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
           text: widget.message.content,
           style: TextStyle(
             color: widget.message.isMe
-                ? Theme.of(context).colorScheme.onPrimary
-                : Theme.of(context).colorScheme.onSurface,
+                ? Colors.black87 // Dark text on light grey
+                : Colors.white, // White text on dark grey
           ),
           linkStyle: TextStyle(
             color: widget.message.isMe
-                ? Theme.of(context).colorScheme.onPrimary // Or a different color for links
-                : Theme.of(context).colorScheme.primary, // Usually primary color for links
+                ? Theme.of(context).colorScheme.primary // Keep link color for user messages
+                : Colors.lightBlue[200], // Lighter blue links on dark background
             decoration: TextDecoration.underline,
           ),
         );
@@ -327,75 +328,96 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
       return const SizedBox.shrink();
     }
 
+    // --- Build Quick Replies Separately (if they exist) ---
+    Widget? quickRepliesWidget;
+    if (widget.message.suggestedReplies != null &&
+        widget.message.suggestedReplies!.isNotEmpty) {
+      quickRepliesWidget = Padding(
+        // Add horizontal padding to align roughly with bubble, top padding for spacing
+        padding: const EdgeInsets.only(top: 8.0, left: 8.0, right: 8.0), 
+        child: Column(
+          // Align buttons based on message sender (might need adjustment)
+          crossAxisAlignment: widget.message.isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min, // Take minimum vertical space
+          children: widget.message.suggestedReplies!
+              .map((reply) => Padding(
+                    // Add padding between buttons
+                    padding: const EdgeInsets.only(top: 6.0), 
+                    child: TextButton(
+                        onPressed: () {
+                          print("[ChatMessageWidget] Quick Reply Button Tapped! Reply Text: ${reply.text}, Value: ${reply.value}");
+                          // Check if this is the Gemini switch button
+                          if (reply.text == "Chat with Gemini") {
+                            print("[ChatMessageWidget] Switching to Gemini Mode...");
+                            // Get providers
+                            final chatModeProvider = context.read<ChatModeProvider>();
+                            final genericChatProvider = context.read<ChatProvider>(); // Use generic ChatProvider
+                            
+                            // Switch mode
+                            chatModeProvider.setMode(ChatMode.gemini);
+                            
+                            // Optional: Decide if you want to clear history on switch
+                            // genericChatProvider.clearChatHistory(); 
+
+                          } else {
+                            // Otherwise, handle as a normal Dash quick reply
+                            print("[ChatMessageWidget] Handling as normal Dash quick reply.");
+                            final dashChatProvider = Provider.of<DashChatProvider>(context, listen: false);
+                            dashChatProvider.handleQuickReply(reply);
+                          }
+                        },
+                        child: Text(reply.text),
+                        style: TextButton.styleFrom(
+                          foregroundColor: const Color(0xFF008080), // Teal text
+                          backgroundColor: Colors.grey[100], // Light grey background
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                          shape: RoundedRectangleBorder( // Rounded corners
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                          alignment: Alignment.centerLeft, // Align text left
+                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                          elevation: 1, // Slight elevation can help separation
+                        ),
+                    ),
+                  ))
+              .toList(),
+        ),
+      );
+    } // --- End Build Quick Replies ---
+
+    // --- Build Content Bubble --- 
+    Widget contentBubble = Container(
+      constraints: BoxConstraints(
+        maxWidth: MediaQuery.of(context).size.width * 0.75, // Limit bubble width
+      ),
+      // Keep margin on the bubble itself for spacing from edges
+      margin: const EdgeInsets.symmetric(vertical: 4, horizontal: 8), 
+      padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+      decoration: BoxDecoration(
+        // Adjust colors based on image more closely
+        color: widget.message.isMe
+            ? Colors.grey[300] // Keep light grey for user messages
+            : const Color(0xFF303030), // Very dark grey for incoming messages
+        borderRadius: BorderRadius.circular(12),
+      ),
+      // Content bubble only contains the main message content now
+      child: _buildContent(), 
+    );
+    // --- End Build Content Bubble ---
+
+    // --- Combine Bubble and Replies (if any) in an Aligned Column ---
     return Align(
       alignment: widget.message.isMe ? Alignment.centerRight : Alignment.centerLeft,
-      child: Container(
-        constraints: BoxConstraints(
-          maxWidth: MediaQuery.of(context).size.width * 0.75, // Limit bubble width
-        ),
-        margin: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
-        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
-        decoration: BoxDecoration(
-          color: widget.message.isMe
-              ? Theme.of(context).colorScheme.primary
-              : Theme.of(context).colorScheme.surface,
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min, // Prevent column from taking full width
-          children: [
-            _buildContent(), // Use the helper method to build content
-            if (widget.message.suggestedReplies != null &&
-                widget.message.suggestedReplies!.isNotEmpty)
-              Padding(
-                padding: const EdgeInsets.only(top: 8),
-                child: Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: widget.message.suggestedReplies!
-                      .map((reply) => TextButton(
-                            onPressed: () {
-                              print("[ChatMessageWidget] Quick Reply Button Tapped! Reply Text: ${reply.text}, Value: ${reply.value}");
-                              // Check if this is the Gemini switch button
-                              if (reply.text == "Chat with Gemini") {
-                                print("[ChatMessageWidget] Switching to Gemini Mode...");
-                                // Get providers
-                                final chatModeProvider = context.read<ChatModeProvider>();
-                                final chatProvider = context.read<DashChatProvider>();
-                                
-                                // Switch mode
-                                chatModeProvider.setMode(ChatMode.gemini);
-                                
-                                // Clear history of the generic provider (which HomeScreen uses for Dash)
-                                // chatProvider.clearChatHistory(); // Optional: Decide if you want to clear history on switch
-
-                                // Optionally add a message indicating the switch? 
-                                // chatProvider.addTextMessage("Switched to Gemini mode.", isMe: false);
-
-                              } else {
-                                // Otherwise, handle as a normal Dash quick reply
-                                print("[ChatMessageWidget] Handling as normal Dash quick reply.");
-                                final dashChatProvider = Provider.of<DashChatProvider>(context, listen: false);
-                                dashChatProvider.handleQuickReply(reply);
-                              }
-                            },
-                            child: Text(reply.text),
-                            style: TextButton.styleFrom(
-                              foregroundColor: Theme.of(context).colorScheme.primary, // Text color
-                              backgroundColor: Theme.of(context).colorScheme.surfaceVariant, // Button bg
-                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(16),
-                              ),
-                            ),
-                          ))
-                      .toList(),
-                ),
-              ),
-          ],
-        ),
-      ),
+      child: Column(
+         mainAxisSize: MainAxisSize.min,
+         // Align the whole column block left/right
+         crossAxisAlignment: widget.message.isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start, 
+         children: [
+            contentBubble,
+            if (quickRepliesWidget != null) quickRepliesWidget, // Add replies below bubble
+         ],
+      )
     );
+    // --- End Combination ---
   }
 }

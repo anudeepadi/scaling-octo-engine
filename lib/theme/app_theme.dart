@@ -32,8 +32,8 @@ class AppTheme {
     appBarTheme: const AppBarTheme(
       elevation: 0,
       centerTitle: true,
-      backgroundColor: surfaceLight,
-      foregroundColor: primaryLight,
+      backgroundColor: Color(0xFF008080),
+      foregroundColor: Colors.white,
     ),
     inputDecorationTheme: InputDecorationTheme(
       filled: true,

@@ -773,7 +773,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   borderSide: BorderSide.none,
                 ),
                 filled: true,
-                fillColor: Theme.of(context).scaffoldBackgroundColor,
+                fillColor: Colors.white,
                 contentPadding: const EdgeInsets.symmetric(
                   horizontal: 16,
                   vertical: 8,
@@ -786,12 +786,20 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
           ),
           const SizedBox(width: 8),
-          IconButton(
-            icon: const Icon(Icons.send),
-            color: _isComposing ? Theme.of(context).primaryColor : Colors.grey,
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.purple,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(20),
+              ),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              minimumSize: Size(60, 36)
+            ),
             onPressed: _isComposing
                 ? () => _handleSubmitted(_messageController.text)
                 : null,
+            child: const Text('SEND'),
           ),
         ],
       ),

@@ -1,47 +1,153 @@
+import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import 'package:uuid/uuid.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../models/chat_message.dart';
 import '../models/quick_reply.dart';
-import '../models/link_preview.dart';
+import '../utils/app_localizations.dart';
+import '../utils/context_holder.dart';
 
 class DashMessagingService {
-  // Latest Dash messaging server endpoint
-  static const String _baseUrl = 'https://dashmessaging-com.ngrok.io/scheduler/mobile-app';
-  static const String _messagesEndpoint = '$_baseUrl/messages'; // Add messages endpoint
+  static final DashMessagingService _instance = DashMessagingService._internal();
+  factory DashMessagingService() => _instance;
+  DashMessagingService._internal();
 
-  // Send a message to the Dash messaging server
-  Future<bool> sendMessage({
-    required String userId,
-    required String messageText,
-    String? fcmToken,
-    int eventTypeCode = 1,
-  }) async {
+  // Server host URL (configurable)
+  String _hostUrl = "https://dashmessaging-com.ngrok.io";
+  String get hostUrl => _hostUrl;
+  
+  // User information
+  String? _userId;
+  String? _fcmToken;
+  final _uuid = Uuid();
+  
+  // Stream controller for receiving messages
+  final _messageStreamController = StreamController<ChatMessage>.broadcast();
+  Stream<ChatMessage> get messageStream => _messageStreamController.stream;
+  
+  // Flag to track initialization state
+  bool _isInitialized = false;
+  bool get isInitialized => _isInitialized;
+
+  // Initialize the service with user ID and FCM token
+  Future<void> initialize(String userId, String fcmToken) async {
+    if (_isInitialized) return;
+    
+    _userId = userId;
+    _fcmToken = fcmToken;
+    _isInitialized = true;
+    
+    // Load host URL from shared preferences
+    await _loadHostUrl();
+    
+    print('DashMessagingService initialized for user: $userId');
+    print('Using host URL: $_hostUrl');
+    print('FCM Token: $fcmToken');
+    
+    // Send a test message to the server to check connection
+    await testConnection();
+  }
+
+  // Load host URL from shared preferences
+  Future<void> _loadHostUrl() async {
     try {
-      final timestamp = DateTime.now().millisecondsSinceEpoch ~/ 1000;
-      final messageId = 'msg_${DateTime.now().millisecondsSinceEpoch}';
+      final prefs = await SharedPreferences.getInstance();
+      final savedUrl = prefs.getString('hostUrl');
+      if (savedUrl != null && savedUrl.isNotEmpty) {
+        _hostUrl = savedUrl;
+      }
+    } catch (e) {
+      print('Error loading host URL: $e');
+    }
+  }
 
-      final response = await http.post(
-        Uri.parse(_baseUrl),
+  // Update host URL and save to shared preferences
+  Future<void> updateHostUrl(String newUrl) async {
+    if (newUrl.isEmpty) return;
+    
+    try {
+      _hostUrl = newUrl;
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('hostUrl', newUrl);
+      print('Host URL updated to: $newUrl');
+      
+      // Test connection with new URL
+      await testConnection();
+    } catch (e) {
+      print('Error updating host URL: $e');
+      throw Exception('Failed to update host URL: $e');
+    }
+  }
+
+  // Test connection to the server
+  Future<bool> testConnection() async {
+    if (!_isInitialized) {
+      throw Exception('DashMessagingService not initialized');
+    }
+    
+    try {
+      final endpoint = '$_hostUrl/scheduler/test-connection';
+      final response = await http.get(
+        Uri.parse(endpoint),
         headers: {
           'Content-Type': 'application/json',
-          'Accept': 'application/json',
+          'User-ID': _userId ?? '',
+          'FCM-Token': _fcmToken ?? '',
         },
-        body: jsonEncode({
-          'userId': userId,
-          'messageText': messageText,
-          'messageTime': timestamp,
-          'messageId': messageId,
-          'eventTypeCode': eventTypeCode,
-          'fcmToken': fcmToken,
-        }),
-      );
-
+      ).timeout(const Duration(seconds: 10));
+      
       if (response.statusCode == 200) {
-        print('Message sent successfully to Dash server.');
+        print('Connection test successful');
         return true;
       } else {
-        print('Failed to send message. Status code: ${response.statusCode}');
+        print('Connection test failed. Status: ${response.statusCode}, Body: ${response.body}');
+        return false;
+      }
+    } catch (e) {
+      print('Connection test error: $e');
+      return false;
+    }
+  }
+
+  // Send a message to the server
+  Future<bool> sendMessage(String text, {int eventTypeCode = 1}) async {
+    if (!_isInitialized) {
+      throw Exception('DashMessagingService not initialized');
+    }
+    
+    if (_userId == null || _fcmToken == null) {
+      throw Exception('User ID or FCM token is null');
+    }
+    
+    final timestamp = DateTime.now().millisecondsSinceEpoch ~/ 1000;
+    final messageId = _uuid.v4();
+    
+    try {
+      final endpoint = '$_hostUrl/scheduler/mobile-app';
+      final payload = {
+        'userId': _userId,
+        'messageId': messageId,
+        'messageText': text,
+        'messageTime': timestamp,
+        'eventTypeCode': eventTypeCode,
+        'fcmToken': _fcmToken,
+      };
+      
+      print('Sending message to server: $payload');
+      
+      final response = await http.post(
+        Uri.parse(endpoint),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode(payload),
+      ).timeout(const Duration(seconds: 10));
+      
+      if (response.statusCode == 200 || response.statusCode == 202) {
+        print('Message sent successfully');
+        return true;
+      } else {
+        print('Failed to send message. Status: ${response.statusCode}, Body: ${response.body}');
         return false;
       }
     } catch (e) {
@@ -49,149 +155,300 @@ class DashMessagingService {
       return false;
     }
   }
-
-  // Get messages from the server
-  Future<List<ChatMessage>> getMessages({String? userId}) async {
+  
+  // Handle incoming push notifications
+  void handlePushNotification(Map<String, dynamic> data) {
     try {
-      final queryParams = userId != null ? {'userId': userId} : null;
-      final uri = Uri.parse(_messagesEndpoint).replace(queryParameters: queryParams);
+      print('Received push notification: $data');
       
-      print('Fetching messages from: $uri');
+      // Parse data into QuitxtServerIncomingDto format
+      final recipientId = data['recipientId'] as String?;
+      final serverMessageId = data['serverMessageId'] as String?;
+      final messageBody = data['messageBody'] as String?;
+      final timestamp = data['timestamp'] as int?;
+      final isPoll = data['isPoll'] as bool? ?? false;
+      final pollId = data['pollId'] as String?;
+      final buttons = data['buttons'] as List<dynamic>?;
       
-      final response = await http.get(
-        uri,
-        headers: {
-          'Accept': 'application/json',
-        },
+      // Handle missing required fields
+      if (recipientId == null || serverMessageId == null || messageBody == null) {
+        print('Missing required fields in push notification');
+        return;
+      }
+      
+      // Create message object
+      final ChatMessage message = ChatMessage(
+        id: serverMessageId,
+        content: messageBody,
+        timestamp: timestamp != null 
+            ? DateTime.fromMillisecondsSinceEpoch(timestamp * 1000) 
+            : DateTime.now(),
+        isMe: false,
+        type: MessageType.text,
       );
-
-      if (response.statusCode == 200) {
-        final List<dynamic> data = jsonDecode(response.body);
-        print('Received ${data.length} messages from server');
-        
-        return data.map((messageData) {
-          if (messageData is Map<String, dynamic>) {
-            return processServerMessage(messageData);
-          } else {
-            print('Invalid message format: $messageData');
-            return null;
+      
+      // Add the main message first
+      _messageStreamController.add(message);
+      
+      // Add buttons as quick replies if available
+      if (isPoll && buttons != null && buttons.isNotEmpty) {
+        final quickReplies = <QuickReply>[];
+        for (final button in buttons) {
+          final title = button['title'] as String?;
+          if (title != null) {
+            quickReplies.add(QuickReply(text: title, value: title));
           }
-        }).whereType<ChatMessage>().toList();
-      } else {
-        print('Failed to fetch messages. Status code: ${response.statusCode}');
-        return [];
+        }
+        
+        if (quickReplies.isNotEmpty) {
+          // Add a separate message with quick replies
+          final quickReplyMessage = ChatMessage(
+            id: '${serverMessageId}_replies',
+            content: '',
+            timestamp: DateTime.now(),
+            isMe: false,
+            type: MessageType.quickReply,
+            suggestedReplies: quickReplies,
+          );
+          _messageStreamController.add(quickReplyMessage);
+          return;
+        }
+      }
+      
+      // Fallback for older 'questionsAnswers' format
+      else if (isPoll && data.containsKey('questionsAnswers')) {
+        final questionsAnswers = data['questionsAnswers'] as Map<String, dynamic>?;
+        if (questionsAnswers != null) {
+          final quickReplies = <QuickReply>[];
+          questionsAnswers.forEach((key, value) {
+            quickReplies.add(QuickReply(text: value.toString(), value: key));
+          });
+          
+          if (quickReplies.isNotEmpty) {
+            // Add a separate message with quick replies
+            final quickReplyMessage = ChatMessage(
+              id: '${serverMessageId}_replies',
+              content: '',
+              timestamp: DateTime.now(),
+              isMe: false,
+              type: MessageType.quickReply,
+              suggestedReplies: quickReplies,
+            );
+            _messageStreamController.add(quickReplyMessage);
+          }
+        }
       }
     } catch (e) {
-      print('Error getting messages: $e');
-      return [];
+      print('Error handling push notification: $e');
     }
   }
-
-  // Process the received message from server to determine its type
-  ChatMessage processServerMessage(Map<String, dynamic> data) {
-    final String messageId = data['serverMessageId'] ?? DateTime.now().millisecondsSinceEpoch.toString();
-    final String messageBody = data['messageBody'] ?? '';
-    final int timestamp = data['timestamp'] ?? DateTime.now().millisecondsSinceEpoch;
-    final bool isUserMessage = data['isUserMessage'] ?? false;
+  
+  // Mock method to simulate server response (for testing without server)
+  Future<void> simulateServerResponse(String userMessage) async {
+    // Add a small delay to simulate network latency
+    await Future.delayed(const Duration(milliseconds: 800));
     
-    // Extract quick replies if this is a poll
-    List<QuickReply>? suggestedReplies;
-    if (data['isPoll'] == true || data['isPoll'] == 'y') {
-      if (data['questionsAnswers'] != null) {
-        Map<String, String> questionsAnswers;
-        
-        // Handle different formats of questionsAnswers
-        if (data['questionsAnswers'] is Map) {
-          questionsAnswers = Map<String, String>.from(data['questionsAnswers']);
-        } else if (data['questionsAnswers'] is List) {
-          // Convert list to map with same values for key and value
-          final List<dynamic> answers = data['questionsAnswers'];
-          questionsAnswers = {
-            for (var answer in answers) answer.toString(): answer.toString()
-          };
-        } else {
-          questionsAnswers = {};
-        }
-        
-        if (questionsAnswers.isNotEmpty) {
-          suggestedReplies = questionsAnswers.entries
-              .map((entry) => QuickReply(
-                    text: entry.key,
-                    value: entry.value,
-                  ))
-              .toList();
-        }
-      }
-      
-      // If no questionsAnswers but there are answers as a list
-      if (suggestedReplies == null && data['answers'] != null && data['answers'] is List) {
-        final List<dynamic> answers = data['answers'];
-        suggestedReplies = answers
-            .map((answer) => QuickReply(
-                  text: answer.toString(),
-                  value: answer.toString(),
-                ))
-            .toList();
-      }
-    }
-
-    // Determine message type
-    MessageType type = MessageType.text;
-    String? mediaUrl;
-    
-    // Check for YouTube URLs
-    final youtubeRegex = RegExp(r'(https?:\/\/)?(www\.)?(youtube\.com|youtu\.?be)\/[^\s]+');
-    final youtubeMatch = youtubeRegex.firstMatch(messageBody);
-    
-    // Check for GIF URLs
-    final gifRegex = RegExp(r'https?:\/\/[^\s]+\.gif');
-    final gifMatch = gifRegex.firstMatch(messageBody);
-    
-    // Check for image URLs
-    final imageRegex = RegExp(r'https?:\/\/[^\s]+\.(jpg|jpeg|png|webp)');
-    final imageMatch = imageRegex.firstMatch(messageBody);
-    
-    // Check for other URLs
-    final urlRegex = RegExp(r'https?:\/\/[^\s]+');
-    final urlMatch = urlRegex.firstMatch(messageBody);
-
-    LinkPreview? linkPreview;
-    
-    if (youtubeMatch != null) {
-      type = MessageType.youtube;
-      mediaUrl = youtubeMatch.group(0);
-    } else if (gifMatch != null) {
-      type = MessageType.gif;
-      mediaUrl = gifMatch.group(0);
-    } else if (imageMatch != null) {
-      type = MessageType.image;
-      mediaUrl = imageMatch.group(0);
-    } else if (urlMatch != null) {
-      type = MessageType.linkPreview;
-      mediaUrl = urlMatch.group(0);
-      linkPreview = LinkPreview(
-        url: mediaUrl!,
-        title: 'Link Preview',
-        description: 'Loading preview...',
+    // Determine which mock response to send based on the user message
+    if (userMessage.toLowerCase().contains('hello') || userMessage.toLowerCase().contains('hi')) {
+      // YouTube link message
+      final youtubeMessage = ChatMessage(
+        id: '0a1b2c3d-4e5f-6a7b-8c9d-0e1f2a3b4c5d',
+        content: 'Welcome to Quitxt from the UT Health Science Center! Congrats on your decision to quit smoking! See why we think you\'re awesome, Tap pic below https://youtu.be/ZWsR3G0mdJo',
+        timestamp: DateTime.now(),
+        isMe: false,
+        type: MessageType.text,
       );
+      _messageStreamController.add(youtubeMessage);
+    } 
+    else if (userMessage.toLowerCase().contains('deactivate')) {
+      // GIF link message
+      final gifMessage = ChatMessage(
+        id: '1b2c3d4e-5f6a-7b8c-9d0e-1f2a3b4c5d6e',
+        content: 'We\'re sorry to see you go. Here\'s a quick tip: Stay strong! https://quitxt.org/sites/quitxt/files/gifs/PreQ6_Hoverboard.gif',
+        timestamp: DateTime.now(),
+        isMe: false,
+        type: MessageType.text,
+      );
+      _messageStreamController.add(gifMessage);
     }
-    
-    // Create a clean text content by removing the media URL if present
-    String cleanContent = messageBody;
-    if (mediaUrl != null) {
-      cleanContent = messageBody.replaceAll(mediaUrl, '').trim();
+    else if (userMessage.toLowerCase().contains('benefit') || userMessage.contains('appeal')) {
+      // Poll message with buttons
+      final pollMessage = ChatMessage(
+        id: '2c3d4e5f-6a7b-8c9d-0e1f-2a3b4c5d6e7f',
+        content: 'Which of these benefits appeals to you the most?',
+        timestamp: DateTime.now(),
+        isMe: false,
+        type: MessageType.text,
+      );
+      _messageStreamController.add(pollMessage);
+      
+      // Add quick reply buttons
+      await Future.delayed(const Duration(milliseconds: 200));
+      final quickReplyMessage = ChatMessage(
+        id: '2c3d4e5f-6a7b-8c9d-0e1f-2a3b4c5d6e7f_replies',
+        content: '',
+        timestamp: DateTime.now(),
+        isMe: false,
+        type: MessageType.quickReply,
+        suggestedReplies: [
+          QuickReply(text: 'Better Health', value: 'Better Health'),
+          QuickReply(text: 'Save Money', value: 'Save Money'),
+          QuickReply(text: 'More Energy', value: 'More Energy'),
+        ],
+      );
+      _messageStreamController.add(quickReplyMessage);
     }
-    
-    return ChatMessage(
-      id: messageId,
-      content: cleanContent.isEmpty ? mediaUrl ?? '' : cleanContent,
-      isMe: isUserMessage,
-      timestamp: DateTime.fromMillisecondsSinceEpoch(timestamp),
-      type: type,
-      suggestedReplies: suggestedReplies,
-      mediaUrl: mediaUrl,
-      linkPreview: linkPreview,
-      status: MessageStatus.delivered,
+    else if (userMessage.toLowerCase().contains('more') || userMessage.toLowerCase().contains('tell')) {
+      // Another GIF link message
+      final anotherGifMessage = ChatMessage(
+        id: '3d4e5f6a-7b8c-9d0e-1f2a-3b4c5d6e7f8a',
+        content: 'Reason #2 to quit smoking while you\'re young: Add a decade to your life and see the rise of fully automated smart homes; who needs to do chores when robots become a common commodity! https://quitxt.org/sites/quitxt/files/gifs/preq5_motiv2_automated_esp.gif',
+        timestamp: DateTime.now(),
+        isMe: false,
+        type: MessageType.text,
+      );
+      _messageStreamController.add(anotherGifMessage);
+    }
+    else {
+      // Default response with all test messages in sequence
+      await sendTestMessages();
+    }
+  }
+  
+  // Send all test messages in sequence (useful for testing)
+  Future<void> sendTestMessages() async {
+    // Message 1: YouTube video
+    final youtubeMessage = ChatMessage(
+      id: '0a1b2c3d-4e5f-6a7b-8c9d-0e1f2a3b4c5d',
+      content: 'Welcome to Quitxt from the UT Health Science Center! Congrats on your decision to quit smoking! See why we think you\'re awesome, Tap pic below https://youtu.be/ZWsR3G0mdJo',
+      timestamp: DateTime.now(),
+      isMe: false,
+      type: MessageType.text,
     );
+    _messageStreamController.add(youtubeMessage);
+    await Future.delayed(const Duration(milliseconds: 1500));
+    
+    // Message 2: GIF link
+    final gifMessage = ChatMessage(
+      id: '1b2c3d4e-5f6a-7b8c-9d0e-1f2a3b4c5d6e',
+      content: 'We\'re sorry to see you go. Here\'s a quick tip: Stay strong! https://quitxt.org/sites/quitxt/files/gifs/PreQ6_Hoverboard.gif',
+      timestamp: DateTime.now(),
+      isMe: false,
+      type: MessageType.text,
+    );
+    _messageStreamController.add(gifMessage);
+    await Future.delayed(const Duration(milliseconds: 1500));
+    
+    // Message 3: Poll with buttons
+    final pollMessage = ChatMessage(
+      id: '2c3d4e5f-6a7b-8c9d-0e1f-2a3b4c5d6e7f',
+      content: 'Which of these benefits appeals to you the most?',
+      timestamp: DateTime.now(),
+      isMe: false,
+      type: MessageType.text,
+    );
+    _messageStreamController.add(pollMessage);
+    
+    await Future.delayed(const Duration(milliseconds: 500));
+    final quickReplyMessage = ChatMessage(
+      id: '2c3d4e5f-6a7b-8c9d-0e1f-2a3b4c5d6e7f_replies',
+      content: '',
+      timestamp: DateTime.now(),
+      isMe: false,
+      type: MessageType.quickReply,
+      suggestedReplies: [
+        QuickReply(text: 'Better Health', value: 'Better Health'),
+        QuickReply(text: 'Save Money', value: 'Save Money'),
+        QuickReply(text: 'More Energy', value: 'More Energy'),
+      ],
+    );
+    _messageStreamController.add(quickReplyMessage);
+    await Future.delayed(const Duration(milliseconds: 1500));
+    
+    // Message 4: Another GIF link
+    final anotherGifMessage = ChatMessage(
+      id: '3d4e5f6a-7b8c-9d0e-1f2a-3b4c5d6e7f8a',
+      content: 'Reason #2 to quit smoking while you\'re young: Add a decade to your life and see the rise of fully automated smart homes; who needs to do chores when robots become a common commodity! https://quitxt.org/sites/quitxt/files/gifs/preq5_motiv2_automated_esp.gif',
+      timestamp: DateTime.now(),
+      isMe: false,
+      type: MessageType.text,
+    );
+    _messageStreamController.add(anotherGifMessage);
+  }
+  
+  // Send a quick reply to the server
+  Future<bool> sendQuickReply(String value, String text) async {
+    return sendMessage(text, eventTypeCode: 2);
+  }
+  
+  // Process sample test data in the format provided
+  Future<void> processSampleTestData() async {
+    // Sample data structure matching the expected server format
+    final sampleData = {
+      "sentMessages": [
+        {
+          "userId": "pUuutN05eoVeWhsKyXBiwRoFW9u1",
+          "messageId": "70ae2ec3-55f7-4aa2-9c35-eb963b8fbd2b",
+          "messageText": "Hello, I'm ready to quit!",
+          "messageTime": 1710072000,
+          "eventTypeCode": 1,
+          "fcmToken": "e-D8y5f8RoOcRgQl4AV18K:APA91bEdH6CwssC..."
+        }
+      ],
+      "expectedResponses": [
+        {
+          "recipientId": "pUuutN05eoVeWhsKyXBiwRoFW9u1",
+          "serverMessageId": "0a1b2c3d-4e5f-6a7b-8c9d-0e1f2a3b4c5d",
+          "messageBody": "Welcome to Quitxt from the UT Health Science Center! Congrats on your decision to quit smoking! See why we think you're awesome, Tap pic below https://youtu.be/ZWsR3G0mdJo",
+          "timestamp": 1710072001,
+          "isPoll": false,
+          "pollId": null,
+          "buttons": []
+        },
+        {
+          "recipientId": "pUuutN05eoVeWhsKyXBiwRoFW9u1",
+          "serverMessageId": "1b2c3d4e-5f6a-7b8c-9d0e-1f2a3b4c5d6e",
+          "messageBody": "We're sorry to see you go. Here's a quick tip: Stay strong! https://quitxt.org/sites/quitxt/files/gifs/PreQ6_Hoverboard.gif",
+          "timestamp": 1710075601,
+          "isPoll": false,
+          "pollId": null,
+          "buttons": []
+        },
+        {
+          "recipientId": "pUuutN05eoVeWhsKyXBiwRoFW9u1",
+          "serverMessageId": "2c3d4e5f-6a7b-8c9d-0e1f-2a3b4c5d6e7f",
+          "messageBody": "Which of these benefits appeals to you the most?",
+          "timestamp": 1710079201,
+          "isPoll": true,
+          "pollId": 42,
+          "buttons": [
+            { "title": "Better Health", "eventTypeCode": 2 },
+            { "title": "Save Money",     "eventTypeCode": 2 },
+            { "title": "More Energy",    "eventTypeCode": 2 }
+          ]
+        },
+        {
+          "recipientId": "pUuutN05eoVeWhsKyXBiwRoFW9u1",
+          "serverMessageId": "3d4e5f6a-7b8c-9d0e-1f2a-3b4c5d6e7f8a",
+          "messageBody": "Reason #2 to quit smoking while you're young: Add a decade to your life and see the rise of fully automated smart homes; who needs to do chores when robots become a common commodity! https://quitxt.org/sites/quitxt/files/gifs/preq5_motiv2_automated_esp.gif",
+          "timestamp": 1710082801,
+          "isPoll": false,
+          "pollId": null,
+          "buttons": []
+        }
+      ]
+    };
+
+    // Process each expected response with a delay between them
+    for (final response in sampleData['expectedResponses'] as List<dynamic>) {
+      await Future.delayed(const Duration(milliseconds: 1000));
+      handlePushNotification(response as Map<String, dynamic>);
+    }
+  }
+  
+  // Dispose resources
+  void dispose() {
+    _messageStreamController.close();
+    _isInitialized = false;
   }
 }

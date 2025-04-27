@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
-import 'package:firebase_auth/firebase_auth.dart'; // Add Firebase Auth import
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 
 // Update class to use Firebase Authentication
 class AuthProvider extends ChangeNotifier {
@@ -107,6 +108,49 @@ class AuthProvider extends ChangeNotifier {
        notifyListeners();
     }
     // Loading state is reset within _onAuthStateChanged after sign out completes
+  }
+
+  Future<bool> signInWithGoogle() async {
+    _isLoading = true;
+    _error = null;
+    notifyListeners();
+    
+    try {
+      // Initialize Google Sign-In
+      final GoogleSignIn googleSignIn = GoogleSignIn();
+      
+      // Start the sign-in process
+      final GoogleSignInAccount? googleUser = await googleSignIn.signIn();
+      
+      // If no user was selected (user canceled the sign-in), return false
+      if (googleUser == null) {
+        _error = 'Google sign-in was canceled.';
+        _isLoading = false;
+        notifyListeners();
+        return false;
+      }
+      
+      // Get authentication details from Google Sign-In
+      final GoogleSignInAuthentication googleAuth = await googleUser.authentication;
+      
+      // Create a credential for Firebase using Google tokens
+      final AuthCredential credential = GoogleAuthProvider.credential(
+        accessToken: googleAuth.accessToken,
+        idToken: googleAuth.idToken,
+      );
+      
+      // Sign in to Firebase with Google credential
+      await _auth.signInWithCredential(credential);
+      
+      // _onAuthStateChanged will handle updating state
+      return true;
+    } catch (e) {
+      _error = 'An error occurred during Google sign-in: ${e.toString()}';
+      print('AuthProvider: Google SignIn Error - $e');
+      _isLoading = false;
+      notifyListeners();
+      return false;
+    }
   }
 
   Future<void> updateUserProfile({String? displayName, String? photoURL}) async {

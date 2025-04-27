@@ -1,23 +1,19 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/cupertino.dart';
 import 'package:provider/provider.dart';
-import 'dart:io' show Platform;
 import 'providers/chat_provider.dart';
-import 'providers/bot_chat_provider.dart';
 import 'providers/channel_provider.dart';
 import 'providers/system_chat_provider.dart';
 import 'providers/auth_provider.dart';
 import 'providers/dash_chat_provider.dart';
 import 'providers/service_provider.dart';
-import 'providers/chat_mode_provider.dart';
-import 'providers/gemini_chat_provider.dart';
-import 'services/bot_service.dart';
+import 'providers/language_provider.dart';
 import 'screens/home_screen.dart';
 import 'screens/login_screen.dart';
-import 'screens/main_screen.dart';
-import 'screens/simple_gemini_tester.dart';
 import 'theme/app_theme.dart';
-import 'theme/ios_theme.dart';
+import 'utils/app_localizations.dart';
+
+// Import Flutter localizations
+import 'package:flutter_localizations/flutter_localizations.dart';
 
 // Import Firebase
 import 'package:firebase_core/firebase_core.dart';
@@ -62,13 +58,10 @@ class MyApp extends StatelessWidget {
       providers: [
         ChangeNotifierProvider(create: (_) => AuthProvider()),
         ChangeNotifierProvider(create: (_) => ChatProvider()),
-        ChangeNotifierProvider(create: (_) => BotChatProvider()),
         ChangeNotifierProvider(create: (_) => ChannelProvider()),
         ChangeNotifierProvider(create: (_) => SystemChatProvider()),
-        ChangeNotifierProvider(create: (_) => ChatModeProvider()),
-        ChangeNotifierProvider(create: (_) => GeminiChatProvider()),
-        Provider(create: (_) => BotService()),
         ChangeNotifierProvider(create: (_) => ServiceProvider()),
+        ChangeNotifierProvider(create: (_) => LanguageProvider()),
 
         ChangeNotifierProxyProvider<AuthProvider, DashChatProvider>(
           create: (_) => DashChatProvider(),
@@ -100,24 +93,27 @@ class MyApp extends StatelessWidget {
           },
         ),
       ],
-      child: Consumer<AuthProvider>(
-        builder: (context, authProvider, _) {
-          final app = Platform.isIOS
-              ? MaterialApp(
-                  title: 'RCS Demo App',
-                  debugShowCheckedModeBanner: false,
-                  theme: IosTheme.lightTheme,
-                  themeMode: ThemeMode.light,
-                  home: authProvider.isAuthenticated ? const HomeScreen() : const LoginScreen(),
-                )
-              : MaterialApp(
-                  title: 'RCS Demo App',
-                  debugShowCheckedModeBanner: false,
-                  theme: AppTheme.lightTheme,
-                  themeMode: ThemeMode.light,
-                  home: authProvider.isAuthenticated ? const HomeScreen() : const LoginScreen(),
-                );
-          return app;
+      child: Consumer<LanguageProvider>(
+        builder: (context, languageProvider, _) {
+          return Consumer<AuthProvider>(
+            builder: (context, authProvider, _) {
+              return MaterialApp(
+                title: 'QuitTXT Mobile',
+                debugShowCheckedModeBanner: false,
+                theme: AppTheme.lightTheme,
+                themeMode: ThemeMode.light,
+                locale: languageProvider.currentLocale,
+                supportedLocales: AppLocalizations.supportedLocales,
+                localizationsDelegates: const [
+                  AppLocalizations.delegate,
+                  GlobalMaterialLocalizations.delegate,
+                  GlobalWidgetsLocalizations.delegate,
+                  GlobalCupertinoLocalizations.delegate,
+                ],
+                home: authProvider.isAuthenticated ? const HomeScreen() : const LoginScreen(),
+              );
+            },
+          );
         },
       ),
     );

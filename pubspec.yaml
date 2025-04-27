@@ -1,5 +1,5 @@
-name: rcs_demo_app
-description: "Rich Communication Services Demo App"
+name: quitxt_mobile
+description: "QuitTXT Mobile Application"
 publish_to: 'none'
 version: 1.0.0+1
 
@@ -10,16 +10,15 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  flutter_localizations:
+    sdk: flutter
   cupertino_icons: ^1.0.6
   http: ^1.1.2
-  web_socket_channel: ^3.0.2
   provider: ^6.1.1
   uuid: ^4.2.1
   video_player: ^2.8.1
   chewie: ^1.7.1
-  google_generative_ai: ^0.4.6
   file_picker: ^9.2.3
-  gradient_borders: ^1.0.0
   cached_network_image: ^3.3.0
   path_provider: ^2.1.1
   shared_preferences: ^2.2.2
@@ -31,12 +30,14 @@ dependencies:
   youtube_player_flutter: ^9.1.1
   flutter_linkify: ^6.0.0
   image_picker: ^1.0.7
+  intl: ^0.19.0
+  google_sign_in: ^6.3.0
   # Firebase - Update to latest compatible versions
-  firebase_core: # Let flutter pub get find the latest
-  firebase_auth: # Let flutter pub get find the latest
-  cloud_firestore: # Let flutter pub get find the latest
-  firebase_messaging: # Let flutter pub get find the latest
-  firebase_storage: # Let flutter pub get find the latest
+  firebase_core: ^3.2.0
+  firebase_auth: ^5.1.2
+  cloud_firestore: ^5.1.1
+  firebase_messaging: ^15.1.0
+  firebase_storage: ^12.1.1
 
 dev_dependencies:
   flutter_test:
@@ -49,3 +50,5 @@ flutter:
     - assets/images/
     - assets/icons/
     - assets/gifs/
+    - assets/quitxt/
+    - lib/l10n/

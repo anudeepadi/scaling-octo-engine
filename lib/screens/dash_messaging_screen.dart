@@ -79,6 +79,9 @@ class _DashMessagingScreenState extends State<DashMessagingScreen> {
       // This fixes the double message issue
       final dashChatProvider = Provider.of<DashChatProvider>(context, listen: false);
       await dashChatProvider.sendMessage(messageText);
+      
+      // No need to add to Firestore directly - DashChatProvider will handle that
+      // This was causing double messages
     } catch (e) {
       print("Error sending message: $e");
     } finally {
@@ -105,6 +108,186 @@ class _DashMessagingScreenState extends State<DashMessagingScreen> {
     }
   }
 
+  void _processCustomJson() {
+    // The custom JSON to process with all the server responses
+    final jsonString = '''
+    {
+      "serverResponses": [
+        {
+          "recipientId": "pUuutN05eoVeWhsKyXBiwRoFW9u1",
+          "serverMessageId": "7e9f2a1b-c3d4-5e6f-7g8h-9i0j1k2l3m4n",
+          "messageBody": "Welcome to Quitxt from the UT Health Science Center! Congrats on your decision to quit smoking!",
+          "timestamp": 1710072000,
+          "isPoll": false,
+          "pollId": null,
+          "fcmToken": "e-D8y5f8RoOcRgQl4AV18K:APA91bEdH6CwssC17yIKENOuLiW5eOxnE5CaOxqiOkKXdL4ZgnbOAk9s1_EX0w0E4G0c_zn5QD8X7W0-BHGooS2RyBcfHFYl8hfNEwYVcNIEConIJTyeJnhAnxlhD3OwayB6S_yeZXST",
+          "questionsAnswers": null
+        },
+        {
+          "recipientId": "pUuutN05eoVeWhsKyXBiwRoFW9u1",
+          "serverMessageId": "8f0e1d2c-3b4a-5d6e-7f8g-9h0i1j2k3l4m",
+          "messageBody": "Welcome to Quitxt from the UT Health Science Center! Congrats on your decision to quit smoking! See why we think you're awesome, Tap pic below https://youtu.be/ZWsR3G0mdJo",
+          "timestamp": 1710072100,
+          "isPoll": false,
+          "pollId": null,
+          "fcmToken": "e-D8y5f8RoOcRgQl4AV18K:APA91bEdH6CwssC17yIKENOuLiW5eOxnE5CaOxqiOkKXdL4ZgnbOAk9s1_EX0w0E4G0c_zn5QD8X7W0-BHGooS2RyBcfHFYl8hfNEwYVcNIEConIJTyeJnhAnxlhD3OwayB6S_yeZXST",
+          "questionsAnswers": null
+        },
+        {
+          "recipientId": "pUuutN05eoVeWhsKyXBiwRoFW9u1",
+          "serverMessageId": "9e0d1c2b-3a4f-5e6d-7c8b-9a0f1e2d3c4b",
+          "messageBody": "We'll help you quit smoking with fun messages. By continuing, you agree with our terms of service. If you want to leave the program type EXIT. For more info Tap pic below https://quitxt.org",
+          "timestamp": 1710072200,
+          "isPoll": false,
+          "pollId": null,
+          "fcmToken": "e-D8y5f8RoOcRgQl4AV18K:APA91bEdH6CwssC17yIKENOuLiW5eOxnE5CaOxqiOkKXdL4ZgnbOAk9s1_EX0w0E4G0c_zn5QD8X7W0-BHGooS2RyBcfHFYl8hfNEwYVcNIEConIJTyeJnhAnxlhD3OwayB6S_yeZXST",
+          "questionsAnswers": null
+        },
+        {
+          "recipientId": "pUuutN05eoVeWhsKyXBiwRoFW9u1",
+          "serverMessageId": "0a1b2c3d-4e5f-6g7h-8i9j-0k1l2m3n4o5p",
+          "messageBody": "How many cigarettes do you smoke per day?",
+          "timestamp": 1710072300,
+          "isPoll": true,
+          "pollId": 12345,
+          "fcmToken": "e-D8y5f8RoOcRgQl4AV18K:APA91bEdH6CwssC17yIKENOuLiW5eOxnE5CaOxqiOkKXdL4ZgnbOAk9s1_EX0w0E4G0c_zn5QD8X7W0-BHGooS2RyBcfHFYl8hfNEwYVcNIEConIJTyeJnhAnxlhD3OwayB6S_yeZXST",
+          "questionsAnswers": {
+            "Less than 5": "Less than 5",
+            "5-10": "5-10",
+            "11-20": "11-20",
+            "More than 20": "More than 20"
+          }
+        },
+        {
+          "recipientId": "pUuutN05eoVeWhsKyXBiwRoFW9u1",
+          "serverMessageId": "1a2b3c4d-5e6f-7g8h-9i0j-1k2l3m4n5o6p",
+          "messageBody": "Reason #1 to quit smoking while you're young: You'll have more time to enjoy hoverboards and flying cars. https://quitxt.org/sites/quitxt/files/gifs/PreQ6_Hoverboard.gif",
+          "timestamp": 1710072400,
+          "isPoll": false,
+          "pollId": null,
+          "fcmToken": "e-D8y5f8RoOcRgQl4AV18K:APA91bEdH6CwssC17yIKENOuLiW5eOxnE5CaOxqiOkKXdL4ZgnbOAk9s1_EX0w0E4G0c_zn5QD8X7W0-BHGooS2RyBcfHFYl8hfNEwYVcNIEConIJTyeJnhAnxlhD3OwayB6S_yeZXST",
+          "questionsAnswers": null
+        },
+        {
+          "recipientId": "pUuutN05eoVeWhsKyXBiwRoFW9u1", 
+          "serverMessageId": "2b3c4d5e-6f7g-8h9i-0j1k-2l3m4n5o6p7q",
+          "messageBody": "Drinking alcohol can trigger cravings for a cigarette and makes it harder for you to quit smoking. Tap pic below https://quitxt.org/binge-drinking",
+          "timestamp": 1710072500,
+          "isPoll": false,
+          "pollId": null,
+          "fcmToken": "e-D8y5f8RoOcRgQl4AV18K:APA91bEdH6CwssC17yIKENOuLiW5eOxnE5CaOxqiOkKXdL4ZgnbOAk9s1_EX0w0E4G0c_zn5QD8X7W0-BHGooS2RyBcfHFYl8hfNEwYVcNIEConIJTyeJnhAnxlhD3OwayB6S_yeZXST",
+          "questionsAnswers": null
+        },
+        {
+          "recipientId": "pUuutN05eoVeWhsKyXBiwRoFW9u1",
+          "serverMessageId": "3c4d5e6f-7g8h-9i0j-1k2l-3m4n5o6p7q8r",
+          "messageBody": "Like the Avengers protect the earth, you are protecting your lungs from respiratory diseases and cancer! Stay SUPER and quit smoking! https://quitxt.org/sites/quitxt/files/gifs/App1_Cue1_Avengers.gif",
+          "timestamp": 1710072600,
+          "isPoll": false,
+          "pollId": null,
+          "fcmToken": "e-D8y5f8RoOcRgQl4AV18K:APA91bEdH6CwssC17yIKENOuLiW5eOxnE5CaOxqiOkKXdL4ZgnbOAk9s1_EX0w0E4G0c_zn5QD8X7W0-BHGooS2RyBcfHFYl8hfNEwYVcNIEConIJTyeJnhAnxlhD3OwayB6S_yeZXST",
+          "questionsAnswers": null
+        },
+        {
+          "recipientId": "pUuutN05eoVeWhsKyXBiwRoFW9u1",
+          "serverMessageId": "4d5e6f7g-8h9i-0j1k-2l3m-4n5o6p7q8r9s",
+          "messageBody": "Reason #2 to quit smoking while you're young: Add a decade to your life and see the rise of fully automated smart homes; who needs to do chores when robots become a common commodity! https://quitxt.org/sites/quitxt/files/gifs/App1-Motiv2_automated_home.gif",
+          "timestamp": 1710072700,
+          "isPoll": false,
+          "pollId": null,
+          "fcmToken": "e-D8y5f8RoOcRgQl4AV18K:APA91bEdH6CwssC17yIKENOuLiW5eOxnE5CaOxqiOkKXdL4ZgnbOAk9s1_EX0w0E4G0c_zn5QD8X7W0-BHGooS2RyBcfHFYl8hfNEwYVcNIEConIJTyeJnhAnxlhD3OwayB6S_yeZXST",
+          "questionsAnswers": null
+        },
+        {
+          "recipientId": "pUuutN05eoVeWhsKyXBiwRoFW9u1",
+          "serverMessageId": "5e6f7g8h-9i0j-1k2l-3m4n-5o6p7q8r9s0t",
+          "messageBody": "Beber alcohol puede provocar los deseos de fumar y te hace más difícil dejar el cigarrillo. Clic el pic abajo https://quitxt.org/spanish/consumo-intensivo-de-alcohol",
+          "timestamp": 1710072800,
+          "isPoll": false,
+          "pollId": null,
+          "fcmToken": "e-D8y5f8RoOcRgQl4AV18K:APA91bEdH6CwssC17yIKENOuLiW5eOxnE5CaOxqiOkKXdL4ZgnbOAk9s1_EX0w0E4G0c_zn5QD8X7W0-BHGooS2RyBcfHFYl8hfNEwYVcNIEConIJTyeJnhAnxlhD3OwayB6S_yeZXST",
+          "questionsAnswers": null
+        },
+        {
+          "recipientId": "pUuutN05eoVeWhsKyXBiwRoFW9u1",
+          "serverMessageId": "6f7g8h9i-0j1k-2l3m-4n5o-6p7q8r9s0t1u",
+          "messageBody": "Como los Avengers protegen el planeta, ¡tú estás protegiendo tus pulmones de enfermedades respiratorias y de cáncer! ¡Sigue SUPER y deja de fumar!",
+          "timestamp": 1710072900,
+          "isPoll": false,
+          "pollId": null,
+          "fcmToken": "e-D8y5f8RoOcRgQl4AV18K:APA91bEdH6CwssC17yIKENOuLiW5eOxnE5CaOxqiOkKXdL4ZgnbOAk9s1_EX0w0E4G0c_zn5QD8X7W0-BHGooS2RyBcfHFYl8hfNEwYVcNIEConIJTyeJnhAnxlhD3OwayB6S_yeZXST",
+          "questionsAnswers": null
+        },
+        {
+          "recipientId": "pUuutN05eoVeWhsKyXBiwRoFW9u1",
+          "serverMessageId": "7g8h9i0j-1k2l-3m4n-5o6p-7q8r9s0t1u2v",
+          "messageBody": "Razón #2 para dejar de fumar siendo joven: ¡ganarás 10 años de vida y verás el aumento de las casas inteligentes; ¡quién necesita limpiar la casa cuando los robots lo harán por ti! https://quitxt.org/sites/quitxt/files/gifs/preq5_motiv2_automated_esp.gif",
+          "timestamp": 1710073000,
+          "isPoll": false,
+          "pollId": null,
+          "fcmToken": "e-D8y5f8RoOcRgQl4AV18K:APA91bEdH6CwssC17yIKENOuLiW5eOxnE5CaOxqiOkKXdL4ZgnbOAk9s1_EX0w0E4G0c_zn5QD8X7W0-BHGooS2RyBcfHFYl8hfNEwYVcNIEConIJTyeJnhAnxlhD3OwayB6S_yeZXST",
+          "questionsAnswers": null
+        },
+        {
+          "recipientId": "pUuutN05eoVeWhsKyXBiwRoFW9u1",
+          "serverMessageId": "8h9i0j1k-2l3m-4n5o-6p7q-8r9s0t1u2v3w",
+          "messageBody": "¿Cuántos cigarrillos fumas por día?",
+          "timestamp": 1710073100,
+          "isPoll": true,
+          "pollId": 12346,
+          "fcmToken": "e-D8y5f8RoOcRgQl4AV18K:APA91bEdH6CwssC17yIKENOuLiW5eOxnE5CaOxqiOkKXdL4ZgnbOAk9s1_EX0w0E4G0c_zn5QD8X7W0-BHGooS2RyBcfHFYl8hfNEwYVcNIEConIJTyeJnhAnxlhD3OwayB6S_yeZXST",
+          "questionsAnswers": {
+            "Menos de 5": "Menos de 5",
+            "5-10": "5-10",
+            "11-20": "11-20",
+            "Más de 20": "Más de 20"
+          }
+        }
+      ]
+    }
+    ''';
+    
+    final dashChatProvider = Provider.of<DashChatProvider>(context, listen: false);
+    dashChatProvider.processCustomJsonInput(jsonString);
+  }
+
+  void _showHelpDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Help - Demo Commands'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: const [
+            Text('Available demo commands:', style: TextStyle(fontWeight: FontWeight.bold)),
+            SizedBox(height: 8),
+            Text('• Play button: Show a complete interactive conversation demo'),
+            Text('• List button: Load all predefined server responses'),
+            Text('• Message button: Show server responses one by one'),
+            Text('• Test button: Show sample test messages'),
+            SizedBox(height: 16),
+            Text('Message keywords:', style: TextStyle(fontWeight: FontWeight.bold)),
+            SizedBox(height: 8),
+            Text('• Hello/Hi: English greeting'),
+            Text('• Hola: Spanish greeting'),
+            Text('• I want to quit smoking: Shows poll'),
+            Text('• 5-10: Responds to cigarette poll'),
+            Text('• Cool/Thanks: Trigger info messages'),
+            Text('• EXIT/SALIR: Show exit messages'),
+            Text('• #deactivate: Show deactivation message'),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Close'),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     // Get the DashChatProvider instance
@@ -125,6 +308,34 @@ class _DashMessagingScreenState extends State<DashMessagingScreen> {
       appBar: AppBar(
         title: const Text('Dash Messaging'),
         actions: [
+          // Add help button
+          IconButton(
+            icon: const Icon(Icons.help_outline),
+            tooltip: 'Show help',
+            onPressed: () => _showHelpDialog(context),
+          ),
+          // Add action to trigger the interactive demo conversation
+          IconButton(
+            icon: const Icon(Icons.play_arrow),
+            tooltip: 'Start demo conversation',
+            onPressed: () {
+              dashChatProvider.sendMessage('#demo_conversation');
+            },
+          ),
+          // Add action to trigger custom JSON responses
+          IconButton(
+            icon: const Icon(Icons.format_list_bulleted),
+            tooltip: 'Load custom JSON responses',
+            onPressed: _processCustomJson,
+          ),
+          // Add action to trigger predefined server responses
+          IconButton(
+            icon: const Icon(Icons.message),
+            tooltip: 'Load predefined server responses',
+            onPressed: () {
+              dashChatProvider.sendMessage('#server_responses');
+            },
+          ),
           // Add action to trigger test messages
           IconButton(
             icon: const Icon(Icons.science),

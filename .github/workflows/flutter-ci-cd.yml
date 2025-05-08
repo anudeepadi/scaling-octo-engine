@@ -1,0 +1,260 @@
+name: Flutter CI/CD Pipeline
+
+on:
+  push:
+    branches: [development, staging, production]
+  pull_request:
+    branches: [development, staging, production]
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to deploy to'
+        required: true
+        default: 'development'
+        type: choice
+        options:
+          - development
+          - staging
+          - production
+
+permissions:
+  contents: read
+  packages: read
+  # Limit permissions to only what's needed
+
+jobs:
+  # Add this job at the beginning to verify repository access
+  check_repo_access:
+    name: Verify Repository Access
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v3
+        with:
+          repository: ${{ github.repository }}
+          token: ${{ secrets.QUITXT_REPO_TOKEN || secrets.GITHUB_TOKEN }}
+      - name: Check Repository
+        run: |
+          echo "Current repository: ${{ github.repository }}"
+          echo "No access to other repositories is needed for this workflow"
+
+  flutter_test:
+    name: Run Flutter tests
+    needs: check_repo_access
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          repository: ${{ github.repository }}
+          token: ${{ secrets.QUITXT_REPO_TOKEN || secrets.GITHUB_TOKEN }}
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.16.x'
+          channel: 'stable'
+      - run: flutter pub get
+      - run: flutter analyze
+      - run: flutter test
+
+  build_android:
+    name: Build Android Package
+    needs: flutter_test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          repository: ${{ github.repository }}
+          token: ${{ secrets.QUITXT_REPO_TOKEN || secrets.GITHUB_TOKEN }}
+      - uses: actions/setup-java@v3
+        with:
+          distribution: 'zulu'
+          java-version: '17'
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.16.x'
+          channel: 'stable'
+      
+      # Set up environment variables based on branch
+      - name: Set Environment Variables
+        run: |
+          if [[ "${{ github.ref }}" == "refs/heads/development" ]]; then
+            echo "Using Development Environment"
+            cp .env.development .env
+          elif [[ "${{ github.ref }}" == "refs/heads/staging" ]]; then
+            echo "Using Staging Environment"
+            cp .env.development .env
+          elif [[ "${{ github.ref }}" == "refs/heads/production" ]]; then
+            echo "Using Production Environment"
+            cp .env.production .env
+          fi
+      
+      - run: flutter pub get
+      
+      # Build Android app
+      - name: Build Android App Bundle
+        run: flutter build appbundle --release
+        
+      # Upload build artifacts
+      - name: Upload Android App Bundle
+        uses: actions/upload-artifact@v3
+        with:
+          name: android-release
+          path: build/app/outputs/bundle/release/app-release.aab
+          retention-days: 7
+          
+      # Deploy to Google Play Store if on production branch
+      - name: Deploy to Google Play Store
+        if: github.ref == 'refs/heads/production'
+        uses: r0adkll/upload-google-play@v1
+        with:
+          serviceAccountJson: ${{ secrets.PLAYSTORE_SERVICE_ACCOUNT_JSON }}
+          packageName: com.utsascns.quitTxTapp
+          releaseFiles: build/app/outputs/bundle/release/app-release.aab
+          track: production
+          status: completed
+
+      # Deploy to internal testing if on staging branch
+      - name: Deploy to Google Play Internal Testing
+        if: github.ref == 'refs/heads/staging'
+        uses: r0adkll/upload-google-play@v1
+        with:
+          serviceAccountJson: ${{ secrets.PLAYSTORE_SERVICE_ACCOUNT_JSON }}
+          packageName: com.utsascns.quitTxTapp
+          releaseFiles: build/app/outputs/bundle/release/app-release.aab
+          track: internal
+          status: completed
+
+  build_ios:
+    name: Build iOS Package
+    needs: flutter_test
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          repository: ${{ github.repository }}
+          token: ${{ secrets.QUITXT_REPO_TOKEN || secrets.GITHUB_TOKEN }}
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.16.x'
+          channel: 'stable'
+          
+      # Set up environment variables based on branch
+      - name: Set Environment Variables
+        run: |
+          if [[ "${{ github.ref }}" == "refs/heads/development" ]]; then
+            echo "Using Development Environment"
+            cp .env.development .env
+          elif [[ "${{ github.ref }}" == "refs/heads/staging" ]]; then
+            echo "Using Staging Environment"
+            cp .env.development .env
+          elif [[ "${{ github.ref }}" == "refs/heads/production" ]]; then
+            echo "Using Production Environment"
+            cp .env.production .env
+          fi
+      
+      - run: flutter pub get
+      
+      # Setup iOS code signing
+      - name: Install Apple Certificate
+        if: github.ref == 'refs/heads/staging' || github.ref == 'refs/heads/production'
+        uses: apple-actions/import-codesign-certs@v1
+        with:
+          p12-file-base64: ${{ secrets.IOS_DISTRIBUTION_P12_BASE64 }}
+          p12-password: ${{ secrets.IOS_DISTRIBUTION_P12_PASSWORD }}
+          keychain-password: ${{ secrets.KEYCHAIN_PASSWORD }}
+          
+      # Setup provisioning profile
+      - name: Install Provisioning Profile
+        if: github.ref == 'refs/heads/staging' || github.ref == 'refs/heads/production'
+        run: |
+          mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
+          echo -n "${{ secrets.IOS_PROVISIONING_PROFILE_BASE64 }}" | base64 --decode > ~/Library/MobileDevice/Provisioning\ Profiles/profile.mobileprovision
+          
+      # Create Export Options Plist file
+      - name: Create Export Options Plist
+        if: github.ref == 'refs/heads/staging' || github.ref == 'refs/heads/production'
+        run: |
+          cat > ios/ExportOptions.plist << EOL
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+            <key>method</key>
+            <string>app-store</string>
+            <key>teamID</key>
+            <string>${{ secrets.APPLE_TEAM_ID }}</string>
+            <key>uploadBitcode</key>
+            <false/>
+            <key>uploadSymbols</key>
+            <true/>
+          </dict>
+          </plist>
+          EOL
+      
+      # Build iOS app
+      - name: Build iOS App
+        run: |
+          cd ios
+          pod install
+          cd ..
+          flutter build ios --release --no-codesign
+      
+      # Archive and Export IPA if on staging or production
+      - name: Archive and Export IPA
+        if: github.ref == 'refs/heads/staging' || github.ref == 'refs/heads/production'
+        run: |
+          cd ios
+          xcodebuild -workspace Runner.xcworkspace -scheme Runner -configuration Release archive -archivePath Runner.xcarchive
+          xcodebuild -exportArchive -archivePath Runner.xcarchive -exportOptionsPlist ExportOptions.plist -exportPath ./build
+          cd ..
+
+      # Upload build artifacts
+      - name: Upload iOS App
+        if: github.ref == 'refs/heads/staging' || github.ref == 'refs/heads/production'
+        uses: actions/upload-artifact@v3
+        with:
+          name: ios-release
+          path: ios/build/*.ipa
+          retention-days: 7
+          
+      # Deploy to TestFlight if on staging branch
+      - name: Deploy to TestFlight
+        if: github.ref == 'refs/heads/staging'
+        uses: apple-actions/upload-testflight-build@v1
+        with:
+          app-path: ios/build/*.ipa
+          issuer-id: ${{ secrets.APPSTORE_ISSUER_ID }}
+          api-key-id: ${{ secrets.APPSTORE_API_KEY_ID }}
+          api-private-key: ${{ secrets.APPSTORE_API_PRIVATE_KEY }}
+          
+      # Deploy to App Store if on production branch
+      - name: Deploy to App Store
+        if: github.ref == 'refs/heads/production'
+        uses: apple-actions/upload-app-store-connect-app@v1
+        with:
+          app-path: ios/build/*.ipa
+          issuer-id: ${{ secrets.APPSTORE_ISSUER_ID }}
+          api-key-id: ${{ secrets.APPSTORE_API_KEY_ID }}
+          api-private-key: ${{ secrets.APPSTORE_API_PRIVATE_KEY }}
+
+  notify:
+    name: Notify Team of Deployment
+    needs: [build_android, build_ios]
+    runs-on: ubuntu-latest
+    if: success() && (github.ref == 'refs/heads/staging' || github.ref == 'refs/heads/production')
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          repository: ${{ github.repository }}
+          token: ${{ secrets.QUITXT_REPO_TOKEN || secrets.GITHUB_TOKEN }}
+      - name: Send Slack notification
+        uses: rtCamp/action-slack-notify@v2
+        env:
+          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
+          SLACK_CHANNEL: deployments
+          SLACK_COLOR: ${{ github.ref == 'refs/heads/production' && 'good' || 'warning' }}
+          SLACK_TITLE: Deployment Status
+          SLACK_MESSAGE: |
+            Environment: ${{ github.ref == 'refs/heads/production' && 'Production' || 'Staging' }}
+            Status: Success
+            Commit: ${{ github.sha }}
+            Triggered by: ${{ github.actor }} 

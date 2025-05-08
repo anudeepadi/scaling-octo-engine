@@ -23,6 +23,11 @@ class DashChatProvider extends ChangeNotifier {
   bool _isTyping = false;
   bool get isTyping => _isTyping;
   bool get isServerServiceInitialized => _dashService.isInitialized;
+  
+  // Add debounce variables to prevent double sends
+  bool _isSendingMessage = false;
+  String? _lastMessageSent;
+  DateTime? _lastSendTime;
 
   // Constructor
   DashChatProvider() {
@@ -83,6 +88,10 @@ class DashChatProvider extends ChangeNotifier {
       if (message.type == MessageType.quickReply) {
         _chatProvider!.addQuickReplyMessage(message.suggestedReplies ?? []);
       } else {
+        // Skip server status messages
+        if (message.content.startsWith('Using server:')) {
+          return;
+        }
         _chatProvider!.addTextMessage(message.content, isMe: message.isMe);
       }
       
@@ -124,11 +133,31 @@ class DashChatProvider extends ChangeNotifier {
     final messageContent = message.trim();
     final userId = _currentUser!.uid;
     
+    // Prevent duplicate sends (debounce)
+    if (_isSendingMessage) {
+      print('Already sending a message. Ignoring duplicate request.');
+      return;
+    }
+    
+    // Check for rapid duplicate messages
+    if (_lastMessageSent == messageContent && _lastSendTime != null) {
+      final timeSinceLastSend = DateTime.now().difference(_lastSendTime!);
+      if (timeSinceLastSend.inSeconds < 2) {
+        print('Duplicate message detected within 2 seconds. Ignoring: $messageContent');
+        return;
+      }
+    }
+    
+    // Set debounce flags
+    _isSendingMessage = true;
+    _lastMessageSent = messageContent;
+    _lastSendTime = DateTime.now();
+    
     try {
       // Special command to load sample test data
       if (messageContent.toLowerCase() == '#test' || messageContent.toLowerCase() == '#sample') {
         print('[DashChatProvider] Detected test command. Processing test data...');
-        // Add message to local chat UI first
+        // Add message to local chat UI first - only add user message once
         if (_chatProvider != null) {
           _chatProvider!.addTextMessage(messageContent, isMe: true);
           
@@ -146,8 +175,33 @@ class DashChatProvider extends ChangeNotifier {
         return;
       }
       
-      // Important: ChatProvider adds the message to UI automatically in HomeScreen's _handleSubmitted,
-      // so we don't need to add it again here to avoid duplication
+      // Special command to load predefined server responses
+      if (messageContent.toLowerCase() == '#server_responses') {
+        print('[DashChatProvider] Detected server responses command');
+        // Add message to local chat UI first - only add user message once
+        if (_chatProvider != null) {
+          _chatProvider!.addTextMessage(messageContent, isMe: true);
+          
+          final context = ContextHolder.currentContext;
+          final localizations = context != null 
+              ? AppLocalizations.of(context) 
+              : null;
+          
+          final loadingMessage = localizations?.translate('loading_predefined') ?? 'Loading predefined server responses...';
+          _chatProvider!.addTextMessage(loadingMessage, isMe: false);
+        }
+        
+        // Call service method to process predefined responses
+        await _dashService.sendMessage(messageContent);
+        return;
+      }
+      
+      // Add message to local chat UI - but only if this is a new message
+      // This prevents duplicate messages from appearing
+      if (_chatProvider != null) {
+        // For regular messages, add to local UI
+        _chatProvider!.addTextMessage(messageContent, isMe: true);
+      }
       
       // If in demo mode or testing, simulate response
       if (!_dashService.isInitialized) {
@@ -174,7 +228,17 @@ class DashChatProvider extends ChangeNotifier {
     } catch (e) {
       print('Error in DashChatProvider.sendMessage: $e');
       // On error, use simulation as fallback
+      if (_chatProvider != null) {
+        // Make sure the message is added to UI if it failed earlier
+        // But check if it already exists to prevent duplicates
+        if (_chatProvider!.messages.where((m) => m.content == messageContent && m.isMe).isEmpty) {
+          _chatProvider!.addTextMessage(messageContent, isMe: true);
+        }
+      }
       await _dashService.simulateServerResponse(messageContent);
+    } finally {
+      // Reset debounce flags
+      _isSendingMessage = false;
     }
   }
 
@@ -187,27 +251,42 @@ class DashChatProvider extends ChangeNotifier {
       return;
     }
     
+    // Prevent duplicate sends
+    if (_isSendingMessage) {
+      print('Already sending a message. Ignoring duplicate quick reply.');
+      return;
+    }
+    
+    _isSendingMessage = true;
+    
     try {
       // Add the reply to the chat UI
       if (_chatProvider != null) {
         _chatProvider!.addTextMessage(reply.text, isMe: true);
       }
       
-      // Process the quick reply response directly through simulation
-      // This ensures consistent behavior for the demo scenarios
-      await _dashService.simulateServerResponse(reply.value);
+      // If in demo mode or testing, simulate response
+      if (!_dashService.isInitialized) {
+        print('DashMessagingService not initialized. Using simulation mode.');
+        await _dashService.simulateServerResponse(reply.text);
+        return;
+      }
       
-      // If server is initialized and we're not in demo mode, also send to server
-      if (_dashService.isInitialized) {
-        final success = await _dashService.sendQuickReply(reply.value, reply.text);
-        if (success) {
-          print('Quick reply sent successfully to server');
-        } else {
-          print('Failed to send quick reply to server');
-        }
+      // Send the quick reply to the server
+      final success = await _dashService.sendQuickReply(reply.value, reply.text);
+      if (success) {
+        print('Quick reply sent successfully to server');
+      } else {
+        print('Failed to send quick reply to server');
+        // If server send failed, simulate response in demo mode
+        await _dashService.simulateServerResponse(reply.text);
       }
     } catch (e) {
-      print('Error handling quick reply: $e');
+      print('Error sending quick reply: $e');
+      // On error, use simulation as fallback
+      await _dashService.simulateServerResponse(reply.text);
+    } finally {
+      _isSendingMessage = false;
     }
   }
 
@@ -219,6 +298,31 @@ class DashChatProvider extends ChangeNotifier {
     } catch (e) {
       print('Error updating host URL: $e');
       throw Exception('Failed to update host URL: $e');
+    }
+  }
+
+  // Process custom JSON input
+  Future<void> processCustomJsonInput(String jsonInput) async {
+    if (jsonInput.trim().isEmpty || _currentUser == null) {
+      print('JSON input empty or user not logged in. Cannot process.');
+      return;
+    }
+    
+    _isSendingMessage = true;
+    
+    try {
+      print('[DashChatProvider] Processing custom JSON input');
+      
+      // Call the service method to process the custom JSON
+      if (_dashService.isInitialized) {
+        await _dashService.processCustomJsonInput(jsonInput);
+      } else {
+        print('DashMessagingService not initialized. Cannot process custom JSON.');
+      }
+    } catch (e) {
+      print('Error processing custom JSON input: $e');
+    } finally {
+      _isSendingMessage = false;
     }
   }
 

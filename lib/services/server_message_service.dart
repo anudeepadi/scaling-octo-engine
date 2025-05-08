@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:http/http.dart' as http;
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:uuid/uuid.dart';
 
@@ -6,6 +7,7 @@ class ServerMessageService {
   final FirebaseFirestore _firestore;
   final String _userId;
   final String _fcmToken;
+  final String _serverUrl = "http://localhost:8080/scheduler";
 
   ServerMessageService({
     required String userId,
@@ -14,15 +16,103 @@ class ServerMessageService {
        _fcmToken = fcmToken,
        _firestore = FirebaseFirestore.instance;
 
+  // Process a message both locally (Firebase) and remotely (Java server)
   Future<void> processMessage({
     required String messageText,
     required String messageId,
     required int eventTypeCode,
   }) async {
     try {
-      final userMessagesRef = _firestore.collection('messages').doc(_userId).collection('messages');
+      // First store it in Firebase for local persistence
+      final userMessagesRef = _firestore.collection('messages').doc(_userId).collection('chat');
+      
+      // Store the user message
+      await userMessagesRef.doc(messageId).set({
+        'messageBody': messageText,
+        'source': 'client',
+        'createdAt': FieldValue.serverTimestamp(),
+        'isPoll': 'n',
+      });
+      
+      // Then send to server for processing
+      await _sendToJavaServer(messageText, messageId, eventTypeCode);
+    } catch (e) {
+      print('Error processing message: $e');
+      // If server fails, fall back to local mock response
+      await _generateLocalResponse(messageText, eventTypeCode);
+      rethrow;
+    }
+  }
 
-      // Generate server response based on message content
+  // Send message to Java server
+  Future<void> _sendToJavaServer(String messageText, String messageId, int eventTypeCode) async {
+    try {
+      final endpoint = '$_serverUrl/webservice/messaging/process2/send';
+      final timestamp = DateTime.now().millisecondsSinceEpoch ~/ 1000;
+      
+      final payload = {
+        'userId': _userId,
+        'messageId': messageId,
+        'messageText': messageText,
+        'messageTime': timestamp,
+        'eventTypeCode': eventTypeCode,
+        'fcmToken': _fcmToken,
+      };
+      
+      print('Sending message to server: $payload');
+      
+      final response = await http.post(
+        Uri.parse(endpoint),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode(payload),
+      ).timeout(const Duration(seconds: 10));
+      
+      if (response.statusCode == 200 || response.statusCode == 202) {
+        print('Message sent successfully to Java server');
+        
+        // If response has content, process it
+        if (response.body.isNotEmpty) {
+          try {
+            final responseData = jsonDecode(response.body);
+            if (responseData['messageBody'] != null) {
+              final serverMessageId = const Uuid().v4();
+              final serverMessagePayload = {
+                'messageBody': responseData['messageBody'],
+                'source': 'server',
+                'createdAt': FieldValue.serverTimestamp(),
+              };
+              
+              // Add options if they exist
+              if (responseData['answers'] != null) {
+                serverMessagePayload['answers'] = responseData['answers'];
+                serverMessagePayload['isPoll'] = 'y';
+              }
+              
+              // Store server response in Firebase
+              await _firestore.collection('messages').doc(_userId).collection('chat')
+                  .doc(serverMessageId).set(serverMessagePayload);
+                  
+              print('Server response stored with ID: $serverMessageId');
+            }
+          } catch (e) {
+            print('Error processing server response: $e');
+          }
+        }
+      } else {
+        print('Failed to send message to server. Status: ${response.statusCode}, Body: ${response.body}');
+        // Fall back to local mock response
+        await _generateLocalResponse(messageText, eventTypeCode);
+      }
+    } catch (e) {
+      print('Error sending message to Java server: $e');
+      // Fall back to local mock response
+      await _generateLocalResponse(messageText, eventTypeCode);
+    }
+  }
+
+  // Generate and store local response when server unavailable
+  Future<void> _generateLocalResponse(String messageText, int eventTypeCode) async {
+    try {
       final response = _generateServerResponse(messageText, eventTypeCode);
       
       if (response['text'] != null) {
@@ -30,7 +120,7 @@ class ServerMessageService {
         final serverMessagePayload = {
           'messageBody': response['text'],
           'source': 'server',
-          'timestamp': FieldValue.serverTimestamp(),
+          'createdAt': FieldValue.serverTimestamp(),
         };
 
         // Add options if they exist
@@ -39,15 +129,17 @@ class ServerMessageService {
           serverMessagePayload['isPoll'] = 'y';
         }
 
-        await userMessagesRef.doc(serverMessageId).set(serverMessagePayload);
-        print('Server response stored with ID: $serverMessageId');
+        await _firestore.collection('messages').doc(_userId).collection('chat')
+            .doc(serverMessageId).set(serverMessagePayload);
+            
+        print('Local response stored with ID: $serverMessageId');
       }
     } catch (e) {
-      print('Error processing message: $e');
-      rethrow;
+      print('Error generating local response: $e');
     }
   }
 
+  // Local fallback response generator
   Map<String, dynamic> _generateServerResponse(String messageText, int eventTypeCode) {
     String responseText = "I don't understand the command: '$messageText'. Can you please clarify?"; // Default for commands
     List<String> options = [];

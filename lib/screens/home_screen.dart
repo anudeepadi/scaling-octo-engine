@@ -12,6 +12,7 @@ import '../models/quick_reply.dart';
 import '../theme/app_theme.dart';
 import '../utils/app_localizations.dart';
 import 'profile_screen.dart';
+import 'settings_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -232,114 +233,98 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  Widget _buildNavigationDrawer() {
-    final authProvider = Provider.of<AuthProvider>(context);
-    final localizations = AppLocalizations.of(context);
-    final user = authProvider.currentUser;
-
+  Widget _buildDrawer() {
+    final authProvider = context.read<AuthProvider>();
     return Drawer(
-      backgroundColor: AppTheme.quitxtTeal,
       child: ListView(
         padding: EdgeInsets.zero,
         children: [
-          DrawerHeader(
-            decoration: const BoxDecoration(
+          UserAccountsDrawerHeader(
+            accountName: Text(authProvider.currentUser?.displayName ?? 'User'),
+            accountEmail: Text(authProvider.currentUser?.email ?? 'No email'),
+            currentAccountPicture: CircleAvatar(
+              backgroundColor: Colors.white,
+              child: Text(
+                (authProvider.currentUser?.displayName?.isNotEmpty == true
+                    ? authProvider.currentUser!.displayName![0]
+                    : 'U'),
+                style: const TextStyle(fontSize: 24.0),
+              ),
+            ),
+            decoration: BoxDecoration(
               color: AppTheme.quitxtTeal,
             ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // QuitTXT logo
-                Container(
-                  width: 40,
-                  height: 40,
-                  decoration: BoxDecoration(
-                    color: Colors.black,
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Center(
-                    child: Text(
-                      'Q',
-                      style: TextStyle(
-                        color: AppTheme.quitxtGreen,
-                        fontSize: 24,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 12),
-                // App name and user info
-                Text(
-                  localizations.translate('app_title'),
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 18,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  '${localizations.translate('user')}: ${user?.displayName ?? 'Guest User'}',
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 14,
-                  ),
-                ),
-              ],
-            ),
           ),
-          // Navigation items
-          _buildDrawerItem(
-            icon: Icons.person,
-            title: localizations.translate('profile'),
+          ListTile(
+            leading: const Icon(Icons.person),
+            title: const Text('Profile'),
             onTap: () {
-              Navigator.pop(context); // Close drawer
+              // Update state and close drawer before navigating
+              setState(() {
+                _isDrawerOpen = false;
+              });
+              Navigator.pop(context);
+              
               Navigator.push(
                 context,
                 MaterialPageRoute(builder: (context) => const ProfileScreen()),
               );
             },
           ),
-          _buildDrawerItem(
-            icon: Icons.chat,
-            title: localizations.translate('chat'),
+          ListTile(
+            leading: const Icon(Icons.settings),
+            title: const Text('Server Settings'),
             onTap: () {
-              Navigator.pop(context); // Close drawer
-              // We're already on chat screen
+              // Update state and close drawer before navigating
+              setState(() {
+                _isDrawerOpen = false;
+              });
+              Navigator.pop(context);
+              
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const SettingsScreen()),
+              );
             },
           ),
-          _buildDrawerItem(
-            icon: Icons.exit_to_app,
-            title: localizations.translate('exit'),
-            onTap: () {
-              Navigator.pop(context); // Close drawer
-              // Sign out
-              authProvider.signOut();
+          const Divider(),
+          ListTile(
+            leading: const Icon(Icons.logout),
+            title: const Text('Logout'),
+            onTap: () async {
+              // Close the drawer
+              setState(() {
+                _isDrawerOpen = false;
+              });
+              Navigator.pop(context);
+              
+              // Show confirmation dialog
+              bool confirmLogout = await showDialog(
+                context: context,
+                builder: (context) => AlertDialog(
+                  title: const Text('Confirm Logout'),
+                  content: const Text('Are you sure you want to logout?'),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.pop(context, false),
+                      child: const Text('CANCEL'),
+                    ),
+                    TextButton(
+                      onPressed: () => Navigator.pop(context, true),
+                      child: const Text('LOGOUT'),
+                    ),
+                  ],
+                ),
+              ) ?? false;
+              
+              // If confirmed, proceed with logout
+              if (confirmLogout && mounted) {
+                await context.read<AuthProvider>().signOut();
+              }
             },
           ),
         ],
       ),
-    );
-  }
-
-  Widget _buildDrawerItem({
-    required IconData icon,
-    required String title,
-    required VoidCallback onTap,
-  }) {
-    return ListTile(
-      leading: Icon(
-        icon,
-        color: Colors.white,
-      ),
-      title: Text(
-        title,
-        style: const TextStyle(
-          color: Colors.white,
-          fontSize: 16,
-        ),
-      ),
-      onTap: onTap,
     );
   }
 
@@ -399,7 +384,7 @@ class _HomeScreenState extends State<HomeScreen> {
         title: Text(localizations.translate('app_title')),
         backgroundColor: AppTheme.quitxtPurple,
       ),
-      drawer: _buildNavigationDrawer(),
+      drawer: _buildDrawer(),
       body: Column(
         children: [
           Expanded(

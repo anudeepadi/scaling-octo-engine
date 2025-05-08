@@ -211,6 +211,29 @@ class ChatProvider extends ChangeNotifier {
 
   // Add a text message
   void addTextMessage(String text, {bool isMe = false}) {
+    // Check for duplicate messages to prevent displaying multiple instances of the same message
+    if (_messages.isNotEmpty) {
+      final lastMessage = _messages.last;
+      // If the last message has the same content, is from the same user, and was sent within 2 seconds
+      if (lastMessage.content == text && 
+          lastMessage.isMe == isMe &&
+          DateTime.now().difference(lastMessage.timestamp).inSeconds < 2) {
+        print('Preventing duplicate message: $text from ${isMe ? "user" : "server"}');
+        return; // Skip adding this duplicate message
+      }
+      
+      // Also check if any message in the last 5 messages has the exact same content and sender
+      final recentMessages = _messages.length > 5 ? _messages.sublist(_messages.length - 5) : _messages;
+      for (final message in recentMessages) {
+        if (message.content == text && 
+            message.isMe == isMe &&
+            DateTime.now().difference(message.timestamp).inSeconds < 5) {
+          print('Preventing recent duplicate message: $text from ${isMe ? "user" : "server"}');
+          return; // Skip adding this duplicate message
+        }
+      }
+    }
+    
     _messages.add(
       ChatMessage(
         id: _uuid.v4(),

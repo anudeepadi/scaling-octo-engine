@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'dart:io' show Platform;
 import 'package:provider/provider.dart';
 import 'providers/chat_provider.dart';
 import 'providers/channel_provider.dart';
@@ -11,6 +12,8 @@ import 'screens/home_screen.dart';
 import 'screens/login_screen.dart';
 import 'theme/app_theme.dart';
 import 'utils/app_localizations.dart';
+import 'utils/env_switcher.dart';
+import 'utils/platform_utils.dart';
 
 // Import Flutter localizations
 import 'package:flutter_localizations/flutter_localizations.dart';
@@ -20,10 +23,45 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'services/firebase_connection_service.dart';
 
+// Import dotenv for environment variables
+import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   try {
+    // Determine which .env file to load
+    final prefs = await SharedPreferences.getInstance();
+    final currentEnv = prefs.getString('current_env');
+    String envFile = '.env';
+    
+    if (currentEnv == Environment.production.toString()) {
+      envFile = '.env.production';
+    } else if (currentEnv == Environment.development.toString()) {
+      envFile = '.env.development';
+    }
+    
+    // Load environment variables
+    await dotenv.load(fileName: envFile);
+    print('Environment variables loaded from $envFile');
+    print('Using environment: ${dotenv.env['ENV']}');
+    
+    // Print platform information for debugging
+    final platformInfo = Platform.isAndroid 
+        ? "Android ${Platform.operatingSystemVersion}"
+        : Platform.isIOS 
+        ? "iOS ${Platform.operatingSystemVersion}" 
+        : Platform.operatingSystem;
+    print('Running on platform: $platformInfo');
+    print('Running in emulator: ${PlatformUtils.isEmulator}');
+    
+    // Platform-specific server URL
+    final originalUrl = dotenv.env['SERVER_URL'] ?? 'http://localhost:8080';
+    final transformedUrl = PlatformUtils.transformLocalHostUrl(originalUrl);
+    print('Original server URL: $originalUrl');
+    print('Transformed server URL: $transformedUrl');
+    
     // Initialize Firebase
     await Firebase.initializeApp();
     print('Firebase initialized successfully');
@@ -42,7 +80,7 @@ void main() async {
     }
   } catch (e) {
     // If Firebase initialization fails, log it but don't crash
-    print('Failed to initialize Firebase: $e');
+    print('Failed to initialize Firebase or load env: $e');
     print('Running in demo mode without Firebase');
   }
 

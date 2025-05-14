@@ -103,7 +103,7 @@ class DashChatProvider extends ChangeNotifier {
   // Initialize the server message service
   void initializeServerService(String userId, String fcmToken) {
     print('[DashChatProvider] Initializing DashMessagingService for user $userId');
-    _dashService.initialize(userId, fcmToken).then((_) {
+    _dashService.initialize(userId).then((_) {
       // Setup message listener after successful initialization
       if (_chatProvider != null) {
         _setupMessageListener();
@@ -154,60 +154,10 @@ class DashChatProvider extends ChangeNotifier {
     _lastSendTime = DateTime.now();
     
     try {
-      // Special command to load sample test data
-      if (messageContent.toLowerCase() == '#test' || messageContent.toLowerCase() == '#sample') {
-        print('[DashChatProvider] Detected test command. Processing test data...');
-        // Add message to local chat UI first - only add user message once
-        if (_chatProvider != null) {
-          _chatProvider!.addTextMessage(messageContent, isMe: true);
-          
-          final context = ContextHolder.currentContext;
-          final localizations = context != null 
-              ? AppLocalizations.of(context) 
-              : null;
-          
-          final loadingMessage = localizations?.translate('loading_sample') ?? 'Loading sample test messages...';
-          _chatProvider!.addTextMessage(loadingMessage, isMe: false);
-        }
-        
-        // Process sample test data via direct method call (no server)
-        await _dashService.processSampleTestData();
-        return;
-      }
-      
-      // Special command to load predefined server responses
-      if (messageContent.toLowerCase() == '#server_responses') {
-        print('[DashChatProvider] Detected server responses command');
-        // Add message to local chat UI first - only add user message once
-        if (_chatProvider != null) {
-          _chatProvider!.addTextMessage(messageContent, isMe: true);
-          
-          final context = ContextHolder.currentContext;
-          final localizations = context != null 
-              ? AppLocalizations.of(context) 
-              : null;
-          
-          final loadingMessage = localizations?.translate('loading_predefined') ?? 'Loading predefined server responses...';
-          _chatProvider!.addTextMessage(loadingMessage, isMe: false);
-        }
-        
-        // Call service method to process predefined responses
-        await _dashService.sendMessage(messageContent);
-        return;
-      }
-      
-      // Add message to local chat UI - but only if this is a new message
-      // This prevents duplicate messages from appearing
-      if (_chatProvider != null) {
-        // For regular messages, add to local UI
-        _chatProvider!.addTextMessage(messageContent, isMe: true);
-      }
-      
-      // If in demo mode or testing, simulate response
-      if (!_dashService.isInitialized) {
-        print('DashMessagingService not initialized. Using simulation mode.');
-        await _dashService.simulateServerResponse(messageContent);
-        return;
+      // If the messaging service is not initialized, initialize it now
+      if (!_dashService.isInitialized && _currentUser != null) {
+        print('DashMessagingService not initialized. Initializing now.');
+        await _dashService.initialize(_currentUser!.uid);
       }
       
       // Send message to the server via DashMessagingService
@@ -216,26 +166,13 @@ class DashChatProvider extends ChangeNotifier {
         if (success) {
           print('Message sent successfully to server');
         } else {
-          print('Failed to send message to server');
-          // If server send failed, simulate response in demo mode
-          await _dashService.simulateServerResponse(messageContent);
+          print('Failed to send message to server - check server logs');
         }
       } catch (e) {
         print('Error sending message to server: $e');
-        // On error, use simulation as fallback
-        await _dashService.simulateServerResponse(messageContent);
       }
     } catch (e) {
       print('Error in DashChatProvider.sendMessage: $e');
-      // On error, use simulation as fallback
-      if (_chatProvider != null) {
-        // Make sure the message is added to UI if it failed earlier
-        // But check if it already exists to prevent duplicates
-        if (_chatProvider!.messages.where((m) => m.content == messageContent && m.isMe).isEmpty) {
-          _chatProvider!.addTextMessage(messageContent, isMe: true);
-        }
-      }
-      await _dashService.simulateServerResponse(messageContent);
     } finally {
       // Reset debounce flags
       _isSendingMessage = false;

@@ -22,10 +22,12 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'services/firebase_connection_service.dart';
+import 'services/firebase_messaging_service.dart';
 
 // Import dotenv for environment variables
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'dart:developer' as developer;
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -44,8 +46,8 @@ void main() async {
     
     // Load environment variables
     await dotenv.load(fileName: envFile);
-    print('Environment variables loaded from $envFile');
-    print('Using environment: ${dotenv.env['ENV']}');
+    developer.log('Environment variables loaded from $envFile', name: 'App');
+    developer.log('Using environment: ${dotenv.env['ENV']}', name: 'App');
     
     // Print platform information for debugging
     final platformInfo = Platform.isAndroid 
@@ -53,35 +55,39 @@ void main() async {
         : Platform.isIOS 
         ? "iOS ${Platform.operatingSystemVersion}" 
         : Platform.operatingSystem;
-    print('Running on platform: $platformInfo');
-    print('Running in emulator: ${PlatformUtils.isEmulator}');
+    developer.log('Running on platform: $platformInfo', name: 'App');
+    developer.log('Running in emulator: ${PlatformUtils.isEmulator}', name: 'App');
     
     // Platform-specific server URL
     final originalUrl = dotenv.env['SERVER_URL'] ?? 'http://localhost:8080';
     final transformedUrl = PlatformUtils.transformLocalHostUrl(originalUrl);
-    print('Original server URL: $originalUrl');
-    print('Transformed server URL: $transformedUrl');
+    developer.log('Original server URL: $originalUrl', name: 'App');
+    developer.log('Transformed server URL: $transformedUrl', name: 'App');
     
     // Initialize Firebase
     await Firebase.initializeApp();
-    print('Firebase initialized successfully');
+    developer.log('Firebase initialized successfully', name: 'App');
     
-    // Request FCM token
-    final fcmToken = await FirebaseMessaging.instance.getToken();
-    print('FCM Token: $fcmToken');
+    // Initialize Firebase Messaging Service
+    final firebaseMessagingService = FirebaseMessagingService();
+    await firebaseMessagingService.setupMessaging();
+    
+    // Request and log FCM token
+    final fcmToken = await firebaseMessagingService.getFcmToken();
+    developer.log('FCM Token: $fcmToken', name: 'FCM');
     
     // Test Firebase connection - but don't block app startup if it fails
     try {
       final firebaseConnectionService = FirebaseConnectionService();
       await firebaseConnectionService.testConnection();
     } catch (connectionError) {
-      print('Firebase connection test failed: $connectionError');
-      print('Continuing in demo mode');
+      developer.log('Firebase connection test failed: $connectionError', name: 'App');
+      developer.log('Continuing in demo mode', name: 'App');
     }
   } catch (e) {
     // If Firebase initialization fails, log it but don't crash
-    print('Failed to initialize Firebase or load env: $e');
-    print('Running in demo mode without Firebase');
+    developer.log('Failed to initialize Firebase or load env: $e', name: 'App');
+    developer.log('Running in demo mode without Firebase', name: 'App');
   }
 
   runApp(const MyApp());
@@ -111,20 +117,25 @@ class MyApp extends StatelessWidget {
               if (userId != null) {
                 FirebaseMessaging.instance.getToken().then((token) {
                   if (token != null) {
-                    print('Attempting to initialize Server Service for user: $userId with token: $token');
+                    developer.log('Initializing Server Service for user: $userId with token: $token', name: 'App');
                     dashChatProvider.initializeServerService(userId, token);
+                    
+                    // Print token in a format easy to copy for testing
+                    developer.log('==================== FCM TOKEN ====================', name: 'FCM');
+                    developer.log(token, name: 'FCM');
+                    developer.log('==================================================', name: 'FCM');
                   } else {
-                     print('Failed to get FCM token for user: $userId');
+                     developer.log('Failed to get FCM token for user: $userId', name: 'App');
                   }
                 }).catchError((error) {
-                   print('Error getting FCM token or initializing server service for user $userId: $error');
+                   developer.log('Error getting FCM token or initializing server service for user $userId: $error', name: 'App');
                 });
               } else {
-                 print('Cannot initialize Server Service: User ID is null even though authenticated.');
+                 developer.log('Cannot initialize Server Service: User ID is null even though authenticated.', name: 'App');
               }
             } else if (!authProvider.isAuthenticated) {
                dashChatProvider.clearOnLogout();
-               print('User logged out, cleared DashChatProvider state.');
+               developer.log('User logged out, cleared DashChatProvider state.', name: 'App');
             }
 
             return dashChatProvider;

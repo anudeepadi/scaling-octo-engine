@@ -12,7 +12,6 @@ import '../models/quick_reply.dart';
 import '../theme/app_theme.dart';
 import '../utils/app_localizations.dart';
 import 'profile_screen.dart';
-import 'settings_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -268,22 +267,6 @@ class _HomeScreenState extends State<HomeScreen> {
               Navigator.push(
                 context,
                 MaterialPageRoute(builder: (context) => const ProfileScreen()),
-              );
-            },
-          ),
-          ListTile(
-            leading: const Icon(Icons.settings),
-            title: const Text('Server Settings'),
-            onTap: () {
-              // Update state and close drawer before navigating
-              setState(() {
-                _isDrawerOpen = false;
-              });
-              Navigator.pop(context);
-              
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) => const SettingsScreen()),
               );
             },
           ),

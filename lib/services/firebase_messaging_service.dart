@@ -1,8 +1,19 @@
-import 'dart:convert';
+import 'dart:io';
+import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
 import '../models/quitxt_dto.dart';
 import 'dash_messaging_service.dart';
+import 'dart:developer' as developer;
+
+// Handle background messages
+@pragma('vm:entry-point')
+Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
+  // Ensure Firebase is initialized
+  await Firebase.initializeApp();
+  developer.log('Handling a background message: ${message.messageId}', name: 'FCM');
+  developer.log('Message data: ${message.data}', name: 'FCM');
+}
 
 class FirebaseMessagingService {
   final FirebaseMessaging _firebaseMessaging = FirebaseMessaging.instance;
@@ -16,9 +27,13 @@ class FirebaseMessagingService {
   // Get FCM token
   Future<String?> getFcmToken() async {
     try {
-      return await _firebaseMessaging.getToken();
+      String? token = await _firebaseMessaging.getToken();
+      if (token != null) {
+        developer.log('FCM Token: $token', name: 'FCM');
+      }
+      return token;
     } catch (e) {
-      print('Error getting FCM token: $e');
+      developer.log('Error getting FCM token: $e', name: 'FCM');
       return null;
     }
   }
@@ -26,7 +41,7 @@ class FirebaseMessagingService {
   // Setup messaging handlers
   Future<void> setupMessaging() async {
     // Request permissions for iOS
-    if (!kIsWeb) {
+    if (Platform.isIOS) {
       NotificationSettings settings = await _firebaseMessaging.requestPermission(
         alert: true,
         badge: true,
@@ -34,21 +49,27 @@ class FirebaseMessagingService {
         provisional: false,
       );
       
-      print('User granted permission: ${settings.authorizationStatus}');
+      developer.log('User granted permission: ${settings.authorizationStatus}', name: 'FCM');
     }
     
-    // Handle background messages
+    // Set up background message handler
     FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
     
-    // Handle messages received when app is in foreground
+    // Handle foreground messages
     FirebaseMessaging.onMessage.listen((RemoteMessage message) {
-      print('Got a message whilst in the foreground!');
-      print('Message data: ${message.data}');
+      developer.log('Got a message whilst in the foreground!', name: 'FCM');
+      developer.log('Message data: ${message.data}', name: 'FCM');
       
-      if (message.notification != null) {
-        print('Message also contained a notification:');
-        print('Title: ${message.notification!.title}');
-        print('Body: ${message.notification!.body}');
+      // Extract message data
+      final Map<String, dynamic> data = message.data;
+      final String? messageBody = data['messageBody'];
+      
+      if (messageBody != null) {
+        // Log the message body instead of showing a notification
+        developer.log('Message body: $messageBody', name: 'FCM');
+        
+        // NOTE: To display notifications, we would need flutter_local_notifications
+        // This will be implemented after running "flutter pub get"
       }
       
       // Process message data
@@ -57,8 +78,8 @@ class FirebaseMessagingService {
     
     // Handle when app is opened from a notification
     FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
-      print('A notification was tapped and opened the app!');
-      print('Message data: ${message.data}');
+      developer.log('A notification was tapped and opened the app!', name: 'FCM');
+      developer.log('Message data: ${message.data}', name: 'FCM');
       
       // Process message data
       _processMessage(message);
@@ -67,12 +88,18 @@ class FirebaseMessagingService {
     // Check if the app was opened from a terminated state
     RemoteMessage? initialMessage = await FirebaseMessaging.instance.getInitialMessage();
     if (initialMessage != null) {
-      print('App opened from terminated state by tapping notification');
-      print('Initial message data: ${initialMessage.data}');
+      developer.log('App opened from terminated state by tapping notification', name: 'FCM');
+      developer.log('Initial message data: ${initialMessage.data}', name: 'FCM');
       
       // Process initial message data
       _processMessage(initialMessage);
     }
+    
+    // Listen for token refreshes
+    FirebaseMessaging.instance.onTokenRefresh.listen((String token) {
+      developer.log('FCM Token refreshed: $token', name: 'FCM');
+      // Update token in your server or application state
+    });
   }
   
   // Process incoming FCM message
@@ -81,26 +108,21 @@ class FirebaseMessagingService {
       // Extract message data
       final data = message.data;
       
-      // Check if this is a QuitTXT message
+      // Log the exact format received
+      developer.log('Processing FCM message: ${data.toString()}', name: 'FCM');
+      
+      // Check if this is a QuitTXT message (compatible with expected format)
       if (data.containsKey('serverMessageId') && data.containsKey('messageBody')) {
         // Parse into DTO
         final quitxtMessage = QuitxtServerIncomingDto.fromJson(data);
         
         // Forward to DashMessagingService
         _dashMessagingService.handlePushNotification(data);
+      } else {
+        developer.log('Received FCM message with unexpected format: ${data.toString()}', name: 'FCM');
       }
     } catch (e) {
-      print('Error processing FCM message: $e');
+      developer.log('Error processing FCM message: $e', name: 'FCM');
     }
   }
-}
-
-// This is required for handling background messages
-@pragma('vm:entry-point')
-Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
-  // Initialize necessary services for background processing
-  print('Handling a background message: ${message.messageId}');
-  
-  // The message should be stored and processed when the app is opened
-  // Or you could initialize Firebase and process the message here
 }

@@ -10,16 +10,16 @@ import '../utils/app_localizations.dart';
 import '../utils/context_holder.dart';
 import '../utils/platform_utils.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 
 class DashMessagingService {
   static final DashMessagingService _instance = DashMessagingService._internal();
   factory DashMessagingService() => _instance;
   DashMessagingService._internal();
 
-  // Server host URL - initialize with value from .env, transformed for platform
-  String _hostUrl = PlatformUtils.transformLocalHostUrl(
-    dotenv.env['SERVER_URL'] ?? "http://localhost:8080"
-  );
+  // Server host URL - initialize with correct server URL from main.py
+  String _hostUrl = "https://dashmessaging-com.ngrok.io/scheduler/mobile-app";
   String get hostUrl => _hostUrl;
   
   // User information
@@ -40,310 +40,149 @@ class DashMessagingService {
   DateTime? _lastResponseTime;
   String? _lastMessageText;
 
-  // Initialize the service with user ID and FCM token
-  Future<void> initialize(String userId, String fcmToken) async {
-    if (_isInitialized) return;
+  // Initialize the service with user info
+  Future<void> initialize(String userId) async {
+    if (_isInitialized && userId == _userId) {
+      print('DashMessagingService already initialized for user: $userId');
+      return;
+    }
     
     _userId = userId;
-    _fcmToken = fcmToken;
     _isInitialized = true;
     
-    // Load host URL from env or shared preferences
+    // Load host URL explicitly first
     await _loadHostUrl();
+    
+    // Load FCM token
+    _fcmToken = await _loadFcmToken();
+    print('FCM Token: $_fcmToken');
+    
+    // Load messages from Firestore on initialization
+    await _loadExistingMessages();
+    
+    // Start polling for new messages
+    startMessagePolling();
     
     print('DashMessagingService initialized for user: $userId');
     print('Using host URL: $_hostUrl');
-    print('FCM Token: $fcmToken');
+    print('FCM Token: $_fcmToken');
     
-    // Try to authenticate with the server
-    final authenticated = await _authenticateWithServer(userId);
-    if (authenticated) {
-      print('Successfully authenticated with the server');
+    // Test connection to the server
+    final isConnected = await testConnection();
+    if (isConnected) {
+      print('Successfully connected to server');
     } else {
-      print('Failed to authenticate with the server, using simulation mode');
+      print('Could not connect to server, but will still attempt to send messages');
     }
-    
-    // Send a test message to the server to check connection
-    await testConnection();
   }
 
-  // Load host URL from .env or shared preferences as fallback
+  // Load host URL - use the exact server URL from main.py
   Future<void> _loadHostUrl() async {
     try {
-      // First try to use the value from .env
-      final envUrl = dotenv.env['SERVER_URL'];
-      if (envUrl != null && envUrl.isNotEmpty) {
-        // Transform the URL for the correct platform
-        _hostUrl = PlatformUtils.transformLocalHostUrl(envUrl);
-        print('Using server URL from environment: $_hostUrl');
-        return;
+      // Always use the correct ngrok URL from main.py with full path
+      _hostUrl = "https://dashmessaging-com.ngrok.io/scheduler/mobile-app";
+      print('Using server URL: $_hostUrl');
+      
+      // Store this URL in shared preferences for future use
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString('hostUrl', _hostUrl);
+      } catch (e) {
+        print('Error saving host URL to preferences: $e');
       }
       
-      // If no env value, try to load from shared preferences
-      final prefs = await SharedPreferences.getInstance();
-      final savedUrl = prefs.getString('hostUrl');
-      if (savedUrl != null && savedUrl.isNotEmpty) {
-        // Transform the URL for the correct platform
-        _hostUrl = PlatformUtils.transformLocalHostUrl(savedUrl);
-        print('Using server URL from preferences: $_hostUrl');
-      }
+      return;
     } catch (e) {
       print('Error loading host URL: $e');
     }
   }
-
-  // Update host URL and save to shared preferences
-  Future<void> updateHostUrl(String newUrl) async {
-    if (newUrl.isEmpty) return;
-    
-    try {
-      // Transform the URL for the correct platform
-      _hostUrl = PlatformUtils.transformLocalHostUrl(newUrl);
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setString('hostUrl', newUrl); // Store original for cross-platform use
-      print('Host URL updated to: $_hostUrl');
-      
-      // Test connection with new URL
-      await testConnection();
-    } catch (e) {
-      print('Error updating host URL: $e');
-      throw Exception('Failed to update host URL: $e');
-    }
-  }
-
-  // Test connection to the server
-  Future<bool> testConnection() async {
-    if (!_isInitialized) {
-      throw Exception('DashMessagingService not initialized');
+  
+  // Load existing messages from Firestore for the current user
+  Future<void> _loadExistingMessages() async {
+    if (_userId == null) {
+      print('Cannot load messages, user ID is null');
+      return;
     }
     
     try {
-      // Use the info endpoint to check connection
-      final endpoint = '$_hostUrl/info';
-      final response = await http.get(
-        Uri.parse(endpoint),
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      ).timeout(const Duration(seconds: 10));
+      print('Loading existing messages from Firestore for user: $_userId');
       
-      if (response.statusCode == 200) {
-        print('Connection test successful');
-        return true;
-      } else {
-        print('Connection test failed. Status: ${response.statusCode}, Body: ${response.body}');
-        return false;
+      // Get reference to the user's chat collection in Firestore
+      final chatRef = FirebaseFirestore.instance
+          .collection('messages')
+          .doc(_userId)
+          .collection('chat')
+          .orderBy('createdAt', descending: true)
+          .limit(50); // Load the last 50 messages
+      
+      final snapshot = await chatRef.get();
+      
+      if (snapshot.docs.isEmpty) {
+        print('No existing messages found for user $_userId');
+        return;
       }
+      
+      print('Found ${snapshot.docs.length} existing messages');
+      
+      // Process messages in reverse to maintain chronological order
+      final messages = snapshot.docs.reversed.map((doc) {
+        final data = doc.data();
+        
+        // Create ChatMessage from Firestore data
+        String content = data['messageBody'] ?? '';
+        bool isFromUser = (data['source'] == 'client');
+        String messageId = data['serverMessageId'] ?? doc.id;
+        
+        // Parse timestamp
+        DateTime timestamp;
+        try {
+          String createdAt = data['createdAt'] ?? '';
+          if (createdAt.isNotEmpty) {
+            // Convert string timestamp to int if needed
+            int timeValue = int.tryParse(createdAt) ?? 0;
+            // Convert milliseconds to DateTime
+            timestamp = DateTime.fromMillisecondsSinceEpoch(timeValue);
+          } else {
+            timestamp = DateTime.now();
+          }
+        } catch (e) {
+          print('Error parsing timestamp: $e');
+          timestamp = DateTime.now();
+        }
+        
+        // Create message object
+        return ChatMessage(
+          id: messageId,
+          content: content,
+          timestamp: timestamp,
+          isMe: isFromUser,
+          type: MessageType.text,
+        );
+      }).toList();
+      
+      // Add messages to the stream
+      for (var message in messages) {
+        _messageStreamController.add(message);
+      }
+      
+      print('Loaded ${messages.length} messages from Firestore');
     } catch (e) {
-      print('Connection test error: $e');
-      return false;
+      print('Error loading messages from Firestore: $e');
     }
   }
 
-  // Authenticate with the server
-  Future<bool> _authenticateWithServer(String userId) async {
-    try {
-      final loginEndpoint = '$_hostUrl/login?1';
-      
-      print('Trying to authenticate with server: $loginEndpoint');
-      
-      final response = await http.post(
-        Uri.parse(loginEndpoint),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({
-          'email': '$userId@example.com', // Using userId as email for demo
-          'password': 'defaultPassword123', // Using a default password for demo
-        }),
-      ).timeout(const Duration(seconds: 10));
-      
-      if (response.statusCode == 200) {
-        print('Authentication successful');
-        // Save any auth tokens if needed
-        return true;
-      } else {
-        print('Authentication failed. Status: ${response.statusCode}, Body: ${response.body}');
-        return false;
-      }
-    } catch (e) {
-      print('Authentication error: $e');
-      return false;
-    }
-  }
-
-  // Send a message to the server
+  // Send a message to the server - using exact format from main.py
   Future<bool> sendMessage(String text, {int eventTypeCode = 1}) async {
     if (_userId == null || _fcmToken == null) {
-      print('User ID or FCM token is null. Using simulation mode.');
-      await simulateServerResponse(text);
-      return true;
+      print('User ID or FCM token is null. Will attempt to send to server anyway.');
+      return false;
     }
-    
-    // Handle special test command to load sample data
-    if (text.toLowerCase() == '#test' || text.toLowerCase() == '#sample') {
-      print('Processing sample test data command: $text');
-      await processSampleTestData();
-      return true;
-    }
-    
-    // Handle special command to load predefined server responses
-    if (text.toLowerCase() == '#server_responses') {
-      print('Processing predefined server responses command');
-      
-      final predefinedResponses = {
-        "serverResponses": [
-          {
-            "recipientId": "pUuutN05eoVeWhsKyXBiwRoFW9u1",
-            "serverMessageId": "7e9f2a1b-c3d4-5e6f-7g8h-9i0j1k2l3m4n",
-            "messageBody": "Welcome to Quitxt from the UT Health Science Center! Congrats on your decision to quit smoking!",
-            "timestamp": 1710072000,
-            "isPoll": false,
-            "pollId": null,
-            "fcmToken": "e-D8y5f8RoOcRgQl4AV18K:APA91bEdH6CwssC17yIKENOuLiW5eOxnE5CaOxqiOkKXdL4ZgnbOAk9s1_EX0w0E4G0c_zn5QD8X7W0-BHGooS2RyBcfHFYl8hfNEwYVcNIEConIJTyeJnhAnxlhD3OwayB6S_yeZXST",
-            "questionsAnswers": null
-          },
-          {
-            "recipientId": "pUuutN05eoVeWhsKyXBiwRoFW9u1",
-            "serverMessageId": "8f0e1d2c-3b4a-5d6e-7f8g-9h0i1j2k3l4m",
-            "messageBody": "Welcome to Quitxt from the UT Health Science Center! Congrats on your decision to quit smoking! See why we think you're awesome, Tap pic below https://youtu.be/ZWsR3G0mdJo",
-            "timestamp": 1710072100,
-            "isPoll": false,
-            "pollId": null,
-            "fcmToken": "e-D8y5f8RoOcRgQl4AV18K:APA91bEdH6CwssC17yIKENOuLiW5eOxnE5CaOxqiOkKXdL4ZgnbOAk9s1_EX0w0E4G0c_zn5QD8X7W0-BHGooS2RyBcfHFYl8hfNEwYVcNIEConIJTyeJnhAnxlhD3OwayB6S_yeZXST",
-            "questionsAnswers": null
-          },
-          {
-            "recipientId": "pUuutN05eoVeWhsKyXBiwRoFW9u1",
-            "serverMessageId": "9e0d1c2b-3a4f-5e6d-7c8b-9a0f1e2d3c4b",
-            "messageBody": "We'll help you quit smoking with fun messages. By continuing, you agree with our terms of service. If you want to leave the program type EXIT. For more info Tap pic below https://quitxt.org",
-            "timestamp": 1710072200,
-            "isPoll": false,
-            "pollId": null,
-            "fcmToken": "e-D8y5f8RoOcRgQl4AV18K:APA91bEdH6CwssC17yIKENOuLiW5eOxnE5CaOxqiOkKXdL4ZgnbOAk9s1_EX0w0E4G0c_zn5QD8X7W0-BHGooS2RyBcfHFYl8hfNEwYVcNIEConIJTyeJnhAnxlhD3OwayB6S_yeZXST",
-            "questionsAnswers": null
-          },
-          {
-            "recipientId": "pUuutN05eoVeWhsKyXBiwRoFW9u1",
-            "serverMessageId": "0a1b2c3d-4e5f-6g7h-8i9j-0k1l2m3n4o5p",
-            "messageBody": "How many cigarettes do you smoke per day?",
-            "timestamp": 1710072300,
-            "isPoll": true,
-            "pollId": 12345,
-            "fcmToken": "e-D8y5f8RoOcRgQl4AV18K:APA91bEdH6CwssC17yIKENOuLiW5eOxnE5CaOxqiOkKXdL4ZgnbOAk9s1_EX0w0E4G0c_zn5QD8X7W0-BHGooS2RyBcfHFYl8hfNEwYVcNIEConIJTyeJnhAnxlhD3OwayB6S_yeZXST",
-            "questionsAnswers": {
-              "Less than 5": "Less than 5",
-              "5-10": "5-10",
-              "11-20": "11-20",
-              "More than 20": "More than 20"
-            }
-          },
-          {
-            "recipientId": "pUuutN05eoVeWhsKyXBiwRoFW9u1",
-            "serverMessageId": "1a2b3c4d-5e6f-7g8h-9i0j-1k2l3m4n5o6p",
-            "messageBody": "Reason #1 to quit smoking while you're young: You'll have more time to enjoy hoverboards and flying cars. https://quitxt.org/sites/quitxt/files/gifs/PreQ6_Hoverboard.gif",
-            "timestamp": 1710072400,
-            "isPoll": false,
-            "pollId": null,
-            "fcmToken": "e-D8y5f8RoOcRgQl4AV18K:APA91bEdH6CwssC17yIKENOuLiW5eOxnE5CaOxqiOkKXdL4ZgnbOAk9s1_EX0w0E4G0c_zn5QD8X7W0-BHGooS2RyBcfHFYl8hfNEwYVcNIEConIJTyeJnhAnxlhD3OwayB6S_yeZXST",
-            "questionsAnswers": null
-          },
-          {
-            "recipientId": "pUuutN05eoVeWhsKyXBiwRoFW9u1", 
-            "serverMessageId": "2b3c4d5e-6f7g-8h9i-0j1k-2l3m4n5o6p7q",
-            "messageBody": "Drinking alcohol can trigger cravings for a cigarette and makes it harder for you to quit smoking. Tap pic below https://quitxt.org/binge-drinking",
-            "timestamp": 1710072500,
-            "isPoll": false,
-            "pollId": null,
-            "fcmToken": "e-D8y5f8RoOcRgQl4AV18K:APA91bEdH6CwssC17yIKENOuLiW5eOxnE5CaOxqiOkKXdL4ZgnbOAk9s1_EX0w0E4G0c_zn5QD8X7W0-BHGooS2RyBcfHFYl8hfNEwYVcNIEConIJTyeJnhAnxlhD3OwayB6S_yeZXST",
-            "questionsAnswers": null
-          },
-          {
-            "recipientId": "pUuutN05eoVeWhsKyXBiwRoFW9u1",
-            "serverMessageId": "3c4d5e6f-7g8h-9i0j-1k2l-3m4n5o6p7q8r",
-            "messageBody": "Like the Avengers protect the earth, you are protecting your lungs from respiratory diseases and cancer! Stay SUPER and quit smoking! https://quitxt.org/sites/quitxt/files/gifs/App1_Cue1_Avengers.gif",
-            "timestamp": 1710072600,
-            "isPoll": false,
-            "pollId": null,
-            "fcmToken": "e-D8y5f8RoOcRgQl4AV18K:APA91bEdH6CwssC17yIKENOuLiW5eOxnE5CaOxqiOkKXdL4ZgnbOAk9s1_EX0w0E4G0c_zn5QD8X7W0-BHGooS2RyBcfHFYl8hfNEwYVcNIEConIJTyeJnhAnxlhD3OwayB6S_yeZXST",
-            "questionsAnswers": null
-          },
-          {
-            "recipientId": "pUuutN05eoVeWhsKyXBiwRoFW9u1",
-            "serverMessageId": "4d5e6f7g-8h9i-0j1k-2l3m-4n5o6p7q8r9s",
-            "messageBody": "Reason #2 to quit smoking while you're young: Add a decade to your life and see the rise of fully automated smart homes; who needs to do chores when robots become a common commodity! https://quitxt.org/sites/quitxt/files/gifs/App1-Motiv2_automated_home.gif",
-            "timestamp": 1710072700,
-            "isPoll": false,
-            "pollId": null,
-            "fcmToken": "e-D8y5f8RoOcRgQl4AV18K:APA91bEdH6CwssC17yIKENOuLiW5eOxnE5CaOxqiOkKXdL4ZgnbOAk9s1_EX0w0E4G0c_zn5QD8X7W0-BHGooS2RyBcfHFYl8hfNEwYVcNIEConIJTyeJnhAnxlhD3OwayB6S_yeZXST",
-            "questionsAnswers": null
-          },
-          {
-            "recipientId": "pUuutN05eoVeWhsKyXBiwRoFW9u1",
-            "serverMessageId": "5e6f7g8h-9i0j-1k2l-3m4n-5o6p7q8r9s0t",
-            "messageBody": "Beber alcohol puede provocar los deseos de fumar y te hace más difícil dejar el cigarrillo. Clic el pic abajo https://quitxt.org/spanish/consumo-intensivo-de-alcohol",
-            "timestamp": 1710072800,
-            "isPoll": false,
-            "pollId": null,
-            "fcmToken": "e-D8y5f8RoOcRgQl4AV18K:APA91bEdH6CwssC17yIKENOuLiW5eOxnE5CaOxqiOkKXdL4ZgnbOAk9s1_EX0w0E4G0c_zn5QD8X7W0-BHGooS2RyBcfHFYl8hfNEwYVcNIEConIJTyeJnhAnxlhD3OwayB6S_yeZXST",
-            "questionsAnswers": null
-          },
-          {
-            "recipientId": "pUuutN05eoVeWhsKyXBiwRoFW9u1",
-            "serverMessageId": "6f7g8h9i-0j1k-2l3m-4n5o-6p7q8r9s0t1u",
-            "messageBody": "Como los Avengers protegen el planeta, ¡tú estás protegiendo tus pulmones de enfermedades respiratorias y de cáncer! ¡Sigue SUPER y deja de fumar!",
-            "timestamp": 1710072900,
-            "isPoll": false,
-            "pollId": null,
-            "fcmToken": "e-D8y5f8RoOcRgQl4AV18K:APA91bEdH6CwssC17yIKENOuLiW5eOxnE5CaOxqiOkKXdL4ZgnbOAk9s1_EX0w0E4G0c_zn5QD8X7W0-BHGooS2RyBcfHFYl8hfNEwYVcNIEConIJTyeJnhAnxlhD3OwayB6S_yeZXST",
-            "questionsAnswers": null
-          },
-          {
-            "recipientId": "pUuutN05eoVeWhsKyXBiwRoFW9u1",
-            "serverMessageId": "7g8h9i0j-1k2l-3m4n-5o6p-7q8r9s0t1u2v",
-            "messageBody": "Razón #2 para dejar de fumar siendo joven: ¡ganarás 10 años de vida y verás el aumento de las casas inteligentes; ¡quién necesita limpiar la casa cuando los robots lo harán por ti! https://quitxt.org/sites/quitxt/files/gifs/preq5_motiv2_automated_esp.gif",
-            "timestamp": 1710073000,
-            "isPoll": false,
-            "pollId": null,
-            "fcmToken": "e-D8y5f8RoOcRgQl4AV18K:APA91bEdH6CwssC17yIKENOuLiW5eOxnE5CaOxqiOkKXdL4ZgnbOAk9s1_EX0w0E4G0c_zn5QD8X7W0-BHGooS2RyBcfHFYl8hfNEwYVcNIEConIJTyeJnhAnxlhD3OwayB6S_yeZXST",
-            "questionsAnswers": null
-          },
-          {
-            "recipientId": "pUuutN05eoVeWhsKyXBiwRoFW9u1",
-            "serverMessageId": "8h9i0j1k-2l3m-4n5o-6p7q-8r9s0t1u2v3w",
-            "messageBody": "¿Cuántos cigarrillos fumas por día?",
-            "timestamp": 1710073100,
-            "isPoll": true,
-            "pollId": 12346,
-            "fcmToken": "e-D8y5f8RoOcRgQl4AV18K:APA91bEdH6CwssC17yIKENOuLiW5eOxnE5CaOxqiOkKXdL4ZgnbOAk9s1_EX0w0E4G0c_zn5QD8X7W0-BHGooS2RyBcfHFYl8hfNEwYVcNIEConIJTyeJnhAnxlhD3OwayB6S_yeZXST",
-            "questionsAnswers": {
-              "Menos de 5": "Menos de 5",
-              "5-10": "5-10",
-              "11-20": "11-20",
-              "Más de 20": "Más de 20"
-            }
-          }
-        ]
-      };
-      
-      await processPredefinedResponses(predefinedResponses);
-      return true;
-    }
-    
-    // Handle demo conversation command
-    if (text.toLowerCase() == '#demo_conversation') {
-      print('Starting demo conversation');
-      await processDemoConversation();
-      return true;
-    }
-    
-    // Handle interactive user-specific responses based on the submitted text
-    await processInteractiveResponses(text);
-    return true;
     
     // Early deduplication check - prevent rapid duplicate sends of the same message
     if (_lastResponseTime != null && 
         DateTime.now().difference(_lastResponseTime!).inSeconds < 2 &&
         text.toLowerCase() == _lastMessageText?.toLowerCase()) {
-      print('Preventing duplicate send of message: $text');
+      print('Preventing duplicate message: $text from user');
       return true; // Return success to avoid error handling in the UI
     }
     
@@ -351,20 +190,20 @@ class DashMessagingService {
     _lastMessageText = text;
     _lastResponseTime = DateTime.now();
     
-    // If not initialized, use simulation
-    if (!_isInitialized) {
-      print('DashMessagingService not initialized. Using simulation mode for: $text');
-      await simulateServerResponse(text);
-      return true;
-    }
-    
     try {
       final messageId = _uuid.v4();
-      final timestamp = DateTime.now().millisecondsSinceEpoch ~/ 1000;
+      final timestamp = DateTime.now().millisecondsSinceEpoch ~/ 1000; // Convert to seconds
       
-      // Use the correct endpoint for the Java server
-      final endpoint = '$_hostUrl/webservice/messaging/process2/send';
+      // Double check that we're using the correct URL
+      if (!_hostUrl.contains("/scheduler/mobile-app")) {
+        print('Correcting server URL to include path');
+        _hostUrl = "https://dashmessaging-com.ngrok.io/scheduler/mobile-app";
+      }
       
+      // Use the exact endpoint from main.py
+      final endpoint = _hostUrl;
+      
+      // Create payload using exact structure from main.py
       final payload = {
         'userId': _userId,
         'messageId': messageId,
@@ -375,6 +214,7 @@ class DashMessagingService {
       };
       
       print('Sending message to server: $payload');
+      print('Using endpoint: $endpoint');
       
       final response = await http.post(
         Uri.parse(endpoint),
@@ -382,13 +222,26 @@ class DashMessagingService {
         body: jsonEncode(payload),
       ).timeout(const Duration(seconds: 10));
       
+      print('Send message response status: ${response.statusCode}');
+      print('Send message response body: ${response.body}');
+      
       if (response.statusCode == 200 || response.statusCode == 202) {
-        print('Message sent successfully');
+        print('Message sent successfully to server');
         
         // Parse the server response if any
         if (response.body.isNotEmpty) {
           try {
             final responseData = jsonDecode(response.body);
+            
+            // Add the user's message to the local chat
+            final userMessage = ChatMessage(
+              id: messageId,
+              content: text,
+              timestamp: DateTime.now(),
+              isMe: true,
+              type: MessageType.text,
+            );
+            _messageStreamController.add(userMessage);
             
             // Handle response data - check if there's a message to display
             if (responseData['messageBody'] != null) {
@@ -424,24 +277,244 @@ class DashMessagingService {
           } catch (e) {
             print('Error parsing server response: $e');
           }
+        } else {
+          // If server doesn't send an immediate response, just add the user message
+          final userMessage = ChatMessage(
+            id: messageId,
+            content: text,
+            timestamp: DateTime.now(),
+            isMe: true,
+            type: MessageType.text,
+          );
+          _messageStreamController.add(userMessage);
         }
         
         return true;
       } else {
         print('Failed to send message. Status: ${response.statusCode}, Body: ${response.body}');
-        // Fallback to simulation if server fails
-        await simulateServerResponse(text);
         return false;
       }
     } catch (e) {
       print('Error sending message: $e');
       print('Failed to send message to server');
-      // Fallback to simulation on error
-      await simulateServerResponse(text);
       return false;
     }
   }
   
+  // Periodically check for new messages in Firestore
+  void startMessagePolling() {
+    if (_userId == null) {
+      print('Cannot start message polling, user ID is null');
+      return;
+    }
+    
+    // Cancel any existing timer
+    _messagePollingTimer?.cancel();
+    
+    // Create a new timer that checks for messages every 30 seconds
+    _messagePollingTimer = Timer.periodic(const Duration(seconds: 30), (timer) {
+      _checkForNewMessages();
+    });
+    
+    print('Started message polling for user: $_userId');
+  }
+  
+  // Stop message polling
+  void stopMessagePolling() {
+    _messagePollingTimer?.cancel();
+    _messagePollingTimer = null;
+    print('Stopped message polling');
+  }
+  
+  // Check for new messages in Firestore
+  Future<void> _checkForNewMessages() async {
+    if (_userId == null) {
+      print('Cannot check for messages, user ID is null');
+      return;
+    }
+    
+    try {
+      // Get the timestamp of the last message we processed
+      final lastMessageTime = _lastFirestoreMessageTime ?? 0;
+      
+      print('Checking for new messages since: $lastMessageTime');
+      
+      // Query Firestore for new messages
+      final chatRef = FirebaseFirestore.instance
+          .collection('messages')
+          .doc(_userId)
+          .collection('chat')
+          .where('createdAt', isGreaterThan: lastMessageTime.toString())
+          .orderBy('createdAt')
+          .limit(20);
+      
+      final snapshot = await chatRef.get();
+      
+      if (snapshot.docs.isEmpty) {
+        print('No new messages found');
+        return;
+      }
+      
+      print('Found ${snapshot.docs.length} new messages');
+      
+      // Process the new messages
+      for (var doc in snapshot.docs) {
+        final data = doc.data();
+        
+        // Skip messages from the client (user) as we already have those
+        if (data['source'] == 'client') {
+          continue;
+        }
+        
+        // Create ChatMessage from Firestore data
+        String content = data['messageBody'] ?? '';
+        String messageId = data['serverMessageId'] ?? doc.id;
+        
+        // Parse timestamp
+        DateTime timestamp;
+        try {
+          String createdAt = data['createdAt'] ?? '';
+          if (createdAt.isNotEmpty) {
+            // Convert string timestamp to int if needed
+            int timeValue = int.tryParse(createdAt) ?? 0;
+            
+            // Update the last message time
+            if (timeValue > _lastFirestoreMessageTime!) {
+              _lastFirestoreMessageTime = timeValue;
+            }
+            
+            // Convert milliseconds to DateTime
+            timestamp = DateTime.fromMillisecondsSinceEpoch(timeValue);
+          } else {
+            timestamp = DateTime.now();
+          }
+        } catch (e) {
+          print('Error parsing timestamp: $e');
+          timestamp = DateTime.now();
+        }
+        
+        // Create message object
+        final message = ChatMessage(
+          id: messageId,
+          content: content,
+          timestamp: timestamp,
+          isMe: false,
+          type: MessageType.text,
+        );
+        
+        // Add to the stream
+        _messageStreamController.add(message);
+        
+        // Check for quick replies
+        if (data['isPoll'] == 'y' && data['answers'] != null) {
+          try {
+            List<String> answers = [];
+            if (data['answers'] is String && data['answers'] != 'None') {
+              // Parse comma-separated answers string
+              answers = data['answers'].split(',').map((e) => e.trim()).toList();
+            } else if (data['answers'] is List) {
+              answers = List<String>.from(data['answers']);
+            }
+            
+            if (answers.isNotEmpty) {
+              final quickReplies = answers.map((item) => 
+                QuickReply(text: item, value: item)
+              ).toList();
+              
+              final quickReplyMessage = ChatMessage(
+                id: '${message.id}_replies',
+                content: '',
+                timestamp: timestamp.add(const Duration(milliseconds: 100)),
+                isMe: false,
+                type: MessageType.quickReply,
+                suggestedReplies: quickReplies,
+              );
+              
+              _messageStreamController.add(quickReplyMessage);
+            }
+          } catch (e) {
+            print('Error processing quick replies: $e');
+          }
+        }
+      }
+      
+      print('Processed ${snapshot.docs.length} new messages');
+    } catch (e) {
+      print('Error checking for new messages: $e');
+    }
+  }
+  
+  // Variable to track the last Firestore message timestamp
+  int? _lastFirestoreMessageTime = 0;
+  
+  // Timer for polling messages
+  Timer? _messagePollingTimer;
+
+  // Load FCM token from Firebase Messaging
+  Future<String?> _loadFcmToken() async {
+    try {
+      // Try to use the token from main.py if we can't get a real FCM token
+      // This is a fallback for testing purposes
+      String defaultToken = "eLjQWERyTm2Kltsqxahvw6:APA91bFqgowOQxoeOpZuf9wMsUQczuxBBZZim_yo-r_j9H_SMKqU4HLuioUUgI028IRpUG5SObBY3Fp4HiJIkTNsLkrKPEgWEo2UWVvMa81mPIVdM0WEuV0";
+      
+      // Try to get the FCM token from Firebase Messaging
+      final messaging = FirebaseMessaging.instance;
+      final token = await messaging.getToken();
+      
+      if (token != null && token.isNotEmpty) {
+        print('Successfully retrieved FCM token from Firebase Messaging');
+        return token;
+      } else {
+        print('Failed to get FCM token from Firebase Messaging, using default token');
+        return defaultToken;
+      }
+    } catch (e) {
+      print('Error loading FCM token: $e, using default token');
+      // Return the default token from main.py
+      return "eLjQWERyTm2Kltsqxahvw6:APA91bFqgowOQxoeOpZuf9wMsUQczuxBBZZim_yo-r_j9H_SMKqU4HLuioUUgI028IRpUG5SObBY3Fp4HiJIkTNsLkrKPEgWEo2UWVvMa81mPIVdM0WEuV0";
+    }
+  }
+
+  // Update host URL and save to shared preferences
+  Future<void> updateHostUrl(String newUrl) async {
+    if (newUrl.isEmpty) return;
+    
+    try {
+      // Check if the URL is valid
+      final uri = Uri.parse(newUrl);
+      if (!uri.isAbsolute) {
+        throw Exception('URL must be absolute (start with http:// or https://)');
+      }
+      
+      // Update the URL
+      _hostUrl = newUrl;
+      
+      // Save to shared preferences for persistence
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('hostUrl', newUrl);
+      
+      print('Host URL updated to: $_hostUrl');
+      
+      // Test if the new URL is working
+      if (_userId != null) {
+        try {
+          final testResponse = await http.get(
+            Uri.parse('$_hostUrl/info'),
+            headers: {'Content-Type': 'application/json'},
+          ).timeout(const Duration(seconds: 5));
+          
+          print('Connection test response with new URL: ${testResponse.statusCode}');
+        } catch (e) {
+          print('Error testing new URL: $e');
+          // We don't throw here since the URL might be valid but endpoint not available
+        }
+      }
+    } catch (e) {
+      print('Error updating host URL: $e');
+      throw Exception('Failed to update host URL: $e');
+    }
+  }
+
   // Handle incoming push notifications
   void handlePushNotification(Map<String, dynamic> data) {
     try {
@@ -531,6 +604,13 @@ class DashMessagingService {
   
   // Mock method to simulate server response (for testing without server)
   Future<void> simulateServerResponse(String userMessage) async {
+    // Skip all prebuilt responses, just log a message about server unavailability
+    print('Server unavailable, but skipping all prebuilt responses as requested');
+    print('Would normally send message to server: $userMessage');
+    return;
+    
+    // All code below will not execute due to the early return above
+    
     // Add a small delay to simulate network latency
     await Future.delayed(const Duration(milliseconds: 800));
     
@@ -853,7 +933,13 @@ class DashMessagingService {
   }
   
   // Process interactive responses for specific user inputs
-  Future<void> processInteractiveResponses(String userInput) async {
+  Future<bool> processInteractiveResponses(String userInput) async {
+    // Return false to bypass all prebuilt responses and always use the server
+    print('Bypassing prebuilt responses for: $userInput');
+    return false;
+    
+    // The code below is kept but not executed due to the early return above
+    /*
     // Normalize user input by converting to lowercase and trimming
     final normalizedInput = userInput.toLowerCase().trim();
     
@@ -873,300 +959,17 @@ class DashMessagingService {
         };
         
         await _sendServerResponse(youtubeResponse);
-        return;
+        return true;
       }
       
-      // Spanish greeting
-      if (normalizedInput == "hola") {
-        final response = {
-          "recipientId": "pUuutN05eoVeWhsKyXBiwRoFW9u1",
-          "serverMessageId": "9e0d1c2b-3a4f-5e6d-7c8b-9a0f1e2d3c4b",
-          "messageBody": "¡Bienvenido a Quitxt del UT Health Science Center! ¡Felicitaciones por su decisión de dejar de fumar!",
-          "timestamp": DateTime.now().millisecondsSinceEpoch ~/ 1000,
-          "isPoll": false,
-          "pollId": null,
-          "fcmToken": "e-D8y5f8RoOcRgQl4AV18K:APA91bEdH6CwssC17yIKENOuLiW5eOxnE5CaOxqiOkKXdL4ZgnbOAk9s1_EX0w0E4G0c_zn5QD8X7W0-BHGooS2RyBcfHFYl8hfNEwYVcNIEConIJTyeJnhAnxlhD3OwayB6S_yeZXST",
-          "questionsAnswers": null
-        };
-        
-        await _sendServerResponse(response);
-        return;
-      }
-      
-      // Quitting smoking intent
-      if (normalizedInput.contains("quit smoking") || normalizedInput.contains("want to quit")) {
-        final response = {
-          "recipientId": "pUuutN05eoVeWhsKyXBiwRoFW9u1",
-          "serverMessageId": "0a1b2c3d-4e5f-6g7h-8i9j-0k1l2m3n4o5p",
-          "messageBody": "How many cigarettes do you smoke per day?",
-          "timestamp": DateTime.now().millisecondsSinceEpoch ~/ 1000,
-          "isPoll": true,
-          "pollId": 12345,
-          "fcmToken": "e-D8y5f8RoOcRgQl4AV18K:APA91bEdH6CwssC17yIKENOuLiW5eOxnE5CaOxqiOkKXdL4ZgnbOAk9s1_EX0w0E4G0c_zn5QD8X7W0-BHGooS2RyBcfHFYl8hfNEwYVcNIEConIJTyeJnhAnxlhD3OwayB6S_yeZXST",
-          "questionsAnswers": {
-            "Less than 5": "Less than 5",
-            "5-10": "5-10",
-            "11-20": "11-20",
-            "More than 20": "More than 20"
-          }
-        };
-        
-        await _sendServerResponse(response);
-        return;
-      }
-      
-      // Cigarette quantity response
-      if (normalizedInput == "5-10") {
-        final response = {
-          "recipientId": "pUuutN05eoVeWhsKyXBiwRoFW9u1",
-          "serverMessageId": "1a2b3c4d-5e6f-7g8h-9i0j-1k2l3m4n5o6p",
-          "messageBody": "Reason #1 to quit smoking while you're young: You'll have more time to enjoy hoverboards and flying cars. https://quitxt.org/sites/quitxt/files/gifs/PreQ6_Hoverboard.gif",
-          "timestamp": 1710072400,
-          "isPoll": false,
-          "pollId": null,
-          "fcmToken": "e-D8y5f8RoOcRgQl4AV18K:APA91bEdH6CwssC17yIKENOuLiW5eOxnE5CaOxqiOkKXdL4ZgnbOAk9s1_EX0w0E4G0c_zn5QD8X7W0-BHGooS2RyBcfHFYl8hfNEwYVcNIEConIJTyeJnhAnxlhD3OwayB6S_yeZXST",
-          "questionsAnswers": null
-        };
-        
-        await _sendServerResponse(response);
-        return;
-      }
-      
-      // Cool/thanks response
-      if (normalizedInput.contains("cool") || normalizedInput.contains("that's cool") || 
-          normalizedInput == "thanks for the info" || normalizedInput.contains("motivation")) {
-        final response = {
-          "recipientId": "pUuutN05eoVeWhsKyXBiwRoFW9u1", 
-          "serverMessageId": "2b3c4d5e-6f7g-8h9i-0j1k-2l3m4n5o6p7q",
-          "messageBody": "Drinking alcohol can trigger cravings for a cigarette and makes it harder for you to quit smoking. Tap pic below https://quitxt.org/binge-drinking",
-          "timestamp": DateTime.now().millisecondsSinceEpoch ~/ 1000,
-          "isPoll": false,
-          "pollId": null,
-          "fcmToken": "e-D8y5f8RoOcRgQl4AV18K:APA91bEdH6CwssC17yIKENOuLiW5eOxnE5CaOxqiOkKXdL4ZgnbOAk9s1_EX0w0E4G0c_zn5QD8X7W0-BHGooS2RyBcfHFYl8hfNEwYVcNIEConIJTyeJnhAnxlhD3OwayB6S_yeZXST",
-          "questionsAnswers": null
-        };
-        
-        await _sendServerResponse(response);
-        
-        // Second informational response with delay
-        if (normalizedInput.contains("thanks")) {
-          await Future.delayed(const Duration(milliseconds: 1200));
-          final avengersResponse = {
-            "recipientId": "pUuutN05eoVeWhsKyXBiwRoFW9u1",
-            "serverMessageId": "3c4d5e6f-7g8h-9i0j-1k2l-3m4n5o6p7q8r",
-            "messageBody": "Like the Avengers protect the earth, you are protecting your lungs from respiratory diseases and cancer! Stay SUPER and quit smoking! https://quitxt.org/sites/quitxt/files/gifs/App1_Cue1_Avengers.gif",
-            "timestamp": DateTime.now().millisecondsSinceEpoch ~/ 1000,
-            "isPoll": false,
-            "pollId": null,
-            "fcmToken": "e-D8y5f8RoOcRgQl4AV18K:APA91bEdH6CwssC17yIKENOuLiW5eOxnE5CaOxqiOkKXdL4ZgnbOAk9s1_EX0w0E4G0c_zn5QD8X7W0-BHGooS2RyBcfHFYl8hfNEwYVcNIEConIJTyeJnhAnxlhD3OwayB6S_yeZXST",
-            "questionsAnswers": null
-          };
-          
-          await _sendServerResponse(avengersResponse);
-        }
-        return;
-      }
-      
-      // Motivation/inspiration response
-      if (normalizedInput.contains("motivation") || normalizedInput.contains("that's motivation") ||
-          normalizedInput.contains("inspiring") || normalizedInput.contains("inspirador")) {
-        final response = {
-          "recipientId": "pUuutN05eoVeWhsKyXBiwRoFW9u1",
-          "serverMessageId": "4d5e6f7g-8h9i-0j1k-2l3m-4n5o6p7q8r9s",
-          "messageBody": "Reason #2 to quit smoking while you're young: Add a decade to your life and see the rise of fully automated smart homes; who needs to do chores when robots become a common commodity! https://quitxt.org/sites/quitxt/files/gifs/App1-Motiv2_automated_home.gif",
-          "timestamp": DateTime.now().millisecondsSinceEpoch ~/ 1000,
-          "isPoll": false,
-          "pollId": null,
-          "fcmToken": "e-D8y5f8RoOcRgQl4AV18K:APA91bEdH6CwssC17yIKENOuLiW5eOxnE5CaOxqiOkKXdL4ZgnbOAk9s1_EX0w0E4G0c_zn5QD8X7W0-BHGooS2RyBcfHFYl8hfNEwYVcNIEConIJTyeJnhAnxlhD3OwayB6S_yeZXST",
-          "questionsAnswers": null
-        };
-        
-        await _sendServerResponse(response);
-        return;
-      }
-      
-      // Spanish language preference
-      if (normalizedInput.contains("español") || normalizedInput.contains("espanol") || 
-          normalizedInput.contains("en español") || normalizedInput.contains("mensajes en español")) {
-        final response = {
-          "recipientId": "pUuutN05eoVeWhsKyXBiwRoFW9u1",
-          "serverMessageId": "5e6f7g8h-9i0j-1k2l-3m4n-5o6p7q8r9s0t",
-          "messageBody": "Beber alcohol puede provocar los deseos de fumar y te hace más difícil dejar el cigarrillo. Clic el pic abajo https://quitxt.org/spanish/consumo-intensivo-de-alcohol",
-          "timestamp": DateTime.now().millisecondsSinceEpoch ~/ 1000,
-          "isPoll": false,
-          "pollId": null,
-          "fcmToken": "e-D8y5f8RoOcRgQl4AV18K:APA91bEdH6CwssC17yIKENOuLiW5eOxnE5CaOxqiOkKXdL4ZgnbOAk9s1_EX0w0E4G0c_zn5QD8X7W0-BHGooS2RyBcfHFYl8hfNEwYVcNIEConIJTyeJnhAnxlhD3OwayB6S_yeZXST",
-          "questionsAnswers": null
-        };
-        
-        await _sendServerResponse(response);
-        return;
-      }
-      
-      // Spanish thanks response
-      if (normalizedInput == "gracias") {
-        final response = {
-          "recipientId": "pUuutN05eoVeWhsKyXBiwRoFW9u1",
-          "serverMessageId": "6f7g8h9i-0j1k-2l3m-4n5o-6p7q8r9s0t1u",
-          "messageBody": "Como los Avengers protegen el planeta, ¡tú estás protegiendo tus pulmones de enfermedades respiratorias y de cáncer! ¡Sigue SUPER y deja de fumar!",
-          "timestamp": DateTime.now().millisecondsSinceEpoch ~/ 1000,
-          "isPoll": false,
-          "pollId": null,
-          "fcmToken": "e-D8y5f8RoOcRgQl4AV18K:APA91bEdH6CwssC17yIKENOuLiW5eOxnE5CaOxqiOkKXdL4ZgnbOAk9s1_EX0w0E4G0c_zn5QD8X7W0-BHGooS2RyBcfHFYl8hfNEwYVcNIEConIJTyeJnhAnxlhD3OwayB6S_yeZXST",
-          "questionsAnswers": null
-        };
-        
-        await _sendServerResponse(response);
-        return;
-      }
-      
-      // Spanish inspiration response
-      if (normalizedInput.contains("inspirador") || normalizedInput.contains("muy inspirador")) {
-        final response = {
-          "recipientId": "pUuutN05eoVeWhsKyXBiwRoFW9u1",
-          "serverMessageId": "7g8h9i0j-1k2l-3m4n-5o6p-7q8r9s0t1u2v",
-          "messageBody": "Razón #2 para dejar de fumar siendo joven: ¡ganarás 10 años de vida y verás el aumento de las casas inteligentes; ¡quién necesita limpiar la casa cuando los robots lo harán por ti! https://quitxt.org/sites/quitxt/files/gifs/preq5_motiv2_automated_esp.gif",
-          "timestamp": DateTime.now().millisecondsSinceEpoch ~/ 1000,
-          "isPoll": false,
-          "pollId": null,
-          "fcmToken": "e-D8y5f8RoOcRgQl4AV18K:APA91bEdH6CwssC17yIKENOuLiW5eOxnE5CaOxqiOkKXdL4ZgnbOAk9s1_EX0w0E4G0c_zn5QD8X7W0-BHGooS2RyBcfHFYl8hfNEwYVcNIEConIJTyeJnhAnxlhD3OwayB6S_yeZXST",
-          "questionsAnswers": null
-        };
-        
-        await _sendServerResponse(response);
-        return;
-      }
-      
-      // Spanish reason or good reason response
-      if (normalizedInput.contains("buena razón") || normalizedInput.contains("buena razon")) {
-        final response = {
-          "recipientId": "pUuutN05eoVeWhsKyXBiwRoFW9u1",
-          "serverMessageId": "8h9i0j1k-2l3m-4n5o-6p7q-8r9s0t1u2v3w",
-          "messageBody": "¿Cuántos cigarrillos fumas por día?",
-          "timestamp": DateTime.now().millisecondsSinceEpoch ~/ 1000,
-          "isPoll": true,
-          "pollId": 12346,
-          "fcmToken": "e-D8y5f8RoOcRgQl4AV18K:APA91bEdH6CwssC17yIKENOuLiW5eOxnE5CaOxqiOkKXdL4ZgnbOAk9s1_EX0w0E4G0c_zn5QD8X7W0-BHGooS2RyBcfHFYl8hfNEwYVcNIEConIJTyeJnhAnxlhD3OwayB6S_yeZXST",
-          "questionsAnswers": {
-            "Menos de 5": "Menos de 5",
-            "5-10": "5-10",
-            "11-20": "11-20",
-            "Más de 20": "Más de 20"
-          }
-        };
-        
-        await _sendServerResponse(response);
-        return;
-      }
-      
-      // Deactivation response
-      if (normalizedInput == "#deactivate") {
-        final response = {
-          "recipientId": "pUuutN05eoVeWhsKyXBiwRoFW9u1",
-          "serverMessageId": "0j1k2l3m-4n5o-6p7q-8r9s-0t1u2v3w4x5y",
-          "messageBody": "Hemos desactivado tu cuenta. Si deseas volver a usar nuestros servicios en el futuro, simplemente envía un mensaje y estaremos aquí para ayudarte.",
-          "timestamp": DateTime.now().millisecondsSinceEpoch ~/ 1000,
-          "isPoll": false,
-          "pollId": null,
-          "fcmToken": "e-D8y5f8RoOcRgQl4AV18K:APA91bEdH6CwssC17yIKENOuLiW5eOxnE5CaOxqiOkKXdL4ZgnbOAk9s1_EX0w0E4G0c_zn5QD8X7W0-BHGooS2RyBcfHFYl8hfNEwYVcNIEConIJTyeJnhAnxlhD3OwayB6S_yeZXST",
-          "questionsAnswers": null
-        };
-        
-        await _sendServerResponse(response);
-        return;
-      }
-      
-      // Exit response in English
-      if (normalizedInput == "exit") {
-        final response = {
-          "recipientId": "pUuutN05eoVeWhsKyXBiwRoFW9u1",
-          "serverMessageId": "1k2l3m4n-5o6p-7q8r-9s0t-1u2v3w4x5y6z",
-          "messageBody": "You have been unsubscribed from the QuiTXT program. If you would like to rejoin in the future, simply text back to this number.",
-          "timestamp": DateTime.now().millisecondsSinceEpoch ~/ 1000,
-          "isPoll": false,
-          "pollId": null,
-          "fcmToken": "e-D8y5f8RoOcRgQl4AV18K:APA91bEdH6CwssC17yIKENOuLiW5eOxnE5CaOxqiOkKXdL4ZgnbOAk9s1_EX0w0E4G0c_zn5QD8X7W0-BHGooS2RyBcfHFYl8hfNEwYVcNIEConIJTyeJnhAnxlhD3OwayB6S_yeZXST",
-          "questionsAnswers": null
-        };
-        
-        await _sendServerResponse(response);
-        return;
-      }
-      
-      // Exit response in Spanish
-      if (normalizedInput == "salir") {
-        final response = {
-          "recipientId": "pUuutN05eoVeWhsKyXBiwRoFW9u1",
-          "serverMessageId": "2l3m4n5o-6p7q-8r9s-0t1u-2v3w4x5y6z7a",
-          "messageBody": "Has sido dado de baja del programa QuiTXT. Si deseas volver a unirte en el futuro, simplemente envía un mensaje a este número.",
-          "timestamp": DateTime.now().millisecondsSinceEpoch ~/ 1000,
-          "isPoll": false,
-          "pollId": null,
-          "fcmToken": "e-D8y5f8RoOcRgQl4AV18K:APA91bEdH6CwssC17yIKENOuLiW5eOxnE5CaOxqiOkKXdL4ZgnbOAk9s1_EX0w0E4G0c_zn5QD8X7W0-BHGooS2RyBcfHFYl8hfNEwYVcNIEConIJTyeJnhAnxlhD3OwayB6S_yeZXST",
-          "questionsAnswers": null
-        };
-        
-        await _sendServerResponse(response);
-        return;
-      }
-      
-      // Spanish poll response
-      if (normalizedInput == "5-10" && _lastResponseId?.contains("spanish_poll") == true) {
-        final response = {
-          "recipientId": "pUuutN05eoVeWhsKyXBiwRoFW9u1",
-          "serverMessageId": "9i0j1k2l-3m4n-5o6p-7q8r-9s0t1u2v3w4x",
-          "messageBody": "¡Gracias por la información! Estamos aquí para ayudarte a reducir y eventualmente dejar de fumar por completo.",
-          "timestamp": DateTime.now().millisecondsSinceEpoch ~/ 1000,
-          "isPoll": false,
-          "pollId": null,
-          "fcmToken": "e-D8y5f8RoOcRgQl4AV18K:APA91bEdH6CwssC17yIKENOuLiW5eOxnE5CaOxqiOkKXdL4ZgnbOAk9s1_EX0w0E4G0c_zn5QD8X7W0-BHGooS2RyBcfHFYl8hfNEwYVcNIEConIJTyeJnhAnxlhD3OwayB6S_yeZXST",
-          "questionsAnswers": null
-        };
-        
-        await _sendServerResponse(response);
-        return;
-      }
-      
-      // Spanish reason or good reason response
-      if (normalizedInput.contains("buena razón") || normalizedInput.contains("buena razon")) {
-        _lastResponseId = "spanish_poll";
-        final response = {
-          "recipientId": "pUuutN05eoVeWhsKyXBiwRoFW9u1",
-          "serverMessageId": "8h9i0j1k-2l3m-4n5o-6p7q-8r9s0t1u2v3w",
-          "messageBody": "¿Cuántos cigarrillos fumas por día?",
-          "timestamp": DateTime.now().millisecondsSinceEpoch ~/ 1000,
-          "isPoll": true,
-          "pollId": 12346,
-          "fcmToken": "e-D8y5f8RoOcRgQl4AV18K:APA91bEdH6CwssC17yIKENOuLiW5eOxnE5CaOxqiOkKXdL4ZgnbOAk9s1_EX0w0E4G0c_zn5QD8X7W0-BHGooS2RyBcfHFYl8hfNEwYVcNIEConIJTyeJnhAnxlhD3OwayB6S_yeZXST",
-          "questionsAnswers": {
-            "Menos de 5": "Menos de 5",
-            "5-10": "5-10",
-            "11-20": "11-20",
-            "Más de 20": "Más de 20"
-          }
-        };
-        
-        await _sendServerResponse(response);
-        return;
-      }
-      
-      // Default fallback response
-      final defaultResponse = {
-        "recipientId": "pUuutN05eoVeWhsKyXBiwRoFW9u1",
-        "serverMessageId": "${_uuid.v4()}",
-        "messageBody": "Thanks for your message. How can I help you with quitting smoking today?",
-        "timestamp": DateTime.now().millisecondsSinceEpoch ~/ 1000,
-        "isPoll": false,
-        "pollId": null,
-        "fcmToken": "e-D8y5f8RoOcRgQl4AV18K:APA91bEdH6CwssC17yIKENOuLiW5eOxnE5CaOxqiOkKXdL4ZgnbOAk9s1_EX0w0E4G0c_zn5QD8X7W0-BHGooS2RyBcfHFYl8hfNEwYVcNIEConIJTyeJnhAnxlhD3OwayB6S_yeZXST",
-        "questionsAnswers": null
-      };
-      
-      await _sendServerResponse(defaultResponse);
-      
+      // Rest of the method...
     } catch (e) {
-      print('Error in processInteractiveResponses: $e');
+      print('Error processing interactive response: $e');
     }
+    
+    // If we reach here, no interactive response matched
+    return false;
+    */
   }
   
   // Helper to send a server response based on a response object
@@ -1490,6 +1293,38 @@ class DashMessagingService {
       print("Finished processing predefined server responses");
     } catch (e) {
       print("Error in processServerResponses: $e");
+    }
+  }
+
+  // Test connection to the server using the exact URL
+  Future<bool> testConnection() async {
+    if (!_isInitialized) {
+      print('DashMessagingService not initialized, cannot test connection');
+      return false;
+    }
+    
+    // Double check that we're using the correct URL
+    if (!_hostUrl.contains("/scheduler/mobile-app")) {
+      print('Correcting server URL to include path for connection test');
+      _hostUrl = "https://dashmessaging-com.ngrok.io/scheduler/mobile-app";
+    }
+    
+    try {
+      print('Testing connection to server: $_hostUrl');
+      
+      // Try to connect to the server
+      final response = await http.get(
+        Uri.parse(_hostUrl),
+        headers: {'Content-Type': 'application/json'},
+      ).timeout(const Duration(seconds: 5));
+      
+      print('Server connection test response: ${response.statusCode}');
+      
+      // Any response means we can reach the server
+      return response.statusCode >= 200;
+    } catch (e) {
+      print('Error testing connection to server: $e');
+      return false;
     }
   }
 }

@@ -81,32 +81,46 @@ class DashChatProvider extends ChangeNotifier {
 
     // Subscribe to the DashMessagingService message stream
     _messageSubscription = _dashService.messageStream.listen((message) {
-      if (_chatProvider == null) return;
+      if (_chatProvider == null) {
+        print('DashChatProvider: ChatProvider is null, cannot add message.');
+        return;
+      }
+      
+      print('DashChatProvider: Received message from stream: ${message.id}, type: ${message.type}, content: ${message.content.substring(0, message.content.length > 30 ? 30 : message.content.length)}...');
       
       // Add message to chat provider
       // Use the appropriate method based on message type
       if (message.type == MessageType.quickReply) {
+        print('DashChatProvider: Adding quick reply message with ${message.suggestedReplies?.length ?? 0} options');
         _chatProvider!.addQuickReplyMessage(message.suggestedReplies ?? []);
       } else {
         // Skip server status messages
         if (message.content.startsWith('Using server:')) {
+          print('DashChatProvider: Skipping server status message');
           return;
         }
+        print('DashChatProvider: Adding text message (from ${message.isMe ? "user" : "server"})');
         _chatProvider!.addTextMessage(message.content, isMe: message.isMe);
       }
       
     }, onError: (error) {
       print('DashChatProvider: Error listening to messages: $error');
     });
+    
+    print('DashChatProvider: Message listener set up successfully');
   }
 
   // Initialize the server message service
   void initializeServerService(String userId, String fcmToken) {
     print('[DashChatProvider] Initializing DashMessagingService for user $userId');
     _dashService.initialize(userId).then((_) {
+      print('[DashChatProvider] DashMessagingService initialized successfully');
       // Setup message listener after successful initialization
       if (_chatProvider != null) {
         _setupMessageListener();
+        print('[DashChatProvider] Message listener set up');
+      } else {
+        print('[DashChatProvider] Warning: ChatProvider is null, cannot set up message listener');
       }
       notifyListeners();
     }).catchError((error) {
@@ -178,7 +192,7 @@ class DashChatProvider extends ChangeNotifier {
       _isSendingMessage = false;
     }
   }
-
+  
   // Handle quick reply selection
   Future<void> handleQuickReply(QuickReply reply) async {
     print("[HandleQuickReply] Selected reply: text='${reply.text}', value='${reply.value}'");
@@ -270,5 +284,18 @@ class DashChatProvider extends ChangeNotifier {
     _messageSubscription?.cancel();
     _dashService.dispose();
     super.dispose();
+  }
+  
+  // Force a manual sync of messages from Firestore
+  void forceMessageSync() {
+    print('[DashChatProvider] Manually forcing message sync');
+    
+    if (!_dashService.isInitialized) {
+      print('[DashChatProvider] Cannot force sync - DashMessagingService not initialized');
+      return;
+    }
+    
+    // Reset the last message time to force a full refresh
+    _dashService.resetLastMessageTime();
   }
 }

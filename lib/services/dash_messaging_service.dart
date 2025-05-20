@@ -40,12 +40,25 @@ class DashMessagingService {
   DateTime? _lastResponseTime;
   String? _lastMessageText;
 
+  // Track last Firestore message time
+  int _lastFirestoreMessageTime = 0;
+
+  // Add this field to manage the Firestore subscription
+  StreamSubscription<QuerySnapshot>? _firestoreSubscription;
+
   // Initialize the service with user info
   Future<void> initialize(String userId) async {
+    if (userId.isEmpty) {
+      print('Cannot initialize DashMessagingService with empty userId');
+      throw Exception('User ID cannot be empty');
+    }
+    
     if (_isInitialized && userId == _userId) {
       print('DashMessagingService already initialized for user: $userId');
       return;
     }
+    
+    print('Initializing DashMessagingService for user: $userId');
     
     _userId = userId;
     _isInitialized = true;
@@ -57,11 +70,15 @@ class DashMessagingService {
     _fcmToken = await _loadFcmToken();
     print('FCM Token: $_fcmToken');
     
+    // Clear any existing message data
+    _lastFirestoreMessageTime = 0;
+    print('Reset _lastFirestoreMessageTime to 0 during initialization');
+    
     // Load messages from Firestore on initialization
     await _loadExistingMessages();
     
-    // Start polling for new messages
-    startMessagePolling();
+    // Start real-time listening for chat messages
+    startRealtimeMessageListener();
     
     print('DashMessagingService initialized for user: $userId');
     print('Using host URL: $_hostUrl');
@@ -106,6 +123,7 @@ class DashMessagingService {
     
     try {
       print('Loading existing messages from Firestore for user: $_userId');
+      print('Collection path: messages/${_userId}/chat');
       
       // Get reference to the user's chat collection in Firestore
       final chatRef = FirebaseFirestore.instance
@@ -113,8 +131,9 @@ class DashMessagingService {
           .doc(_userId)
           .collection('chat')
           .orderBy('createdAt', descending: true)
-          .limit(50); // Load the last 50 messages
+          .limit(20); // Reduced from 50 to 20 messages initially
       
+      print('Executing Firestore query for recent messages');
       final snapshot = await chatRef.get();
       
       if (snapshot.docs.isEmpty) {
@@ -122,175 +141,231 @@ class DashMessagingService {
         return;
       }
       
-      print('Found ${snapshot.docs.length} existing messages');
+      print('Found ${snapshot.docs.length} existing messages in Firestore');
+      // Log information about documents
+      for (var i = 0; i < snapshot.docs.length; i++) {
+        var doc = snapshot.docs[i];
+        var data = doc.data();
+        print('Document $i: ID=${doc.id}, serverMessageId=${data['serverMessageId']}, createdAt=${data['createdAt']}, messageBody=${data['messageBody'] ?? '<empty>'}');
+      }
+      
+      // Track the highest timestamp we've seen
+      int highestTimestamp = 0;
       
       // Process messages in reverse to maintain chronological order
-      final messages = snapshot.docs.reversed.map((doc) {
-        final data = doc.data();
-        
-        // Create ChatMessage from Firestore data
-        String content = data['messageBody'] ?? '';
-        bool isFromUser = (data['source'] == 'client');
-        String messageId = data['serverMessageId'] ?? doc.id;
-        
-        // Parse timestamp
-        DateTime timestamp;
+      final messages = <ChatMessage>[];
+      for (var doc in snapshot.docs) {
         try {
-          String createdAt = data['createdAt'] ?? '';
-          if (createdAt.isNotEmpty) {
-            // Convert string timestamp to int if needed
-            int timeValue = int.tryParse(createdAt) ?? 0;
-            // Convert milliseconds to DateTime
-            timestamp = DateTime.fromMillisecondsSinceEpoch(timeValue);
-          } else {
-            timestamp = DateTime.now();
+          final data = doc.data();
+          
+          // Skip empty messages
+          if ((data['messageBody'] ?? '').toString().isEmpty) {
+            print('Skipping message with empty content: ${doc.id}');
+            continue;
+          }
+          
+          // Create ChatMessage from Firestore data
+          final message = ChatMessage(
+            id: data['serverMessageId'] ?? doc.id,
+            content: data['messageBody'] ?? '',
+            timestamp: DateTime.now(), // Don't worry about exact timestamps for display
+            isMe: data['source'] == 'client',
+            type: MessageType.text,
+          );
+          
+          messages.add(message);
+          
+          // Track the timestamp for future queries
+          try {
+            var createdAt = data['createdAt'];
+            int timeValue = 0;
+            if (createdAt != null) {
+              // Handle different timestamp formats
+              if (createdAt is String) {
+                timeValue = int.tryParse(createdAt) ?? 0;
+              } else if (createdAt is int) {
+                timeValue = createdAt;
+              }
+              
+              // Keep track of highest timestamp
+              if (timeValue > highestTimestamp) {
+                highestTimestamp = timeValue;
+              }
+            }
+          } catch (e) {
+            print('Error tracking timestamp: $e');
+          }
+
+          // Handle quick replies/polls
+          final isPoll = data['isPoll'];
+          if (isMessagePoll(isPoll) && data['answers'] != null) {
+            try {
+              List<String> answers = [];
+              final answersData = data['answers'];
+              
+              if (answersData is String && answersData != 'None' && answersData.isNotEmpty) {
+                // Parse comma-separated answers string
+                answers = answersData.split(',').map((e) => e.trim()).toList();
+              } else if (answersData is List) {
+                answers = List<String>.from(answersData);
+              }
+              
+              if (answers.isNotEmpty) {
+                final quickReplies = answers.map((item) => 
+                  QuickReply(text: item, value: item)
+                ).toList();
+                
+                final quickReplyMessage = ChatMessage(
+                  id: '${message.id}_replies',
+                  content: '',
+                  timestamp: DateTime.now().add(const Duration(milliseconds: 100)),
+                  isMe: false,
+                  type: MessageType.quickReply,
+                  suggestedReplies: quickReplies,
+                );
+                
+                messages.add(quickReplyMessage);
+              }
+            } catch (e) {
+              print('Error processing quick replies: $e');
+            }
           }
         } catch (e) {
-          print('Error parsing timestamp: $e');
-          timestamp = DateTime.now();
+          print('Error processing message: $e');
         }
-        
-        // Create message object
-        return ChatMessage(
-          id: messageId,
-          content: content,
-          timestamp: timestamp,
-          isMe: isFromUser,
-          type: MessageType.text,
-        );
-      }).toList();
+      }
+      
+      // Update the last message time
+      if (highestTimestamp > 0) {
+        _lastFirestoreMessageTime = highestTimestamp;
+        print('Updated _lastFirestoreMessageTime to $highestTimestamp');
+      }
+      
+      print('Processed ${messages.length} messages from Firestore');
       
       // Add messages to the stream
       for (var message in messages) {
         _messageStreamController.add(message);
       }
       
-      print('Loaded ${messages.length} messages from Firestore');
+      print('Added ${messages.length} messages to the stream');
     } catch (e) {
       print('Error loading messages from Firestore: $e');
     }
   }
 
-  // Send a message to the server - using exact format from main.py
-  Future<bool> sendMessage(String text, {int eventTypeCode = 1}) async {
+  // Send a message to the server
+  Future<bool> sendMessage(String text) async {
     if (_userId == null || _fcmToken == null) {
       print('User ID or FCM token is null. Will attempt to send to server anyway.');
-      return false;
     }
-    
-    // Early deduplication check - prevent rapid duplicate sends of the same message
+
+    // Prevent duplicate messages within 2 seconds
     if (_lastResponseTime != null && 
         DateTime.now().difference(_lastResponseTime!).inSeconds < 2 &&
         text.toLowerCase() == _lastMessageText?.toLowerCase()) {
       print('Preventing duplicate message: $text from user');
-      return true; // Return success to avoid error handling in the UI
+      return false;
     }
-    
-    // Store this message text to prevent duplicates
+
     _lastMessageText = text;
     _lastResponseTime = DateTime.now();
-    
+
     try {
       final messageId = _uuid.v4();
-      final timestamp = DateTime.now().millisecondsSinceEpoch ~/ 1000; // Convert to seconds
-      
-      // Double check that we're using the correct URL
+
+      // Ensure correct server URL
       if (!_hostUrl.contains("/scheduler/mobile-app")) {
         print('Correcting server URL to include path');
         _hostUrl = "https://dashmessaging-com.ngrok.io/scheduler/mobile-app";
       }
-      
-      // Use the exact endpoint from main.py
+
       final endpoint = _hostUrl;
-      
-      // Create payload using exact structure from main.py
       final payload = {
-        'userId': _userId,
         'messageId': messageId,
+        'userId': _userId,
         'messageText': text,
-        'messageTime': timestamp,
-        'eventTypeCode': eventTypeCode,
         'fcmToken': _fcmToken,
+        'messageTime': DateTime.now().millisecondsSinceEpoch,
       };
-      
+
       print('Sending message to server: $payload');
       print('Using endpoint: $endpoint');
-      
+
       final response = await http.post(
         Uri.parse(endpoint),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode(payload),
-      ).timeout(const Duration(seconds: 10));
-      
+      );
+
       print('Send message response status: ${response.statusCode}');
       print('Send message response body: ${response.body}');
-      
-      if (response.statusCode == 200 || response.statusCode == 202) {
+
+      if (response.statusCode == 200) {
         print('Message sent successfully to server');
         
-        // Parse the server response if any
-        if (response.body.isNotEmpty) {
-          try {
-            final responseData = jsonDecode(response.body);
-            
-            // Add the user's message to the local chat
-            final userMessage = ChatMessage(
-              id: messageId,
-              content: text,
+        // Create user message
+        final userMessage = ChatMessage(
+          id: messageId,
+          content: text,
+          timestamp: DateTime.now(),
+          isMe: true,
+          type: MessageType.text,
+        );
+
+        // Add user message to stream
+        _messageStreamController.add(userMessage);
+
+        // Process server response
+        try {
+          final responseData = jsonDecode(response.body);
+          if (responseData != null) {
+            final serverMessage = ChatMessage(
+              id: responseData['messageId'] ?? _uuid.v4(),
+              content: responseData['message'] ?? '',
               timestamp: DateTime.now(),
-              isMe: true,
+              isMe: false,
               type: MessageType.text,
             );
-            _messageStreamController.add(userMessage);
-            
-            // Handle response data - check if there's a message to display
-            if (responseData['messageBody'] != null) {
-              final serverMessage = ChatMessage(
-                id: responseData['messageId'] ?? _uuid.v4(),
-                content: responseData['messageBody'],
-                timestamp: DateTime.now(),
+
+            // Add server message to stream
+            _messageStreamController.add(serverMessage);
+
+            // Handle quick replies if present
+            if (responseData['quickReplies'] != null) {
+              final quickReplyMessage = ChatMessage(
+                id: '${serverMessage.id}_replies',
+                content: '',
+                timestamp: DateTime.now().add(const Duration(milliseconds: 100)),
                 isMe: false,
-                type: MessageType.text,
+                type: MessageType.quickReply,
+                suggestedReplies: (responseData['quickReplies'] as List)
+                    .map((reply) => QuickReply(
+                          text: reply['text'] ?? '',
+                          value: reply['value'] ?? '',
+                        ))
+                    .toList(),
               );
-              _messageStreamController.add(serverMessage);
-              
-              // Add quick replies if available
-              if (responseData['isPoll'] == true && responseData['answers'] != null) {
-                final answers = responseData['answers'] as List;
-                if (answers.isNotEmpty) {
-                  final quickReplies = answers.map((item) => 
-                    QuickReply(text: item.toString(), value: item.toString())
-                  ).toList();
-                  
-                  final quickReplyMessage = ChatMessage(
-                    id: '${serverMessage.id}_replies',
-                    content: '',
-                    timestamp: DateTime.now(),
-                    isMe: false,
-                    type: MessageType.quickReply,
-                    suggestedReplies: quickReplies,
-                  );
-                  _messageStreamController.add(quickReplyMessage);
-                }
-              }
+
+              _messageStreamController.add(quickReplyMessage);
             }
-          } catch (e) {
-            print('Error parsing server response: $e');
           }
-        } else {
-          // If server doesn't send an immediate response, just add the user message
-          final userMessage = ChatMessage(
-            id: messageId,
-            content: text,
-            timestamp: DateTime.now(),
-            isMe: true,
-            type: MessageType.text,
-          );
-          _messageStreamController.add(userMessage);
+        } catch (e) {
+          print('Error parsing server response: $e');
         }
-        
+
         return true;
       } else {
+        // If server fails, still show user message
+        final userMessage = ChatMessage(
+          id: messageId,
+          content: text,
+          timestamp: DateTime.now(),
+          isMe: true,
+          type: MessageType.text,
+        );
+
+        _messageStreamController.add(userMessage);
         print('Failed to send message. Status: ${response.statusCode}, Body: ${response.body}');
         return false;
       }
@@ -301,154 +376,73 @@ class DashMessagingService {
     }
   }
   
-  // Periodically check for new messages in Firestore
-  void startMessagePolling() {
-    if (_userId == null) {
-      print('Cannot start message polling, user ID is null');
-      return;
-    }
-    
-    // Cancel any existing timer
-    _messagePollingTimer?.cancel();
-    
-    // Create a new timer that checks for messages every 30 seconds
-    _messagePollingTimer = Timer.periodic(const Duration(seconds: 30), (timer) {
-      _checkForNewMessages();
+  // Start real-time listening for chat messages
+  void startRealtimeMessageListener() {
+    // Cancel any existing subscription
+    _firestoreSubscription?.cancel();
+    if (_userId == null) return;
+
+    print('Starting real-time Firestore listener for user: [32m$_userId[0m');
+    _firestoreSubscription = FirebaseFirestore.instance
+        .collection('messages')
+        .doc(_userId)
+        .collection('chat')
+        .orderBy('createdAt', descending: false)
+        .snapshots()
+        .listen((snapshot) {
+      for (var change in snapshot.docChanges) {
+        if (change.type == DocumentChangeType.added || change.type == DocumentChangeType.modified) {
+          final data = change.doc.data();
+          if (data == null) continue;
+          if ((data['messageBody'] ?? '').toString().isEmpty) continue;
+
+          final message = ChatMessage(
+            id: data['serverMessageId'] ?? change.doc.id,
+            content: data['messageBody'] ?? '',
+            timestamp: DateTime.now(), // You can parse createdAt if needed
+            isMe: data['source'] == 'client',
+            type: MessageType.text,
+          );
+          _messageStreamController.add(message);
+
+          // Handle quick replies/polls
+          final isPoll = data['isPoll'];
+          if (isMessagePoll(isPoll) && data['answers'] != null) {
+            try {
+              List<String> answers = [];
+              final answersData = data['answers'];
+              if (answersData is String && answersData != 'None' && answersData.isNotEmpty) {
+                answers = answersData.split(',').map((e) => e.trim()).toList();
+              } else if (answersData is List) {
+                answers = List<String>.from(answersData);
+              }
+              if (answers.isNotEmpty) {
+                final quickReplies = answers.map((item) => QuickReply(text: item, value: item)).toList();
+                final quickReplyMessage = ChatMessage(
+                  id: '${message.id}_replies',
+                  content: '',
+                  timestamp: DateTime.now().add(const Duration(milliseconds: 100)),
+                  isMe: false,
+                  type: MessageType.quickReply,
+                  suggestedReplies: quickReplies,
+                );
+                _messageStreamController.add(quickReplyMessage);
+              }
+            } catch (e) {
+              print('Error processing quick replies: $e');
+            }
+          }
+        }
+      }
     });
-    
-    print('Started message polling for user: $_userId');
   }
-  
-  // Stop message polling
-  void stopMessagePolling() {
-    _messagePollingTimer?.cancel();
-    _messagePollingTimer = null;
-    print('Stopped message polling');
+
+  // Stop real-time listener
+  void stopRealtimeMessageListener() {
+    _firestoreSubscription?.cancel();
+    _firestoreSubscription = null;
+    print('Stopped real-time Firestore listener');
   }
-  
-  // Check for new messages in Firestore
-  Future<void> _checkForNewMessages() async {
-    if (_userId == null) {
-      print('Cannot check for messages, user ID is null');
-      return;
-    }
-    
-    try {
-      // Get the timestamp of the last message we processed
-      final lastMessageTime = _lastFirestoreMessageTime ?? 0;
-      
-      print('Checking for new messages since: $lastMessageTime');
-      
-      // Query Firestore for new messages
-      final chatRef = FirebaseFirestore.instance
-          .collection('messages')
-          .doc(_userId)
-          .collection('chat')
-          .where('createdAt', isGreaterThan: lastMessageTime.toString())
-          .orderBy('createdAt')
-          .limit(20);
-      
-      final snapshot = await chatRef.get();
-      
-      if (snapshot.docs.isEmpty) {
-        print('No new messages found');
-        return;
-      }
-      
-      print('Found ${snapshot.docs.length} new messages');
-      
-      // Process the new messages
-      for (var doc in snapshot.docs) {
-        final data = doc.data();
-        
-        // Skip messages from the client (user) as we already have those
-        if (data['source'] == 'client') {
-          continue;
-        }
-        
-        // Create ChatMessage from Firestore data
-        String content = data['messageBody'] ?? '';
-        String messageId = data['serverMessageId'] ?? doc.id;
-        
-        // Parse timestamp
-        DateTime timestamp;
-        try {
-          String createdAt = data['createdAt'] ?? '';
-          if (createdAt.isNotEmpty) {
-            // Convert string timestamp to int if needed
-            int timeValue = int.tryParse(createdAt) ?? 0;
-            
-            // Update the last message time
-            if (timeValue > _lastFirestoreMessageTime!) {
-              _lastFirestoreMessageTime = timeValue;
-            }
-            
-            // Convert milliseconds to DateTime
-            timestamp = DateTime.fromMillisecondsSinceEpoch(timeValue);
-          } else {
-            timestamp = DateTime.now();
-          }
-        } catch (e) {
-          print('Error parsing timestamp: $e');
-          timestamp = DateTime.now();
-        }
-        
-        // Create message object
-        final message = ChatMessage(
-          id: messageId,
-          content: content,
-          timestamp: timestamp,
-          isMe: false,
-          type: MessageType.text,
-        );
-        
-        // Add to the stream
-        _messageStreamController.add(message);
-        
-        // Check for quick replies
-        if (data['isPoll'] == 'y' && data['answers'] != null) {
-          try {
-            List<String> answers = [];
-            if (data['answers'] is String && data['answers'] != 'None') {
-              // Parse comma-separated answers string
-              answers = data['answers'].split(',').map((e) => e.trim()).toList();
-            } else if (data['answers'] is List) {
-              answers = List<String>.from(data['answers']);
-            }
-            
-            if (answers.isNotEmpty) {
-              final quickReplies = answers.map((item) => 
-                QuickReply(text: item, value: item)
-              ).toList();
-              
-              final quickReplyMessage = ChatMessage(
-                id: '${message.id}_replies',
-                content: '',
-                timestamp: timestamp.add(const Duration(milliseconds: 100)),
-                isMe: false,
-                type: MessageType.quickReply,
-                suggestedReplies: quickReplies,
-              );
-              
-              _messageStreamController.add(quickReplyMessage);
-            }
-          } catch (e) {
-            print('Error processing quick replies: $e');
-          }
-        }
-      }
-      
-      print('Processed ${snapshot.docs.length} new messages');
-    } catch (e) {
-      print('Error checking for new messages: $e');
-    }
-  }
-  
-  // Variable to track the last Firestore message timestamp
-  int? _lastFirestoreMessageTime = 0;
-  
-  // Timer for polling messages
-  Timer? _messagePollingTimer;
 
   // Load FCM token from Firebase Messaging
   Future<String?> _loadFcmToken() async {
@@ -839,12 +833,7 @@ class DashMessagingService {
     _messageStreamController.add(anotherGifMessage);
   }
   
-  // Send a quick reply to the server
-  Future<bool> sendQuickReply(String value, String text) async {
-    return sendMessage(text, eventTypeCode: 2);
-  }
-  
-  // Process sample test data in the format provided
+  // Process sample test data
   Future<void> processSampleTestData() async {
     print("Processing sample test data...");
     
@@ -864,346 +853,7 @@ class DashMessagingService {
     }
   }
   
-  // Process predefined server responses from JSON input
-  Future<void> processPredefinedResponses(Map<String, dynamic> jsonInput) async {
-    try {
-      final List<dynamic> serverResponses = jsonInput['serverResponses'];
-      if (serverResponses.isEmpty) {
-        print('No server responses found in the input JSON');
-        return;
-      }
-
-      // Add a small delay between messages for natural flow
-      for (var i = 0; i < serverResponses.length; i++) {
-        final response = serverResponses[i];
-        await Future.delayed(Duration(milliseconds: 800));
-        
-        final messageId = response['serverMessageId'] ?? _uuid.v4();
-        final messageBody = response['messageBody'] ?? '';
-        final isPoll = response['isPoll'] ?? false;
-        Map<String, dynamic>? questionsAnswers = response['questionsAnswers'];
-        
-        if (isPoll && questionsAnswers != null) {
-          // Create quick replies for poll questions
-          final List<QuickReply> quickReplies = [];
-          questionsAnswers.forEach((text, value) {
-            quickReplies.add(QuickReply(text: text, value: value));
-          });
-          
-          // Add poll message with quick replies
-          final message = ChatMessage(
-            id: messageId,
-            content: messageBody,
-            timestamp: DateTime.now(),
-            isMe: false,
-            type: MessageType.quickReply,
-            suggestedReplies: quickReplies,
-          );
-          
-          _messageStreamController.add(message);
-        } else {
-          // Add regular text message
-          final message = ChatMessage(
-            id: messageId,
-            content: messageBody,
-            timestamp: DateTime.now(),
-            isMe: false,
-            type: MessageType.text,
-          );
-          
-          _messageStreamController.add(message);
-        }
-      }
-    } catch (e) {
-      print('Error processing predefined responses: $e');
-    }
-  }
-  
-  // Process responses from custom JSON input
-  Future<bool> processCustomJsonInput(String jsonInput) async {
-    try {
-      print('Processing custom JSON input');
-      final Map<String, dynamic> data = jsonDecode(jsonInput);
-      await processPredefinedResponses(data);
-      return true;
-    } catch (e) {
-      print('Error processing custom JSON input: $e');
-      return false;
-    }
-  }
-  
-  // Process interactive responses for specific user inputs
-  Future<bool> processInteractiveResponses(String userInput) async {
-    // Return false to bypass all prebuilt responses and always use the server
-    print('Bypassing prebuilt responses for: $userInput');
-    return false;
-    
-    // The code below is kept but not executed due to the early return above
-    /*
-    // Normalize user input by converting to lowercase and trimming
-    final normalizedInput = userInput.toLowerCase().trim();
-    
-    try {
-      // Basic greeting responses in English
-      if (normalizedInput == "hello" || normalizedInput == "hi") {
-        // Remove the first response and only send the YouTube link response
-        final youtubeResponse = {
-          "recipientId": "pUuutN05eoVeWhsKyXBiwRoFW9u1",
-          "serverMessageId": "8f0e1d2c-3b4a-5d6e-7f8g-9h0i1j2k3l4m",
-          "messageBody": "Welcome to Quitxt from the UT Health Science Center! Congrats on your decision to quit smoking! See why we think you're awesome, Tap pic below https://youtu.be/ZWsR3G0mdJo",
-          "timestamp": DateTime.now().millisecondsSinceEpoch ~/ 1000,
-          "isPoll": false,
-          "pollId": null,
-          "fcmToken": "e-D8y5f8RoOcRgQl4AV18K:APA91bEdH6CwssC17yIKENOuLiW5eOxnE5CaOxqiOkKXdL4ZgnbOAk9s1_EX0w0E4G0c_zn5QD8X7W0-BHGooS2RyBcfHFYl8hfNEwYVcNIEConIJTyeJnhAnxlhD3OwayB6S_yeZXST",
-          "questionsAnswers": null
-        };
-        
-        await _sendServerResponse(youtubeResponse);
-        return true;
-      }
-      
-      // Rest of the method...
-    } catch (e) {
-      print('Error processing interactive response: $e');
-    }
-    
-    // If we reach here, no interactive response matched
-    return false;
-    */
-  }
-  
-  // Helper to send a server response based on a response object
-  Future<void> _sendServerResponse(Map<String, dynamic> response) async {
-    try {
-      final messageBody = response['messageBody'] as String;
-      final isPoll = response['isPoll'] as bool? ?? false;
-      final serverMessageId = response['serverMessageId'] as String;
-      Map<String, dynamic>? questionsAnswers = response['questionsAnswers'];
-      
-      if (isPoll && questionsAnswers != null) {
-        // Create quick replies for poll questions
-        final List<QuickReply> quickReplies = [];
-        questionsAnswers.forEach((text, value) {
-          quickReplies.add(QuickReply(text: text, value: value));
-        });
-        
-        // Add message with poll question
-        final message = ChatMessage(
-          id: serverMessageId,
-          content: messageBody,
-          timestamp: DateTime.now(),
-          isMe: false,
-          type: MessageType.text,
-        );
-        
-        _messageStreamController.add(message);
-        
-        // Add quick reply options after a short delay
-        await Future.delayed(const Duration(milliseconds: 300));
-        final quickReplyMessage = ChatMessage(
-          id: '${serverMessageId}_replies',
-          content: '',
-          timestamp: DateTime.now(),
-          isMe: false,
-          type: MessageType.quickReply,
-          suggestedReplies: quickReplies,
-        );
-        
-        _messageStreamController.add(quickReplyMessage);
-      } else {
-        // Add regular text message
-        final message = ChatMessage(
-          id: serverMessageId,
-          content: messageBody,
-          timestamp: DateTime.now(),
-          isMe: false,
-          type: MessageType.text,
-        );
-        
-        _messageStreamController.add(message);
-      }
-    } catch (e) {
-      print('Error sending server response: $e');
-    }
-  }
-  
-  // Dispose resources
-  void dispose() {
-    _messageStreamController.close();
-    _isInitialized = false;
-  }
-
-  // Process a complete demo conversation with predefined user messages and server responses
-  Future<void> processDemoConversation() async {
-    try {
-      print('Starting demo conversation sequence...');
-      
-      final interactionPairs = [
-        {"userMessage": "Hello", "serverResponse": "Welcome to Quitxt from the UT Health Science Center! Congrats on your decision to quit smoking!"},
-        {"userMessage": "Hi", "serverResponse": "Welcome to Quitxt from the UT Health Science Center! Congrats on your decision to quit smoking! See why we think you're awesome, Tap pic below https://youtu.be/ZWsR3G0mdJo"},
-        {"userMessage": "Hola", "serverResponse": "¡Bienvenido a Quitxt del UT Health Science Center! ¡Felicitaciones por su decisión de dejar de fumar!"},
-        {"userMessage": "I want to quit smoking", "serverResponse": "How many cigarettes do you smoke per day?", "isPoll": true, "options": {
-          "Less than 5": "Less than 5",
-          "5-10": "5-10",
-          "11-20": "11-20",
-          "More than 20": "More than 20"
-        }},
-        {"userMessage": "5-10", "serverResponse": "Reason #1 to quit smoking while you're young: You'll have more time to enjoy hoverboards and flying cars. https://quitxt.org/sites/quitxt/files/gifs/PreQ6_Hoverboard.gif"},
-        {"userMessage": "That's cool!", "serverResponse": "Drinking alcohol can trigger cravings for a cigarette and makes it harder for you to quit smoking. Tap pic below https://quitxt.org/binge-drinking"},
-        {"userMessage": "Thanks for the info", "serverResponse": "Like the Avengers protect the earth, you are protecting your lungs from respiratory diseases and cancer! Stay SUPER and quit smoking! https://quitxt.org/sites/quitxt/files/gifs/App1_Cue1_Avengers.gif"},
-        {"userMessage": "That's motivation!", "serverResponse": "Reason #2 to quit smoking while you're young: Add a decade to your life and see the rise of fully automated smart homes; who needs to do chores when robots become a common commodity! https://quitxt.org/sites/quitxt/files/gifs/App1-Motiv2_automated_home.gif"},
-        {"userMessage": "Me gustaría recibir mensajes en español", "serverResponse": "Beber alcohol puede provocar los deseos de fumar y te hace más difícil dejar el cigarrillo. Clic el pic abajo https://quitxt.org/spanish/consumo-intensivo-de-alcohol"},
-        {"userMessage": "Gracias", "serverResponse": "Como los Avengers protegen el planeta, ¡tú estás protegiendo tus pulmones de enfermedades respiratorias y de cáncer! ¡Sigue SUPER y deja de fumar!"},
-        {"userMessage": "Muy inspirador", "serverResponse": "Razón #2 para dejar de fumar siendo joven: ¡ganarás 10 años de vida y verás el aumento de las casas inteligentes; ¡quién necesita limpiar la casa cuando los robots lo harán por ti! https://quitxt.org/sites/quitxt/files/gifs/preq5_motiv2_automated_esp.gif"},
-        {"userMessage": "Buena razón", "serverResponse": "¿Cuántos cigarrillos fumas por día?", "isPoll": true, "options": {
-          "Menos de 5": "Menos de 5",
-          "5-10": "5-10",
-          "11-20": "11-20",
-          "Más de 20": "Más de 20"
-        }},
-        {"userMessage": "5-10", "serverResponse": "¡Gracias por la información! Estamos aquí para ayudarte a reducir y eventualmente dejar de fumar por completo."},
-        {"userMessage": "#deactivate", "serverResponse": "Hemos desactivado tu cuenta. Si deseas volver a usar nuestros servicios en el futuro, simplemente envía un mensaje y estaremos aquí para ayudarte."},
-        {"userMessage": "EXIT", "serverResponse": "You have been unsubscribed from the QuiTXT program. If you would like to rejoin in the future, simply text back to this number."},
-        {"userMessage": "SALIR", "serverResponse": "Has sido dado de baja del programa QuiTXT. Si deseas volver a unirte en el futuro, simplemente envía un mensaje a este número."}
-      ];
-      
-      for (final pair in interactionPairs) {
-        // Add user message
-        final userMsg = ChatMessage(
-          id: _uuid.v4(),
-          content: pair["userMessage"] as String,
-          timestamp: DateTime.now(),
-          isMe: true,
-          type: MessageType.text,
-        );
-        _messageStreamController.add(userMsg);
-        
-        // Wait a moment
-        await Future.delayed(const Duration(milliseconds: 800));
-        
-        // Add server response
-        final bool isPoll = pair["isPoll"] as bool? ?? false;
-        if (isPoll) {
-          // Create text message
-          final serverMsg = ChatMessage(
-            id: _uuid.v4(),
-            content: pair["serverResponse"] as String,
-            timestamp: DateTime.now(),
-            isMe: false,
-            type: MessageType.text,
-          );
-          _messageStreamController.add(serverMsg);
-          
-          // Wait a short time
-          await Future.delayed(const Duration(milliseconds: 300));
-          
-          // Create poll options
-          final options = pair["options"] as Map<String, dynamic>;
-          final List<QuickReply> quickReplies = [];
-          options.forEach((text, value) {
-            quickReplies.add(QuickReply(text: text, value: value.toString()));
-          });
-          
-          // Add poll message
-          final pollMsg = ChatMessage(
-            id: "${_uuid.v4()}_poll",
-            content: "",
-            timestamp: DateTime.now(),
-            isMe: false,
-            type: MessageType.quickReply,
-            suggestedReplies: quickReplies,
-          );
-          _messageStreamController.add(pollMsg);
-          
-        } else {
-          // Just add the text message
-          final serverMsg = ChatMessage(
-            id: _uuid.v4(),
-            content: pair["serverResponse"] as String,
-            timestamp: DateTime.now(),
-            isMe: false,
-            type: MessageType.text,
-          );
-          _messageStreamController.add(serverMsg);
-        }
-        
-        // Wait between message pairs
-        await Future.delayed(const Duration(milliseconds: 1000));
-      }
-      
-      print('Demo conversation complete');
-    } catch (e) {
-      print('Error in demo conversation: $e');
-    }
-  }
-
-  /// Takes a raw JSON text message from the server and processes it into a ChatMessage.
-  /// This handles processing of response messages received from the server.
-  /// 
-  /// [serverResponseJson] should be a JSON string containing the server response data.
-  /// 
-  /// Returns a ChatMessage object ready to be added to the chat stream.
-  Future<ChatMessage> processServerResponseJson(String serverResponseJson) async {
-    try {
-      // Parse the JSON string
-      final Map<String, dynamic> responseData = jsonDecode(serverResponseJson);
-      
-      // Extract required fields
-      final String messageId = responseData['serverMessageId'] ?? _uuid.v4();
-      final String messageBody = responseData['messageBody'] ?? '';
-      final bool isPoll = responseData['isPoll'] ?? false;
-      final timestamp = responseData['timestamp'] != null 
-          ? DateTime.fromMillisecondsSinceEpoch((responseData['timestamp'] as int) * 1000)
-          : DateTime.now();
-      
-      // Create the main message
-      ChatMessage message = ChatMessage(
-        id: messageId,
-        content: messageBody,
-        timestamp: timestamp,
-        isMe: false,
-        type: MessageType.text,
-      );
-      
-      // If it's a poll message, add quick replies
-      if (isPoll && responseData.containsKey('questionsAnswers')) {
-        final questionsAnswers = responseData['questionsAnswers'] as Map<String, dynamic>?;
-        if (questionsAnswers != null && questionsAnswers.isNotEmpty) {
-          final List<QuickReply> quickReplies = [];
-          questionsAnswers.forEach((key, value) {
-            quickReplies.add(QuickReply(text: key, value: value.toString()));
-          });
-          
-          // Create a new message with quick replies using copyWith
-          message = message.copyWith(
-            suggestedReplies: quickReplies
-          );
-        }
-      }
-      
-      return message;
-    } catch (e) {
-      print('Error processing server response JSON: $e');
-      // In case of error, return a fallback message
-      return ChatMessage(
-        id: _uuid.v4(),
-        content: 'Error processing server response: $e',
-        timestamp: DateTime.now(),
-        isMe: false,
-        type: MessageType.text,
-      );
-    }
-  }
-
-  /// Processes predefined server responses to demonstrate various message formats.
-  /// 
-  /// This method sends a series of example server messages to show different types
-  /// of content that can be received from the server, including:
-  ///
-  /// - Plain text messages
-  /// - Messages with URLs
-  /// - Poll messages with multiple choice options
-  /// - Responses in both English and Spanish
+  // Process server responses
   Future<void> processServerResponses() async {
     try {
       print("Processing predefined server responses...");
@@ -1295,6 +945,156 @@ class DashMessagingService {
       print("Error in processServerResponses: $e");
     }
   }
+  
+  // Send a quick reply to the server
+  Future<bool> sendQuickReply(String value, String text) async {
+    return sendMessage(text);
+  }
+  
+  // Process predefined server responses from JSON input
+  Future<void> processPredefinedResponses(Map<String, dynamic> jsonInput) async {
+    try {
+      final List<dynamic> serverResponses = jsonInput['serverResponses'];
+      if (serverResponses.isEmpty) {
+        print('No server responses found in the input JSON');
+        return;
+      }
+
+      // Add a small delay between messages for natural flow
+      for (var i = 0; i < serverResponses.length; i++) {
+        final response = serverResponses[i];
+        await Future.delayed(Duration(milliseconds: 800));
+        
+        final messageId = response['serverMessageId'] ?? _uuid.v4();
+        final messageBody = response['messageBody'] ?? '';
+        final isPoll = response['isPoll'] ?? false;
+        Map<String, dynamic>? questionsAnswers = response['questionsAnswers'];
+        
+        if (isPoll && questionsAnswers != null) {
+          // Create quick replies for poll questions
+          final List<QuickReply> quickReplies = [];
+          questionsAnswers.forEach((text, value) {
+            quickReplies.add(QuickReply(text: text, value: value));
+          });
+          
+          // Add poll message with quick replies
+          final message = ChatMessage(
+            id: messageId,
+            content: messageBody,
+            timestamp: DateTime.now(),
+            isMe: false,
+            type: MessageType.quickReply,
+            suggestedReplies: quickReplies,
+          );
+          
+          _messageStreamController.add(message);
+        } else {
+          // Add regular text message
+          final message = ChatMessage(
+            id: messageId,
+            content: messageBody,
+            timestamp: DateTime.now(),
+            isMe: false,
+            type: MessageType.text,
+          );
+          
+          _messageStreamController.add(message);
+        }
+      }
+    } catch (e) {
+      print('Error processing predefined responses: $e');
+    }
+  }
+  
+  // Process responses from custom JSON input
+  Future<bool> processCustomJsonInput(String jsonInput) async {
+    try {
+      print('Processing custom JSON input');
+      final Map<String, dynamic> data = jsonDecode(jsonInput);
+      await processPredefinedResponses(data);
+      return true;
+    } catch (e) {
+      print('Error processing custom JSON input: $e');
+      return false;
+    }
+  }
+  
+  // Process interactive responses for specific user inputs
+  Future<bool> processInteractiveResponses(String userInput) async {
+    // Return false to bypass all prebuilt responses and always use the server
+    print('Bypassing prebuilt responses for: $userInput');
+    return false;
+  }
+  
+  // Dispose resources
+  void dispose() {
+    _messageStreamController.close();
+    _isInitialized = false;
+  }
+
+  // Reset the last message time to force a full refresh
+  void resetLastMessageTime() {
+    _lastFirestoreMessageTime = 0;
+    print('Reset _lastFirestoreMessageTime to 0');
+  }
+
+  /// Takes a raw JSON text message from the server and processes it into a ChatMessage.
+  /// This handles processing of response messages received from the server.
+  /// 
+  /// [serverResponseJson] should be a JSON string containing the server response data.
+  /// 
+  /// Returns a ChatMessage object ready to be added to the chat stream.
+  Future<ChatMessage> processServerResponseJson(String serverResponseJson) async {
+    try {
+      // Parse the JSON string
+      final Map<String, dynamic> responseData = jsonDecode(serverResponseJson);
+      
+      // Extract required fields
+      final String messageId = responseData['serverMessageId'] ?? _uuid.v4();
+      final String messageBody = responseData['messageBody'] ?? '';
+      final bool isPoll = responseData['isPoll'] ?? false;
+      final timestamp = responseData['timestamp'] != null 
+          ? DateTime.fromMillisecondsSinceEpoch((responseData['timestamp'] as int) * 1000)
+          : DateTime.now();
+      
+      // Create the main message
+      ChatMessage message = ChatMessage(
+        id: messageId,
+        content: messageBody,
+        timestamp: timestamp,
+        isMe: false,
+        type: MessageType.text,
+      );
+      
+      // If it's a poll message, add quick replies
+      if (isPoll && responseData.containsKey('questionsAnswers')) {
+        final questionsAnswers = responseData['questionsAnswers'] as Map<String, dynamic>?;
+        if (questionsAnswers != null && questionsAnswers.isNotEmpty) {
+          final List<QuickReply> quickReplies = [];
+          questionsAnswers.forEach((key, value) {
+            quickReplies.add(QuickReply(text: key, value: value.toString()));
+          });
+          
+          // Create a new message with quick replies using copyWith
+          message = message.copyWith(
+            suggestedReplies: quickReplies
+          );
+        }
+      }
+      
+      return message;
+    } catch (e) {
+      print('Error processing server response JSON: $e');
+      // In case of error, return a fallback message
+      return ChatMessage(
+        id: _uuid.v4(),
+        content: 'Error processing server response: $e',
+        timestamp: DateTime.now(),
+        isMe: false,
+        type: MessageType.text,
+      );
+    }
+  }
 
   // Test connection to the server using the exact URL
   Future<bool> testConnection() async {
@@ -1326,5 +1126,23 @@ class DashMessagingService {
       print('Error testing connection to server: $e');
       return false;
     }
+  }
+  
+  // Helper method to determine if a message is a poll/has quick replies
+  bool isMessagePoll(dynamic isPollValue) {
+    if (isPollValue == null) return false;
+    
+    // Convert various formats to a boolean
+    if (isPollValue is bool) {
+      return isPollValue;
+    } else if (isPollValue is String) {
+      return isPollValue.toLowerCase() == 'y' || 
+             isPollValue.toLowerCase() == 'yes' || 
+             isPollValue.toLowerCase() == 'true';
+    } else if (isPollValue is int) {
+      return isPollValue > 0;
+    }
+    
+    return false;
   }
 }

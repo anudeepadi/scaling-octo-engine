@@ -65,29 +65,41 @@ void main() async {
     developer.log('Transformed server URL: $transformedUrl', name: 'App');
     
     // Initialize Firebase
-    await Firebase.initializeApp();
-    developer.log('Firebase initialized successfully', name: 'App');
-    
-    // Initialize Firebase Messaging Service
-    final firebaseMessagingService = FirebaseMessagingService();
-    await firebaseMessagingService.setupMessaging();
-    
-    // Request and log FCM token
-    final fcmToken = await firebaseMessagingService.getFcmToken();
-    developer.log('FCM Token: $fcmToken', name: 'FCM');
-    
-    // Test Firebase connection - but don't block app startup if it fails
     try {
-      final firebaseConnectionService = FirebaseConnectionService();
-      await firebaseConnectionService.testConnection();
-    } catch (connectionError) {
-      developer.log('Firebase connection test failed: $connectionError', name: 'App');
-      developer.log('Continuing in demo mode', name: 'App');
+      await Firebase.initializeApp();
+      developer.log('Firebase initialized successfully', name: 'App');
+      
+      // Log Firebase initialization details for debugging
+      if (Firebase.apps.isNotEmpty) {
+        developer.log('Firebase app name: ${Firebase.app().name}', name: 'App');
+        developer.log('Firebase options: ${Firebase.app().options.projectId}', name: 'App');
+      } else {
+        developer.log('WARNING: Firebase.apps is empty after initialization!', name: 'App');
+      }
+      
+      // Initialize Firebase Messaging Service
+      final firebaseMessagingService = FirebaseMessagingService();
+      await firebaseMessagingService.setupMessaging();
+      
+      // Request and log FCM token
+      final fcmToken = await firebaseMessagingService.getFcmToken();
+      developer.log('FCM Token: $fcmToken', name: 'FCM');
+      
+      // Test Firebase connection - but don't block app startup if it fails
+      try {
+        final firebaseConnectionService = FirebaseConnectionService();
+        await firebaseConnectionService.testConnection();
+      } catch (connectionError) {
+        developer.log('Firebase connection test failed: $connectionError', name: 'App');
+        developer.log('Continuing in demo mode', name: 'App');
+      }
+    } catch (e) {
+      // If Firebase initialization fails, log it but don't crash
+      developer.log('Failed to initialize Firebase or load env: $e', name: 'App');
+      developer.log('Running in demo mode without Firebase', name: 'App');
     }
   } catch (e) {
-    // If Firebase initialization fails, log it but don't crash
-    developer.log('Failed to initialize Firebase or load env: $e', name: 'App');
-    developer.log('Running in demo mode without Firebase', name: 'App');
+    developer.log('Error during app initialization: $e', name: 'App');
   }
 
   runApp(const MyApp());

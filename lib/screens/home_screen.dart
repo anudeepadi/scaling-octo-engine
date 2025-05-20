@@ -358,6 +358,21 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  void _forceSyncMessages() {
+    final dashChatProvider = context.read<DashChatProvider>();
+    
+    // Show loading indicator
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Syncing messages...'),
+        duration: Duration(seconds: 1),
+      ),
+    );
+    
+    // Trigger manual refresh of messages
+    dashChatProvider.forceMessageSync();
+  }
+
   @override
   Widget build(BuildContext context) {
     final localizations = AppLocalizations.of(context);
@@ -366,6 +381,14 @@ class _HomeScreenState extends State<HomeScreen> {
       appBar: AppBar(
         title: Text(localizations.translate('app_title')),
         backgroundColor: AppTheme.quitxtPurple,
+        actions: [
+          // Debug button to force sync messages
+          IconButton(
+            icon: const Icon(Icons.sync),
+            tooltip: 'Force sync messages',
+            onPressed: _forceSyncMessages,
+          ),
+        ],
       ),
       drawer: _buildDrawer(),
       body: Column(

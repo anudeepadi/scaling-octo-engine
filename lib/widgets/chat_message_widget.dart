@@ -270,41 +270,35 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
 
   @override
   Widget build(BuildContext context) {
-    // Skip rendering if it's a quick reply message
-    if (widget.message.type == MessageType.quickReply) {
-      return const SizedBox.shrink();
-    }
-
-    // Build suggested quick replies
-    Widget? quickRepliesWidget;
-    if (widget.message.suggestedReplies != null &&
-        widget.message.suggestedReplies!.isNotEmpty) {
-      quickRepliesWidget = Padding(
-        padding: const EdgeInsets.only(top: 8.0, left: 8.0, right: 8.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
-          children: widget.message.suggestedReplies!
-              .map((reply) => Padding(
-                    padding: const EdgeInsets.only(top: 6.0),
-                    child: ElevatedButton(
-                        onPressed: () {
-                          final dashChatProvider = Provider.of<DashChatProvider>(context, listen: false);
-                          dashChatProvider.handleQuickReply(reply);
-                        },
-                        style: ElevatedButton.styleFrom(
-                          foregroundColor: Colors.white,
-                          backgroundColor: AppTheme.quitxtTeal,
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(16),
-                          ),
-                          elevation: 1,
-                        ),
-                        child: Text(reply.text),
-                    ),
-                  ))
-              .toList(),
+    // Render quick reply buttons if this is a quick reply message
+    final replies = (widget.message.suggestedReplies != null && widget.message.suggestedReplies!.isNotEmpty)
+        ? widget.message.suggestedReplies
+        : (widget.message.quickReplies != null && widget.message.quickReplies!.isNotEmpty)
+            ? widget.message.quickReplies
+            : null;
+    if (widget.message.type == MessageType.quickReply && replies != null && replies.isNotEmpty) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 16.0),
+        child: Wrap(
+          spacing: 8,
+          children: replies.map((reply) {
+            return ElevatedButton(
+              onPressed: () {
+                final dashChatProvider = Provider.of<DashChatProvider>(context, listen: false);
+                dashChatProvider.handleQuickReply(reply);
+              },
+              style: ElevatedButton.styleFrom(
+                foregroundColor: Colors.white,
+                backgroundColor: AppTheme.quitxtTeal,
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                elevation: 1,
+              ),
+              child: Text(reply.text),
+            );
+          }).toList(),
         ),
       );
     }
@@ -332,7 +326,6 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
          crossAxisAlignment: widget.message.isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
          children: [
             contentBubble,
-            if (quickRepliesWidget != null) quickRepliesWidget,
          ],
       ),
     );

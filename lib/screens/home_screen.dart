@@ -235,78 +235,189 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget _buildDrawer() {
     final authProvider = context.read<AuthProvider>();
     return Drawer(
-      child: ListView(
-        padding: EdgeInsets.zero,
-        children: [
-          UserAccountsDrawerHeader(
-            accountName: Text(authProvider.currentUser?.displayName ?? 'User'),
-            accountEmail: Text(authProvider.currentUser?.email ?? 'No email'),
-            currentAccountPicture: CircleAvatar(
-              backgroundColor: Colors.white,
-              child: Text(
-                (authProvider.currentUser?.displayName?.isNotEmpty == true
-                    ? authProvider.currentUser!.displayName![0]
-                    : 'U'),
-                style: const TextStyle(fontSize: 24.0),
+      child: Container(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [
+              Color(0xFF00B7A3), // Lighter teal
+              Color(0xFF009688), // AppTheme.quitxtTeal
+              Color(0xFF00796B), // Darker teal
+            ],
+          ),
+        ),
+        child: Column(
+          children: [
+            // Header section with logo and user info
+            Container(
+              padding: const EdgeInsets.only(top: 60, bottom: 20, left: 20, right: 20),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // QuiTXT logo and app name
+                  Row(
+                    children: [
+                      Container(
+                        width: 40,
+                        height: 40,
+                        decoration: BoxDecoration(
+                          color: Colors.black,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: const Center(
+                          child: Text(
+                            'Q',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 24,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      const Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'QuiTXT mobile app',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  // User info
+                  Text(
+                    'User: ${authProvider.currentUser?.displayName ?? 'Sahak Kaghyan'}',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w400,
+                    ),
+                  ),
+                ],
               ),
             ),
-            decoration: BoxDecoration(
-              color: AppTheme.quitxtTeal,
-            ),
-          ),
-          ListTile(
-            leading: const Icon(Icons.person),
-            title: const Text('Profile'),
-            onTap: () {
-              // Update state and close drawer before navigating
-              setState(() {
-                _isDrawerOpen = false;
-              });
-              Navigator.pop(context);
-              
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) => const ProfileScreen()),
-              );
-            },
-          ),
-          const Divider(),
-          ListTile(
-            leading: const Icon(Icons.logout),
-            title: const Text('Logout'),
-            onTap: () async {
-              // Close the drawer
-              setState(() {
-                _isDrawerOpen = false;
-              });
-              Navigator.pop(context);
-              
-              // Show confirmation dialog
-              bool confirmLogout = await showDialog(
-                context: context,
-                builder: (context) => AlertDialog(
-                  title: const Text('Confirm Logout'),
-                  content: const Text('Are you sure you want to logout?'),
-                  actions: [
-                    TextButton(
-                      onPressed: () => Navigator.pop(context, false),
-                      child: const Text('CANCEL'),
+            
+            // Menu items
+            Expanded(
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: Column(
+                  children: [
+                    const SizedBox(height: 20),
+                    
+                    // Profile item
+                    ListTile(
+                      leading: const Icon(
+                        Icons.person_outline,
+                        color: Colors.white,
+                        size: 24,
+                      ),
+                      title: const Text(
+                        'Profile',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 16,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                      onTap: () {
+                        setState(() {
+                          _isDrawerOpen = false;
+                        });
+                        Navigator.pop(context);
+                        
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (context) => const ProfileScreen()),
+                        );
+                      },
                     ),
-                    TextButton(
-                      onPressed: () => Navigator.pop(context, true),
-                      child: const Text('LOGOUT'),
+                    
+                    // Chat item
+                    ListTile(
+                      leading: const Icon(
+                        Icons.chat_bubble_outline,
+                        color: Colors.white,
+                        size: 24,
+                      ),
+                      title: const Text(
+                        'Chat',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 16,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                      onTap: () {
+                        setState(() {
+                          _isDrawerOpen = false;
+                        });
+                        Navigator.pop(context);
+                        // Already on chat screen, so just close drawer
+                      },
+                    ),
+                    
+                    // Exit item
+                    ListTile(
+                      leading: const Icon(
+                        Icons.exit_to_app,
+                        color: Colors.white,
+                        size: 24,
+                      ),
+                      title: const Text(
+                        'Exit',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 16,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                      onTap: () async {
+                        setState(() {
+                          _isDrawerOpen = false;
+                        });
+                        Navigator.pop(context);
+                        
+                        // Show confirmation dialog
+                        bool confirmLogout = await showDialog(
+                          context: context,
+                          builder: (context) => AlertDialog(
+                            title: const Text('Confirm Exit'),
+                            content: const Text('Are you sure you want to exit?'),
+                            actions: [
+                              TextButton(
+                                onPressed: () => Navigator.pop(context, false),
+                                child: const Text('CANCEL'),
+                              ),
+                              TextButton(
+                                onPressed: () => Navigator.pop(context, true),
+                                child: const Text('EXIT'),
+                              ),
+                            ],
+                          ),
+                        ) ?? false;
+                        
+                        // If confirmed, proceed with logout
+                        if (confirmLogout && mounted) {
+                          await context.read<AuthProvider>().signOut();
+                        }
+                      },
                     ),
                   ],
                 ),
-              ) ?? false;
-              
-              // If confirmed, proceed with logout
-              if (confirmLogout && mounted) {
-                await context.read<AuthProvider>().signOut();
-              }
-            },
-          ),
-        ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -358,21 +469,6 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  void _forceSyncMessages() {
-    final dashChatProvider = context.read<DashChatProvider>();
-    
-    // Show loading indicator
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Syncing messages...'),
-        duration: Duration(seconds: 1),
-      ),
-    );
-    
-    // Trigger manual refresh of messages
-    dashChatProvider.forceMessageSync();
-  }
-
   @override
   Widget build(BuildContext context) {
     final localizations = AppLocalizations.of(context);
@@ -381,14 +477,6 @@ class _HomeScreenState extends State<HomeScreen> {
       appBar: AppBar(
         title: Text(localizations.translate('app_title')),
         backgroundColor: AppTheme.quitxtPurple,
-        actions: [
-          // Debug button to force sync messages
-          IconButton(
-            icon: const Icon(Icons.sync),
-            tooltip: 'Force sync messages',
-            onPressed: _forceSyncMessages,
-          ),
-        ],
       ),
       drawer: _buildDrawer(),
       body: Column(

@@ -26,86 +26,98 @@ class ProfileScreen extends StatelessWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(localizations.translate('app_title')),
-        backgroundColor: AppTheme.quitxtPurple,
+        title: const Text(
+          'QuiTXT Mobile',
+          style: TextStyle(
+            color: Colors.white,
+            fontSize: 18,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+        backgroundColor: AppTheme.quitxtTeal,
+        foregroundColor: Colors.white,
+        elevation: 0,
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // User information displayed as plain text
-            _buildInfoText(localizations.translate('user'), username),
-            _buildInfoText(localizations.translate('last_access_time'), lastAccessString),
-            _buildInfoText(localizations.translate('sign_in_method'), signInMethod),
-            _buildInfoText(localizations.translate('user_id'), userId),
-            
-            const SizedBox(height: 32),
-            
-            // Language selector
-            Card(
-              elevation: 2,
-              child: Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      localizations.translate('language'),
-                      style: const TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
+      body: Container(
+        color: Colors.white,
+        child: Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // User information displayed as plain text
+              _buildInfoText(localizations.translate('user'), username),
+              _buildInfoText(localizations.translate('last_access_time'), lastAccessString),
+              _buildInfoText(localizations.translate('sign_in_method'), signInMethod),
+              _buildInfoText(localizations.translate('user_id'), userId),
+              
+              const SizedBox(height: 32),
+              
+              // Language selector
+              Card(
+                elevation: 2,
+                child: Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        localizations.translate('language'),
+                        style: const TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 16),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: _buildLanguageOption(
-                            context, 
-                            'English', 
-                            languageProvider.currentLocale.languageCode == 'en',
-                            () {
-                              languageProvider.setLanguage('en');
-                            },
+                      const SizedBox(height: 16),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: _buildLanguageOption(
+                              context, 
+                              'English', 
+                              languageProvider.currentLocale.languageCode == 'en',
+                              () {
+                                languageProvider.setLanguage('en');
+                              },
+                            ),
                           ),
-                        ),
-                        const SizedBox(width: 16),
-                        Expanded(
-                          child: _buildLanguageOption(
-                            context, 
-                            'Español',
-                            languageProvider.currentLocale.languageCode == 'es',
-                            () {
-                              languageProvider.setLanguage('es');
-                            },
+                          const SizedBox(width: 16),
+                          Expanded(
+                            child: _buildLanguageOption(
+                              context, 
+                              'Español',
+                              languageProvider.currentLocale.languageCode == 'es',
+                              () {
+                                languageProvider.setLanguage('es');
+                              },
+                            ),
                           ),
-                        ),
-                      ],
-                    ),
-                  ],
+                        ],
+                      ),
+                    ],
+                  ),
                 ),
               ),
-            ),
-            
-            const Spacer(),
-            
-            // Sign out button
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                onPressed: () {
-                  authProvider.signOut();
-                },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.red,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(vertical: 12),
+              
+              const Spacer(),
+              
+              // Sign out button
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: () {
+                    authProvider.signOut();
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.red,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                  ),
+                  child: Text(localizations.translate('sign_out')),
                 ),
-                child: Text(localizations.translate('sign_out')),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );

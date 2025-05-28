@@ -387,6 +387,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         });
                         Navigator.pop(context);
                         
+                        
                         // Show confirmation dialog
                         bool confirmLogout = await showDialog(
                           context: context,
@@ -426,42 +427,54 @@ class _HomeScreenState extends State<HomeScreen> {
     final localizations = AppLocalizations.of(context);
     
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
+      padding: const EdgeInsets.all(16.0),
       color: Colors.white,
       child: Row(
         children: [
           Expanded(
-            child: TextField(
-              controller: _messageController,
-              decoration: InputDecoration(
-                hintText: localizations.translate('type_message'),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(24),
-                  borderSide: BorderSide.none,
-                ),
-                filled: true,
-                fillColor: Colors.grey[200],
-                contentPadding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 8,
-                ),
+            child: Container(
+              decoration: BoxDecoration(
+                color: Colors.grey[100],
+                borderRadius: BorderRadius.circular(25),
+                border: Border.all(color: Colors.grey[300]!),
               ),
-              textCapitalization: TextCapitalization.sentences,
-              keyboardType: TextInputType.multiline,
-              maxLines: null,
-              onSubmitted: _handleSubmitted,
+              child: TextField(
+                controller: _messageController,
+                decoration: const InputDecoration(
+                  hintText: 'Type a message...',
+                  border: InputBorder.none,
+                  contentPadding: EdgeInsets.symmetric(
+                    horizontal: 20,
+                    vertical: 12,
+                  ),
+                ),
+                textCapitalization: TextCapitalization.sentences,
+                keyboardType: TextInputType.multiline,
+                maxLines: null,
+                onSubmitted: _handleSubmitted,
+              ),
             ),
           ),
-          const SizedBox(width: 4),
-          FloatingActionButton(
-            onPressed: _isComposing
-                ? () => _handleSubmitted(_messageController.text)
-                : null,
-            backgroundColor: AppTheme.quitxtPurple,
-            mini: true,
-            child: Text(
-              localizations.translate('send'), 
-              style: const TextStyle(fontSize: 10, color: Colors.white)
+          const SizedBox(width: 12),
+          Container(
+            decoration: BoxDecoration(
+              color: AppTheme.quitxtPurple,
+              borderRadius: BorderRadius.circular(25),
+            ),
+            child: MaterialButton(
+              onPressed: _isComposing
+                  ? () => _handleSubmitted(_messageController.text)
+                  : null,
+              minWidth: 80,
+              height: 45,
+              child: const Text(
+                'SEND',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
             ),
           ),
         ],
@@ -475,43 +488,61 @@ class _HomeScreenState extends State<HomeScreen> {
     
     return Scaffold(
       appBar: AppBar(
-        title: Text(localizations.translate('app_title')),
-        backgroundColor: AppTheme.quitxtPurple,
+        title: const Text(
+          'QuiTXT Mobile',
+          style: TextStyle(
+            color: Colors.white,
+            fontSize: 18,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+        backgroundColor: AppTheme.quitxtTeal,
+        foregroundColor: Colors.white,
+        elevation: 0,
+        leading: Builder(
+          builder: (context) => IconButton(
+            icon: const Icon(Icons.menu, color: Colors.white),
+            onPressed: () => Scaffold.of(context).openDrawer(),
+          ),
+        ),
       ),
       drawer: _buildDrawer(),
       body: Column(
         children: [
           Expanded(
-            child: Consumer<ChatProvider>(
-              builder: (context, chatProvider, child) {
-                WidgetsBinding.instance.addPostFrameCallback((_) {
-                  if (chatProvider.messages.isNotEmpty) {
-                    _scrollToBottom();
-                  }
-                });
+            child: Container(
+              color: Colors.grey[100],
+              child: Consumer<ChatProvider>(
+                builder: (context, chatProvider, child) {
+                  WidgetsBinding.instance.addPostFrameCallback((_) {
+                    if (chatProvider.messages.isNotEmpty) {
+                      _scrollToBottom();
+                    }
+                  });
 
-                return ListView.builder(
-                  controller: _scrollController,
-                  padding: const EdgeInsets.all(8),
-                  itemCount: chatProvider.messages.length,
-                  itemBuilder: (context, index) {
-                    return ChatMessageWidget(
-                      message: chatProvider.messages[index],
-                      onReplyTap: () => _scrollToBottom(),
-                      onReactionAdd: (value) {
-                        if (value.isNotEmpty) {
-                          // Use the Dash messaging service for quick replies
-                          final dashChatProvider = context.read<DashChatProvider>();
-                          dashChatProvider.handleQuickReply(
-                            QuickReply(text: value, value: value)
-                          );
-                        }
-                        _scrollToBottom();
-                      },
-                    );
-                  },
-                );
-              },
+                  return ListView.builder(
+                    controller: _scrollController,
+                    padding: const EdgeInsets.all(16),
+                    itemCount: chatProvider.messages.length,
+                    itemBuilder: (context, index) {
+                      return ChatMessageWidget(
+                        message: chatProvider.messages[index],
+                        onReplyTap: () => _scrollToBottom(),
+                        onReactionAdd: (value) {
+                          if (value.isNotEmpty) {
+                            // Use the Dash messaging service for quick replies
+                            final dashChatProvider = context.read<DashChatProvider>();
+                            dashChatProvider.handleQuickReply(
+                              QuickReply(text: value, value: value)
+                            );
+                          }
+                          _scrollToBottom();
+                        },
+                      );
+                    },
+                  );
+                },
+              ),
             ),
           ),
           _buildMessageInput(),

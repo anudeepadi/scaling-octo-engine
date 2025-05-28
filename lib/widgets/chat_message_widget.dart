@@ -76,6 +76,88 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
   }
 
   Widget _buildContent() {
+    // Handle video messages first
+    if (widget.message.type == MessageType.video) {
+      return Container(
+        width: 250,
+        height: 150,
+        decoration: BoxDecoration(
+          color: Colors.black,
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Stack(
+          children: [
+            // Video thumbnail background
+            Container(
+              width: double.infinity,
+              height: double.infinity,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(8),
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [
+                    Colors.red.withOpacity(0.7),
+                    Colors.red.withOpacity(0.9),
+                  ],
+                ),
+              ),
+            ),
+            // Doctor's image placeholder
+            Positioned(
+              top: 20,
+              left: 20,
+              right: 20,
+              child: Container(
+                height: 80,
+                decoration: BoxDecoration(
+                  color: Colors.grey[200],
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Center(
+                  child: Icon(
+                    Icons.person,
+                    size: 40,
+                    color: Colors.grey,
+                  ),
+                ),
+              ),
+            ),
+            // Doctor's name and title
+            Positioned(
+              bottom: 10,
+              left: 10,
+              right: 10,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: Colors.black.withOpacity(0.7),
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: Text(
+                  widget.message.content,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+              ),
+            ),
+            // Play button
+            const Center(
+              child: Icon(
+                Icons.play_circle_fill,
+                color: Colors.white,
+                size: 50,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
     // --- Check for Local Asset GIF First --- 
     if (_isLocalAssetGif(widget.message.content)) {
        try {
@@ -126,45 +208,99 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
                 ),
               ),
             ),
+          // Always display the YouTube URL above the thumbnail
+          Padding(
+            padding: const EdgeInsets.only(bottom: 8.0),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
+              decoration: BoxDecoration(
+                color: widget.message.isMe 
+                    ? Colors.white.withOpacity(0.2) 
+                    : Colors.grey.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(6.0),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.play_circle_outline,
+                    size: 16,
+                    color: widget.message.isMe ? Colors.white70 : Colors.grey[600],
+                  ),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      firstUrl,
+                      style: TextStyle(
+                        color: widget.message.isMe ? Colors.white70 : Colors.grey[600],
+                        fontSize: 12,
+                        fontStyle: FontStyle.italic,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
           // Display the tappable thumbnail
           GestureDetector(
             onTap: () => _launchURL(firstUrl),
-            child: Image.network(
-              thumbnailUrl,
-              height: 150,
-              width: double.infinity,
-              fit: BoxFit.cover,
-              loadingBuilder: (context, child, loadingProgress) {
-                if (loadingProgress == null) return child;
-                return Container(
+            child: Stack(
+              children: [
+                Image.network(
+                  thumbnailUrl,
                   height: 150,
                   width: double.infinity,
-                  color: Colors.grey[300],
-                  child: Center(
-                    child: CircularProgressIndicator(
-                      value: loadingProgress.expectedTotalBytes != null
-                          ? loadingProgress.cumulativeBytesLoaded /
-                              loadingProgress.expectedTotalBytes!
-                          : null,
+                  fit: BoxFit.cover,
+                  loadingBuilder: (context, child, loadingProgress) {
+                    if (loadingProgress == null) return child;
+                    return Container(
+                      height: 150,
+                      width: double.infinity,
+                      color: Colors.grey[300],
+                      child: Center(
+                        child: CircularProgressIndicator(
+                          value: loadingProgress.expectedTotalBytes != null
+                              ? loadingProgress.cumulativeBytesLoaded /
+                                  loadingProgress.expectedTotalBytes!
+                              : null,
+                        ),
+                      ),
+                    );
+                  },
+                  errorBuilder: (context, error, stackTrace) {
+                    print("Error loading $thumbnailUrl: $error");
+                    return Container(
+                        height: 150,
+                        width: double.infinity,
+                        color: Colors.grey[300],
+                        child: const Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(Icons.error),
+                            SizedBox(height: 4),
+                            Text('Tap to open link', style: TextStyle(fontSize: 12)),
+                          ],
+                        ));
+                  },
+                ),
+                // YouTube play button overlay
+                Positioned.fill(
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: Colors.black.withOpacity(0.3),
+                    ),
+                    child: const Center(
+                      child: Icon(
+                        Icons.play_circle_filled,
+                        color: Colors.white,
+                        size: 60,
+                      ),
                     ),
                   ),
-                );
-              },
-              errorBuilder: (context, error, stackTrace) {
-                print("Error loading $thumbnailUrl: $error");
-                return Container(
-                    height: 150,
-                    width: double.infinity,
-                    color: Colors.grey[300],
-                    child: const Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(Icons.error),
-                        SizedBox(height: 4),
-                        Text('Tap to open link', style: TextStyle(fontSize: 12)),
-                      ],
-                    ));
-              },
+                ),
+              ],
             ),
           ),
           // Display text after the URL if any
@@ -278,25 +414,34 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
             : null;
     if (widget.message.type == MessageType.quickReply && replies != null && replies.isNotEmpty) {
       return Padding(
-        padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 16.0),
-        child: Wrap(
-          spacing: 8,
+        padding: const EdgeInsets.symmetric(vertical: 2.0, horizontal: 8.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: replies.map((reply) {
-            return ElevatedButton(
-              onPressed: () {
-                final dashChatProvider = Provider.of<DashChatProvider>(context, listen: false);
-                dashChatProvider.handleQuickReply(reply);
-              },
-              style: ElevatedButton.styleFrom(
-                foregroundColor: Colors.white,
-                backgroundColor: AppTheme.quitxtTeal,
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16),
+            return Container(
+              margin: const EdgeInsets.only(bottom: 4),
+              child: ElevatedButton(
+                onPressed: () {
+                  final dashChatProvider = Provider.of<DashChatProvider>(context, listen: false);
+                  dashChatProvider.handleQuickReply(reply);
+                },
+                style: ElevatedButton.styleFrom(
+                  foregroundColor: Colors.white,
+                  backgroundColor: AppTheme.quitxtTeal,
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  elevation: 1,
+                  minimumSize: const Size(0, 24),
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                 ),
-                elevation: 1,
+                child: Text(
+                  reply.text,
+                  style: const TextStyle(fontSize: 10),
+                  textAlign: TextAlign.center,
+                ),
               ),
-              child: Text(reply.text),
             );
           }).toList(),
         ),

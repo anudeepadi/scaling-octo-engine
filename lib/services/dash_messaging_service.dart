@@ -12,6 +12,7 @@ import '../utils/platform_utils.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'dart:developer';
 
 class DashMessagingService {
   static final DashMessagingService _instance = DashMessagingService._internal();
@@ -42,54 +43,124 @@ class DashMessagingService {
 
   // Track last Firestore message time
   int _lastFirestoreMessageTime = 0;
+  int _lowestLoadedTimestamp = 0; // Track lowest timestamp for pagination
 
   // Add this field to manage the Firestore subscription
   StreamSubscription<QuerySnapshot>? _firestoreSubscription;
 
+  // Add cache management
+  final Map<String, ChatMessage> _messageCache = {};
+  
+  // Add performance monitoring
+  final Stopwatch _performanceStopwatch = Stopwatch();
+  
+  void _startPerformanceTimer(String operation) {
+    _performanceStopwatch.reset();
+    _performanceStopwatch.start();
+    print('⏱️ Starting performance timer for: $operation');
+  }
+  
+  void _stopPerformanceTimer(String operation) {
+    _performanceStopwatch.stop();
+    final elapsedMs = _performanceStopwatch.elapsedMilliseconds;
+    print('⏱️ $operation completed in ${elapsedMs}ms');
+  }
+  
+  void _addToCache(ChatMessage message) {
+    _messageCache[message.id] = message;
+  }
+  
+  bool _isMessageCached(String messageId) {
+    return _messageCache.containsKey(messageId);
+  }
+  
+  void clearCache() {
+    _messageCache.clear();
+    print('Message cache cleared');
+  }
+
   // Initialize the service with user info
   Future<void> initialize(String userId) async {
-    if (userId.isEmpty) {
-      print('Cannot initialize DashMessagingService with empty userId');
-      throw Exception('User ID cannot be empty');
-    }
-    
-    if (_isInitialized && userId == _userId) {
+    if (_isInitialized && _userId == userId) {
       print('DashMessagingService already initialized for user: $userId');
       return;
     }
     
     print('Initializing DashMessagingService for user: $userId');
-    
     _userId = userId;
-    _isInitialized = true;
     
-    // Load host URL explicitly first
-    await _loadHostUrl();
+    // Clear cache when switching users
+    if (_messageCache.isNotEmpty) {
+      clearCache();
+    }
     
-    // Load FCM token
-    _fcmToken = await _loadFcmToken();
-    print('FCM Token: $_fcmToken');
+    // Stop any existing listeners
+    stopRealtimeMessageListener();
     
-    // Clear any existing message data
-    _lastFirestoreMessageTime = 0;
+    // Reset timestamp tracking
     print('Reset _lastFirestoreMessageTime to 0 during initialization');
+    _lastFirestoreMessageTime = 0;
     
-    // Load messages from Firestore on initialization
-    await _loadExistingMessages();
-    
-    // Start real-time listening for chat messages
-    startRealtimeMessageListener();
-    
-    print('DashMessagingService initialized for user: $userId');
-    print('Using host URL: $_hostUrl');
-    print('FCM Token: $_fcmToken');
-    
-    // Test connection to the server
-    final isConnected = await testConnection();
-    if (isConnected) {
-      print('Successfully connected to server');
-    } else {
-      print('Could not connect to server, but will still attempt to send messages');
+    try {
+      // Load FCM token quickly in background (non-blocking)
+      _loadFcmTokenInBackground();
+      
+      // Load recent messages immediately (most important for user experience)
+      await loadExistingMessages();
+      
+      // Start real-time listener immediately after messages load
+      startRealtimeMessageListener();
+      
+      // Test server connection in background (non-blocking)
+      _testConnectionInBackground();
+      
+      _isInitialized = true;
+      print('DashMessagingService initialized for user: $userId');
+    } catch (e) {
+      print('Error during DashMessagingService initialization: $e');
+      _isInitialized = false;
+      rethrow;
+    }
+  }
+  
+  // Load FCM token in background without blocking initialization
+  void _loadFcmTokenInBackground() async {
+    try {
+      _fcmToken = await _loadFcmToken().timeout(
+        const Duration(seconds: 2),
+        onTimeout: () {
+          print('FCM token loading timed out, using default');
+          return "eLjQWERyTm2Kltsqxahvw6:APA91bFqgowOQxoeOpZuf9wMsUQczuxBBZZim_yo-r_j9H_SMKqU4HLuioUUgI028IRpUG5SObBY3Fp4HiJIkTNsLkrKPEgWEo2UWVvMa81mPIVdM0WEuV0";
+        },
+      );
+      print('FCM Token: $_fcmToken');
+    } catch (e) {
+      print('Error loading FCM token in background: $e');
+      // Use default token
+      _fcmToken = "eLjQWERyTm2Kltsqxahvw6:APA91bFqgowOQxoeOpZuf9wMsUQczuxBBZZim_yo-r_j9H_SMKqU4HLuioUUgI028IRpUG5SObBY3Fp4HiJIkTNsLkrKPEgWEo2UWVvMa81mPIVdM0WEuV0";
+    }
+  }
+
+  // Background connection test that doesn't block initialization
+  void _testConnectionInBackground() async {
+    try {
+      final hostUrl = _hostUrl;
+      print('Using host URL: $hostUrl');
+      print('FCM Token: $_fcmToken');
+      print('Testing connection to server: $hostUrl');
+      
+      final response = await http.get(
+        Uri.parse(hostUrl),
+        headers: {'Content-Type': 'application/json'},
+      ).timeout(const Duration(seconds: 10));
+      
+      print('Server connection test response: ${response.statusCode}');
+      if (response.statusCode == 200) {
+        print('Successfully connected to server');
+      }
+    } catch (e) {
+      print('Background server connection test failed: $e');
+      // Don't throw - this is just a background test
     }
   }
 
@@ -114,89 +185,110 @@ class DashMessagingService {
     }
   }
   
-  // Load existing messages from Firestore for the current user
-  Future<void> _loadExistingMessages() async {
+  // Load existing messages from Firestore
+  Future<void> loadExistingMessages() async {
+    _startPerformanceTimer('Initial message loading');
+    
     if (_userId == null) {
       print('Cannot load messages, user ID is null');
       return;
     }
     
     try {
-      print('Loading existing messages from Firestore for user: $_userId');
+      print('Loading recent messages from Firestore for user: $_userId');
       print('Collection path: messages/${_userId}/chat');
       
       // Get reference to the user's chat collection in Firestore
+      // Optimize: Load only 5 most recent messages initially for fastest loading
       final chatRef = FirebaseFirestore.instance
           .collection('messages')
           .doc(_userId)
           .collection('chat')
           .orderBy('createdAt', descending: true)
-          .limit(20); // Reduced from 50 to 20 messages initially
+          .limit(5); // Reduced from 10 to 5 for fastest initial load
       
-      print('Executing Firestore query for recent messages');
-      final snapshot = await chatRef.get();
+      print('Executing optimized Firestore query for recent messages');
+      
+      // Add timeout to prevent hanging
+      final snapshot = await chatRef.get().timeout(
+        const Duration(seconds: 2),
+        onTimeout: () {
+          print('Firestore query timeout - returning empty result');
+          throw TimeoutException('Firestore query timeout', const Duration(seconds: 2));
+        },
+      );
       
       if (snapshot.docs.isEmpty) {
         print('No existing messages found for user $_userId');
+        _stopPerformanceTimer('Initial message loading (no messages)');
         return;
       }
       
       print('Found ${snapshot.docs.length} existing messages in Firestore');
-      // Log information about documents
-      for (var i = 0; i < snapshot.docs.length; i++) {
-        var doc = snapshot.docs[i];
-        var data = doc.data();
-        print('Document $i: ID=${doc.id}, serverMessageId=${data['serverMessageId']}, createdAt=${data['createdAt']}, messageBody=${data['messageBody'] ?? '<empty>'}');
-      }
       
-      // Track the highest timestamp we've seen
+      // Track the highest and lowest timestamps for pagination
       int highestTimestamp = 0;
+      int lowestTimestamp = 0;
       
-      // Process messages in reverse to maintain chronological order
+      // Process messages efficiently with minimal processing
       final messages = <ChatMessage>[];
-      for (var doc in snapshot.docs) {
+      final processedMessageIds = <String>{};
+      
+      for (var doc in snapshot.docs.reversed) { // Process in chronological order
         try {
           final data = doc.data();
+          final messageId = data['serverMessageId'] ?? doc.id;
           
+          // Skip if already processed
+          if (processedMessageIds.contains(messageId)) {
+            continue;
+          }
+          processedMessageIds.add(messageId);
+          
+          final messageBody = (data['messageBody'] ?? '').toString();
           // Skip empty messages
-          if ((data['messageBody'] ?? '').toString().isEmpty) {
-            print('Skipping message with empty content: ${doc.id}');
+          if (messageBody.isEmpty) {
             continue;
           }
           
-          // Create ChatMessage from Firestore data
-          final message = ChatMessage(
-            id: data['serverMessageId'] ?? doc.id,
-            content: data['messageBody'] ?? '',
-            timestamp: DateTime.now(), // Don't worry about exact timestamps for display
-            isMe: data['source'] == 'client',
-            type: MessageType.text,
-          );
-          
-          messages.add(message);
-          
-          // Track the timestamp for future queries
+          // Track timestamps efficiently (simplified)
           try {
             var createdAt = data['createdAt'];
-            int timeValue = 0;
             if (createdAt != null) {
-              // Handle different timestamp formats
+              int timeValue = 0;
               if (createdAt is String) {
                 timeValue = int.tryParse(createdAt) ?? 0;
               } else if (createdAt is int) {
                 timeValue = createdAt;
               }
               
-              // Keep track of highest timestamp
-              if (timeValue > highestTimestamp) {
-                highestTimestamp = timeValue;
+              if (timeValue > 0) {
+                if (highestTimestamp == 0 || timeValue > highestTimestamp) {
+                  highestTimestamp = timeValue;
+                }
+                if (lowestTimestamp == 0 || timeValue < lowestTimestamp) {
+                  lowestTimestamp = timeValue;
+                }
               }
             }
           } catch (e) {
-            print('Error tracking timestamp: $e');
+            // Silently continue on timestamp errors
           }
+          
+          // Create ChatMessage from Firestore data (minimal processing)
+          final message = ChatMessage(
+            id: messageId,
+            content: messageBody,
+            timestamp: DateTime.now(),
+            isMe: data['source'] == 'client',
+            type: MessageType.text,
+          );
+          
+          // Add to cache and messages list
+          _addToCache(message);
+          messages.add(message);
 
-          // Handle quick replies/polls
+          // Handle quick replies/polls efficiently (only if really needed)
           final isPoll = data['isPoll'];
           if (isMessagePoll(isPoll) && data['answers'] != null) {
             try {
@@ -204,38 +296,43 @@ class DashMessagingService {
               final answersData = data['answers'];
               
               if (answersData is String && answersData != 'None' && answersData.isNotEmpty) {
-                // Parse comma-separated answers string
-                answers = answersData.split(',').map((e) => e.trim()).toList();
+                answers = answersData.split(',').map((e) => e.trim()).where((e) => e.isNotEmpty).take(3).toList(); // Limit to 3 answers for speed
               } else if (answersData is List) {
-                answers = List<String>.from(answersData);
+                answers = List<String>.from(answersData).take(3).toList(); // Limit to 3 answers
               }
               
               if (answers.isNotEmpty) {
-                final quickReplies = answers.map((item) => 
-                  QuickReply(text: item, value: item)
-                ).toList();
-                
-                final quickReplyMessage = ChatMessage(
-                  id: '${message.id}_replies',
-                  content: '',
-                  timestamp: DateTime.now().add(const Duration(milliseconds: 100)),
-                  isMe: false,
-                  type: MessageType.quickReply,
-                  suggestedReplies: quickReplies,
-                );
-                
-                messages.add(quickReplyMessage);
+                final quickReplyId = '${messageId}_replies';
+                if (!processedMessageIds.contains(quickReplyId)) {
+                  processedMessageIds.add(quickReplyId);
+                  
+                  final quickReplies = answers.map((item) => 
+                    QuickReply(text: item, value: item)
+                  ).toList();
+                  
+                  final quickReplyMessage = ChatMessage(
+                    id: quickReplyId,
+                    content: '',
+                    timestamp: DateTime.now().add(const Duration(milliseconds: 100)),
+                    isMe: false,
+                    type: MessageType.quickReply,
+                    suggestedReplies: quickReplies,
+                  );
+                  
+                  _addToCache(quickReplyMessage);
+                  messages.add(quickReplyMessage);
+                }
               }
             } catch (e) {
-              print('Error processing quick replies: $e');
+              // Silently continue on quick reply errors
             }
           }
         } catch (e) {
-          print('Error processing message: $e');
+          // Silently continue on message processing errors
         }
       }
       
-      // Update the last message time
+      // Update tracking timestamps
       if (highestTimestamp > 0) {
         _lastFirestoreMessageTime = highestTimestamp;
         print('Updated _lastFirestoreMessageTime to $highestTimestamp');
@@ -243,14 +340,16 @@ class DashMessagingService {
       
       print('Processed ${messages.length} messages from Firestore');
       
-      // Add messages to the stream
+      // Add messages to the stream in batch for better performance
       for (var message in messages) {
         _messageStreamController.add(message);
       }
       
       print('Added ${messages.length} messages to the stream');
+      _stopPerformanceTimer('Initial message loading');
     } catch (e) {
       print('Error loading messages from Firestore: $e');
+      _stopPerformanceTimer('Initial message loading (error)');
     }
   }
 
@@ -376,65 +475,133 @@ class DashMessagingService {
     }
   }
   
-  // Start real-time listening for chat messages
+  // Optimized real-time listener
   void startRealtimeMessageListener() {
-    // Cancel any existing subscription
+    _startPerformanceTimer('Realtime listener setup');
+    
+    if (_userId == null) {
+      print('Cannot start listener, user ID is null');
+      return;
+    }
+    
+    print('Starting optimized realtime listener for user: $_userId');
+    
+    // Cancel existing listener if any
     _firestoreSubscription?.cancel();
-    if (_userId == null) return;
-
-    print('Starting real-time Firestore listener for user: [32m$_userId[0m');
-    _firestoreSubscription = FirebaseFirestore.instance
-        .collection('messages')
-        .doc(_userId)
-        .collection('chat')
-        .orderBy('createdAt', descending: false)
-        .snapshots()
-        .listen((snapshot) {
-      for (var change in snapshot.docChanges) {
-        if (change.type == DocumentChangeType.added || change.type == DocumentChangeType.modified) {
-          final data = change.doc.data();
-          if (data == null) continue;
-          if ((data['messageBody'] ?? '').toString().isEmpty) continue;
-
-          final message = ChatMessage(
-            id: data['serverMessageId'] ?? change.doc.id,
-            content: data['messageBody'] ?? '',
-            timestamp: DateTime.now(), // You can parse createdAt if needed
-            isMe: data['source'] == 'client',
-            type: MessageType.text,
-          );
-          _messageStreamController.add(message);
-
-          // Handle quick replies/polls
-          final isPoll = data['isPoll'];
-          if (isMessagePoll(isPoll) && data['answers'] != null) {
-            try {
-              List<String> answers = [];
-              final answersData = data['answers'];
-              if (answersData is String && answersData != 'None' && answersData.isNotEmpty) {
-                answers = answersData.split(',').map((e) => e.trim()).toList();
-              } else if (answersData is List) {
-                answers = List<String>.from(answersData);
-              }
-              if (answers.isNotEmpty) {
-                final quickReplies = answers.map((item) => QuickReply(text: item, value: item)).toList();
-                final quickReplyMessage = ChatMessage(
-                  id: '${message.id}_replies',
-                  content: '',
-                  timestamp: DateTime.now().add(const Duration(milliseconds: 100)),
-                  isMe: false,
-                  type: MessageType.quickReply,
-                  suggestedReplies: quickReplies,
+    
+    try {
+      // Set up optimized Firestore listener
+      final chatRef = FirebaseFirestore.instance
+          .collection('messages')
+          .doc(_userId)
+          .collection('chat')
+          .orderBy('createdAt', descending: true);
+      
+      _firestoreSubscription = chatRef.snapshots().listen(
+        (snapshot) async {
+          _startPerformanceTimer('Processing realtime update');
+          
+          print('📨 Realtime update received: ${snapshot.docChanges.length} changes');
+          
+          try {
+            final newMessages = <ChatMessage>[];
+            
+            for (var change in snapshot.docChanges) {
+              if (change.type == DocumentChangeType.added || change.type == DocumentChangeType.modified) {
+                final doc = change.doc;
+                final data = doc.data();
+                
+                if (data == null) continue;
+                
+                final messageId = data['serverMessageId'] ?? doc.id;
+                
+                // Skip if already in cache
+                if (_messageCache.containsKey(messageId)) {
+                  continue;
+                }
+                
+                // Skip empty messages
+                if ((data['messageBody'] ?? '').toString().isEmpty) {
+                  continue;
+                }
+                
+                final message = ChatMessage(
+                  id: messageId,
+                  content: data['messageBody'] ?? '',
+                  timestamp: DateTime.now(),
+                  isMe: data['source'] == 'client',
+                  type: MessageType.text,
                 );
-                _messageStreamController.add(quickReplyMessage);
+                
+                _addToCache(message);
+                newMessages.add(message);
+                
+                // Handle quick replies efficiently
+                final isPoll = data['isPoll'];
+                if (isMessagePoll(isPoll) && data['answers'] != null) {
+                  try {
+                    List<String> answers = [];
+                    final answersData = data['answers'];
+                    
+                    if (answersData is String && answersData != 'None' && answersData.isNotEmpty) {
+                      answers = answersData.split(',').map((e) => e.trim()).where((e) => e.isNotEmpty).toList();
+                    } else if (answersData is List) {
+                      answers = List<String>.from(answersData);
+                    }
+                    
+                    if (answers.isNotEmpty) {
+                      final quickReplyId = '${messageId}_replies';
+                      if (!_messageCache.containsKey(quickReplyId)) {
+                        final quickReplies = answers.map((item) => 
+                          QuickReply(text: item, value: item)
+                        ).toList();
+                        
+                        final quickReplyMessage = ChatMessage(
+                          id: quickReplyId,
+                          content: '',
+                          timestamp: DateTime.now().add(const Duration(milliseconds: 100)),
+                          isMe: false,
+                          type: MessageType.quickReply,
+                          suggestedReplies: quickReplies,
+                        );
+                        
+                        _addToCache(quickReplyMessage);
+                        newMessages.add(quickReplyMessage);
+                      }
+                    }
+                  } catch (e) {
+                    print('Error processing quick replies: $e');
+                  }
+                }
               }
-            } catch (e) {
-              print('Error processing quick replies: $e');
             }
+            
+            // Batch add new messages to stream
+            for (var message in newMessages) {
+              _messageStreamController.add(message);
+            }
+            
+            if (newMessages.isNotEmpty) {
+              print('✅ Added ${newMessages.length} new messages to stream');
+            }
+            
+            _stopPerformanceTimer('Processing realtime update');
+          } catch (e) {
+            print('Error processing realtime update: $e');
+            _stopPerformanceTimer('Processing realtime update (error)');
           }
-        }
-      }
-    });
+        },
+        onError: (error) {
+          print('Firestore listener error: $error');
+        },
+      );
+      
+      _stopPerformanceTimer('Realtime listener setup');
+      print('✅ Optimized realtime listener started successfully');
+    } catch (e) {
+      print('Error starting realtime listener: $e');
+      _stopPerformanceTimer('Realtime listener setup (error)');
+    }
   }
 
   // Stop real-time listener
@@ -1144,5 +1311,290 @@ class DashMessagingService {
     }
     
     return false;
+  }
+
+  // Load older messages for pagination
+  Future<List<ChatMessage>> loadOlderMessages({int limit = 10}) async {
+    _startPerformanceTimer('Loading older messages (pagination)');
+    
+    if (_userId == null) {
+      print('Cannot load older messages, user ID is null');
+      _stopPerformanceTimer('Loading older messages (pagination - no user)');
+      return [];
+    }
+    
+    try {
+      print('Loading $limit older messages from Firestore for user: $_userId');
+      
+      // Get reference to the user's chat collection
+      var query = FirebaseFirestore.instance
+          .collection('messages')
+          .doc(_userId)
+          .collection('chat')
+          .orderBy('createdAt', descending: true)
+          .limit(limit);
+      
+      // Add pagination using the lowest timestamp we've seen
+      if (_lowestLoadedTimestamp > 0) {
+        query = query.where('createdAt', isLessThan: _lowestLoadedTimestamp);
+        print('Loading messages older than timestamp: $_lowestLoadedTimestamp');
+      }
+      
+      final snapshot = await query.get();
+      
+      if (snapshot.docs.isEmpty) {
+        print('No older messages found');
+        _stopPerformanceTimer('Loading older messages (pagination - no messages)');
+        return [];
+      }
+      
+      print('Found ${snapshot.docs.length} older messages');
+      
+      final messages = <ChatMessage>[];
+      final processedMessageIds = <String>{};
+      
+      for (var doc in snapshot.docs.reversed) {
+        try {
+          final data = doc.data();
+          final messageId = data['serverMessageId'] ?? doc.id;
+          
+          // Skip if already processed or cached
+          if (processedMessageIds.contains(messageId) || _messageCache.containsKey(messageId)) {
+            continue;
+          }
+          processedMessageIds.add(messageId);
+          
+          // Skip empty messages
+          if ((data['messageBody'] ?? '').toString().isEmpty) {
+            continue;
+          }
+          
+          // Update lowest timestamp for next pagination
+          try {
+            var createdAt = data['createdAt'];
+            if (createdAt != null) {
+              int timeValue = 0;
+              if (createdAt is String) {
+                timeValue = int.tryParse(createdAt) ?? 0;
+              } else if (createdAt is int) {
+                timeValue = createdAt;
+              }
+              
+              if (timeValue > 0 && (_lowestLoadedTimestamp == 0 || timeValue < _lowestLoadedTimestamp)) {
+                _lowestLoadedTimestamp = timeValue;
+              }
+            }
+          } catch (e) {
+            print('Error updating pagination timestamp: $e');
+          }
+          
+          final message = ChatMessage(
+            id: messageId,
+            content: data['messageBody'] ?? '',
+            timestamp: DateTime.now(),
+            isMe: data['source'] == 'client',
+            type: MessageType.text,
+          );
+          
+          _addToCache(message);
+          messages.add(message);
+          
+          // Handle quick replies
+          final isPoll = data['isPoll'];
+          if (isMessagePoll(isPoll) && data['answers'] != null) {
+            try {
+              List<String> answers = [];
+              final answersData = data['answers'];
+              
+              if (answersData is String && answersData != 'None' && answersData.isNotEmpty) {
+                answers = answersData.split(',').map((e) => e.trim()).where((e) => e.isNotEmpty).toList();
+              } else if (answersData is List) {
+                answers = List<String>.from(answersData);
+              }
+              
+              if (answers.isNotEmpty) {
+                final quickReplyId = '${messageId}_replies';
+                if (!processedMessageIds.contains(quickReplyId) && !_messageCache.containsKey(quickReplyId)) {
+                  processedMessageIds.add(quickReplyId);
+                  
+                  final quickReplies = answers.map((item) => 
+                    QuickReply(text: item, value: item)
+                  ).toList();
+                  
+                  final quickReplyMessage = ChatMessage(
+                    id: quickReplyId,
+                    content: '',
+                    timestamp: DateTime.now().add(const Duration(milliseconds: 100)),
+                    isMe: false,
+                    type: MessageType.quickReply,
+                    suggestedReplies: quickReplies,
+                  );
+                  
+                  _addToCache(quickReplyMessage);
+                  messages.add(quickReplyMessage);
+                }
+              }
+            } catch (e) {
+              print('Error processing quick replies for older message: $e');
+            }
+          }
+        } catch (e) {
+          print('Error processing older message: $e');
+        }
+      }
+      
+      print('Processed ${messages.length} older messages');
+      _stopPerformanceTimer('Loading older messages (pagination)');
+      return messages;
+    } catch (e) {
+      print('Error loading older messages: $e');
+      _stopPerformanceTimer('Loading older messages (pagination - error)');
+      return [];
+    }
+  }
+
+  // Load more messages on demand (for pagination or when user scrolls up)
+  Future<void> loadMoreMessages({int additionalCount = 10}) async {
+    _startPerformanceTimer('Loading additional messages');
+    
+    if (_userId == null) {
+      print('Cannot load more messages, user ID is null');
+      return;
+    }
+    
+    try {
+      print('Loading $additionalCount additional messages from Firestore');
+      
+      // Query for older messages using pagination
+      var query = FirebaseFirestore.instance
+          .collection('messages')
+          .doc(_userId)
+          .collection('chat')
+          .orderBy('createdAt', descending: true)
+          .limit(additionalCount);
+      
+      // Skip the messages we already have
+      if (_lastFirestoreMessageTime > 0) {
+        query = query.where('createdAt', isLessThan: _lastFirestoreMessageTime);
+      }
+      
+      final snapshot = await query.get().timeout(
+        const Duration(seconds: 3),
+        onTimeout: () {
+          print('Additional messages query timeout');
+          throw TimeoutException('Additional messages query timeout', const Duration(seconds: 3));
+        },
+      );
+      
+      if (snapshot.docs.isEmpty) {
+        print('No additional messages found');
+        _stopPerformanceTimer('Loading additional messages (no messages)');
+        return;
+      }
+      
+      print('Found ${snapshot.docs.length} additional messages');
+      
+      // Process additional messages efficiently
+      final messages = <ChatMessage>[];
+      int oldestTimestamp = _lastFirestoreMessageTime;
+      
+      for (var doc in snapshot.docs.reversed) {
+        try {
+          final data = doc.data();
+          final messageId = data['serverMessageId'] ?? doc.id;
+          
+          // Skip if already cached
+          if (_messageCache.containsKey(messageId)) {
+            continue;
+          }
+          
+          final messageBody = (data['messageBody'] ?? '').toString();
+          if (messageBody.isEmpty) {
+            continue;
+          }
+          
+          // Track oldest timestamp
+          try {
+            var createdAt = data['createdAt'];
+            if (createdAt != null) {
+              int timeValue = 0;
+              if (createdAt is String) {
+                timeValue = int.tryParse(createdAt) ?? 0;
+              } else if (createdAt is int) {
+                timeValue = createdAt;
+              }
+              
+              if (timeValue > 0 && (oldestTimestamp == 0 || timeValue < oldestTimestamp)) {
+                oldestTimestamp = timeValue;
+              }
+            }
+          } catch (e) {
+            // Continue silently
+          }
+          
+          final message = ChatMessage(
+            id: messageId,
+            content: messageBody,
+            timestamp: DateTime.now(),
+            isMe: data['source'] == 'client',
+            type: MessageType.text,
+          );
+          
+          _addToCache(message);
+          messages.add(message);
+          
+          // Handle quick replies if present
+          final isPoll = data['isPoll'];
+          if (isMessagePoll(isPoll) && data['answers'] != null) {
+            try {
+              List<String> answers = [];
+              final answersData = data['answers'];
+              
+              if (answersData is String && answersData != 'None' && answersData.isNotEmpty) {
+                answers = answersData.split(',').map((e) => e.trim()).where((e) => e.isNotEmpty).take(3).toList();
+              } else if (answersData is List) {
+                answers = List<String>.from(answersData).take(3).toList();
+              }
+              
+              if (answers.isNotEmpty) {
+                final quickReplyId = '${messageId}_replies';
+                if (!_messageCache.containsKey(quickReplyId)) {
+                  final quickReplies = answers.map((item) => 
+                    QuickReply(text: item, value: item)
+                  ).toList();
+                  
+                  final quickReplyMessage = ChatMessage(
+                    id: quickReplyId,
+                    content: '',
+                    timestamp: DateTime.now().add(const Duration(milliseconds: 100)),
+                    isMe: false,
+                    type: MessageType.quickReply,
+                    suggestedReplies: quickReplies,
+                  );
+                  
+                  _addToCache(quickReplyMessage);
+                  messages.add(quickReplyMessage);
+                }
+              }
+            } catch (e) {
+              // Continue silently
+            }
+          }
+        } catch (e) {
+          // Continue silently
+        }
+      }
+      
+      // Add messages to stream
+      for (var message in messages) {
+        _messageStreamController.add(message);
+      }
+      
+      print('Added ${messages.length} additional messages to stream');
+      _stopPerformanceTimer('Loading additional messages');
+    } catch (e) {
+      print('Error loading additional messages: $e');
+      _stopPerformanceTimer('Loading additional messages (error)');
+    }
   }
 }

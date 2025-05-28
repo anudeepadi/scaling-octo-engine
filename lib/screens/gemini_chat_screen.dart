@@ -122,16 +122,13 @@ class _GeminiChatScreenState extends State<GeminiChatScreen> {
   Widget _buildQuickReplies(List<QuickReply> replies, GeminiChatProvider provider) {
     return Container(
       margin: const EdgeInsets.symmetric(vertical: 8.0),
-      height: 44,
-      child: ListView.builder(
-        scrollDirection: Axis.horizontal,
-        itemCount: replies.length,
-        itemBuilder: (context, index) {
-          final reply = replies[index];
-          return Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 4.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: replies.map((reply) {
+          return Container(
+            margin: const EdgeInsets.only(bottom: 8),
             child: CupertinoButton(
-              padding: const EdgeInsets.symmetric(horizontal: 16.0),
+              padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
               color: CupertinoColors.systemGrey5,
               borderRadius: BorderRadius.circular(20),
               child: Text(
@@ -141,13 +138,14 @@ class _GeminiChatScreenState extends State<GeminiChatScreen> {
                   color: CupertinoColors.activeBlue,
                   fontWeight: FontWeight.w500
                 ),
+                textAlign: TextAlign.center,
               ),
               onPressed: () {
                 provider.sendMessage(reply.value);
               },
             ),
           );
-        },
+        }).toList(),
       ),
     );
   }

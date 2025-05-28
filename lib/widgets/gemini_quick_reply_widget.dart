@@ -33,14 +33,14 @@ class GeminiQuickReplyWidget extends StatelessWidget {
     return Container(
       width: screenWidth - 16, // Leave 8px margin on each side
       margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.all(8),
       decoration: BoxDecoration(
         gradient: LinearGradient(
           colors: [Colors.blue.shade50, Colors.blue.shade100],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(12),
         boxShadow: [
           BoxShadow(
             color: Colors.blue.withOpacity(0.1),
@@ -77,30 +77,13 @@ class GeminiQuickReplyWidget extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           
-          // --- Replace Wrap with a horizontally scrolling ListView ---
-          // Constrain the height of the ListView
-          SizedBox(
-            height: 40, // Adjust height as needed for button size + padding
-            child: ListView.separated(
-              scrollDirection: Axis.horizontal, // Make it scroll horizontally
-              itemCount: quickReplies.length,
-              itemBuilder: (context, index) {
-                // Build each button using the existing method
-                return _buildQuickReplyButton(
-                  context, 
-                  quickReplies[index], 
-                  index // Pass index for animation
-                );
-              },
-              separatorBuilder: (context, index) => const SizedBox(width: 8), // Spacing between buttons
-            ),
-          ),
-          // --- End replacement ---
-/* 
-          // Old Wrap widget - commented out
+          // --- Replace horizontally scrolling ListView with vertical Column ---
+          const SizedBox(height: 4),
+          
+          // Horizontal layout with Wrap widget
           Wrap(
-            spacing: 8.0,
-            runSpacing: 8.0,
+            spacing: 6.0,
+            runSpacing: 6.0,
             children: quickReplies.map((reply) {
               return _buildQuickReplyButton(
                 context, 
@@ -109,15 +92,12 @@ class GeminiQuickReplyWidget extends StatelessWidget {
               );
             }).toList(),
           ),
-*/
         ],
       ),
     );
   }
 
   Widget _buildQuickReplyButton(BuildContext context, QuickReply reply, int index) {
-    final maxWidth = MediaQuery.of(context).size.width * 0.7;
-
     if (Platform.isIOS) {
       return _AnimatedQuickReply(
         index: index,
@@ -125,63 +105,63 @@ class GeminiQuickReplyWidget extends StatelessWidget {
         child: GestureDetector(
           onTap: () => onReplySelected(reply.value),
           child: Container(
-            constraints: BoxConstraints(maxWidth: maxWidth),
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
             decoration: BoxDecoration(
               color: CupertinoColors.systemBlue.withOpacity(0.15),
-              borderRadius: BorderRadius.circular(16),
+              borderRadius: BorderRadius.circular(8),
             ),
             child: Text(
               reply.text,
               style: const TextStyle(
                 color: CupertinoColors.systemBlue,
-                fontSize: 13,
+                fontSize: 11,
                 fontWeight: FontWeight.w500,
               ),
-              maxLines: 2,
+              textAlign: TextAlign.center,
+              maxLines: 1,
               overflow: TextOverflow.ellipsis,
             ),
           ),
         ),
       );
-    } else {
-      // Material design version
-      final geminiBlue = Color(0xFF4285F4);
-      
-      return _AnimatedQuickReply(
-        index: index,
-        animated: animated,
-        child: Material(
-          color: Colors.transparent,
-          child: InkWell(
-            onTap: () => onReplySelected(reply.value),
-            borderRadius: BorderRadius.circular(16),
-            child: Container(
-              constraints: BoxConstraints(maxWidth: maxWidth),
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              decoration: BoxDecoration(
-                color: geminiBlue.withOpacity(0.1),
-                border: Border.all(
-                  color: geminiBlue.withOpacity(0.3),
-                  width: 1,
-                ),
-                borderRadius: BorderRadius.circular(16),
+    }
+    
+    // Material design version
+    final geminiBlue = Color(0xFF4285F4);
+    
+    return _AnimatedQuickReply(
+      index: index,
+      animated: animated,
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: () => onReplySelected(reply.value),
+          borderRadius: BorderRadius.circular(8),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+            decoration: BoxDecoration(
+              color: geminiBlue.withOpacity(0.1),
+              border: Border.all(
+                color: geminiBlue.withOpacity(0.3),
+                width: 0.5,
               ),
-              child: Text(
-                reply.text,
-                style: TextStyle(
-                  color: geminiBlue,
-                  fontSize: 13,
-                  fontWeight: FontWeight.w500,
-                ),
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Text(
+              reply.text,
+              style: TextStyle(
+                color: geminiBlue,
+                fontSize: 11,
+                fontWeight: FontWeight.w500,
               ),
+              textAlign: TextAlign.center,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
             ),
           ),
         ),
-      );
-    }
+      ),
+    );
   }
 }
 

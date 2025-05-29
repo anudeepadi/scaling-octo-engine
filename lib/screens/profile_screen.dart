@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
 import '../providers/language_provider.dart';
+import '../providers/user_profile_provider.dart';
 import '../theme/app_theme.dart';
 import '../utils/app_localizations.dart';
 
@@ -12,12 +13,13 @@ class ProfileScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final authProvider = Provider.of<AuthProvider>(context);
     final languageProvider = Provider.of<LanguageProvider>(context);
+    final userProfileProvider = Provider.of<UserProfileProvider>(context);
     final localizations = AppLocalizations.of(context);
     final user = authProvider.currentUser;
     
-    // Get data from user auth info
+    // Get data from user profile and auth info
     final userId = user?.uid ?? 'pUuutN05eoYeWshsKyXBwrRoFW9u1';
-    final username = user?.displayName ?? 'Sahak Kaghyan';
+    final username = userProfileProvider.displayName ?? user?.displayName ?? 'Sahak Kaghyan';
     final signInMethod = user?.providerData.first.providerId ?? 'GOOGLE_SIGN_IN';
     
     // Format last access time

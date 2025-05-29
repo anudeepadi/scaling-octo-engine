@@ -27,6 +27,7 @@ class UserProfileProvider with ChangeNotifier {
   bool get hasCompletedIntake => _userProfile?.hasCompletedIntake ?? false;
   bool get hasOptedOut => _userProfile?.hasOptedOut ?? false;
   String get preferredLanguage => _userProfile?.preferredLanguage ?? 'en';
+  String? get displayName => _userProfile?.displayName;
 
   // Initialize user profile
   Future<void> initializeProfile(String userId) async {
@@ -52,6 +53,27 @@ class UserProfileProvider with ChangeNotifier {
       _setError('Failed to initialize profile: $e');
     } finally {
       _setLoading(false);
+    }
+  }
+
+  // Update display name from Firebase Auth
+  Future<void> updateDisplayName(String? displayName) async {
+    if (_userProfile == null) return;
+    
+    try {
+      _userProfile = _userProfile!.copyWith(
+        displayName: displayName,
+        updatedAt: DateTime.now(),
+      );
+      await _userProfileService.saveUserProfile(_userProfile!);
+      _analyticsService.trackEvent('display_name_updated', {
+        'user_id': _userProfile!.id,
+        'has_display_name': displayName != null,
+      });
+      _clearError();
+      notifyListeners();
+    } catch (e) {
+      _setError('Failed to update display name: $e');
     }
   }
 

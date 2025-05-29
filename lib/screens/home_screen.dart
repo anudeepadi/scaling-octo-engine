@@ -1,14 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../providers/chat_provider.dart';
-import '../providers/auth_provider.dart';
-import '../providers/service_provider.dart';
-import '../providers/dash_chat_provider.dart';
-import '../widgets/chat_message_widget.dart';
-import '../services/media_picker_service.dart';
-import '../services/gif_service.dart';
 import '../models/chat_message.dart';
 import '../models/quick_reply.dart';
+import '../providers/auth_provider.dart';
+import '../providers/chat_provider.dart';
+import '../providers/service_provider.dart';
+import '../providers/dash_chat_provider.dart';
+import '../providers/language_provider.dart';
+import '../providers/user_profile_provider.dart';
+import '../services/media_picker_service.dart';
+import '../services/gif_service.dart';
+import '../services/dash_messaging_service.dart';
+import '../widgets/chat_message_widget.dart';
 import '../theme/app_theme.dart';
 import '../utils/app_localizations.dart';
 import 'profile_screen.dart';
@@ -234,6 +237,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Widget _buildDrawer() {
     final authProvider = context.read<AuthProvider>();
+    final userProfileProvider = context.watch<UserProfileProvider>();
     return Drawer(
       child: Container(
         decoration: const BoxDecoration(
@@ -295,7 +299,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   const SizedBox(height: 16),
                   // User info
                   Text(
-                    'User: ${authProvider.currentUser?.displayName ?? 'Sahak Kaghyan'}',
+                    'User: ${userProfileProvider.displayName ?? authProvider.currentUser?.displayName ?? 'Sahak Kaghyan'}',
                     style: const TextStyle(
                       color: Colors.white,
                       fontSize: 14,

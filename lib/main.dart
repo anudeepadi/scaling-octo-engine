@@ -8,6 +8,7 @@ import 'providers/auth_provider.dart';
 import 'providers/dash_chat_provider.dart';
 import 'providers/service_provider.dart';
 import 'providers/language_provider.dart';
+import 'providers/user_profile_provider.dart';
 import 'screens/home_screen.dart';
 import 'screens/login_screen.dart';
 import 'theme/app_theme.dart';
@@ -23,6 +24,8 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'services/firebase_connection_service.dart';
 import 'services/firebase_messaging_service.dart';
+import 'services/user_profile_service.dart';
+import 'services/analytics_service.dart';
 
 // Import dotenv for environment variables
 import 'package:flutter_dotenv/flutter_dotenv.dart';
@@ -118,6 +121,36 @@ class MyApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => SystemChatProvider()),
         ChangeNotifierProvider(create: (_) => ServiceProvider()),
         ChangeNotifierProvider(create: (_) => LanguageProvider()),
+
+        ChangeNotifierProxyProvider<AuthProvider, UserProfileProvider>(
+          create: (_) => UserProfileProvider(
+            userProfileService: UserProfileService(),
+            analyticsService: AnalyticsService(),
+          ),
+          update: (_, authProvider, previousUserProfileProvider) {
+            final userProfileProvider = previousUserProfileProvider ?? UserProfileProvider(
+              userProfileService: UserProfileService(),
+              analyticsService: AnalyticsService(),
+            );
+
+            if (authProvider.isAuthenticated) {
+              final userId = authProvider.currentUser?.uid;
+              if (userId != null) {
+                // Initialize user profile when user is authenticated
+                userProfileProvider.initializeProfile(userId).then((_) {
+                  // Sync display name from Firebase Auth
+                  final displayName = authProvider.currentUser?.displayName;
+                  if (displayName != null && displayName.isNotEmpty) {
+                    userProfileProvider.updateDisplayName(displayName);
+                  }
+                });
+                developer.log('Initializing User Profile for user: $userId', name: 'UserProfile');
+              }
+            }
+
+            return userProfileProvider;
+          },
+        ),
 
         ChangeNotifierProxyProvider<AuthProvider, DashChatProvider>(
           create: (_) => DashChatProvider(),

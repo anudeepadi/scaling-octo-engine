@@ -5,6 +5,7 @@ import 'dart:io' show Platform;
 import '../providers/auth_provider.dart';
 import '../theme/app_theme.dart';
 import '../utils/app_localizations.dart';
+import 'registration_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -250,6 +251,40 @@ class _LoginScreenState extends State<LoginScreen> {
                               borderRadius: BorderRadius.circular(4),
                             ),
                           ),
+                        ),
+                        const SizedBox(height: 24),
+                        
+                        // Create Account Link
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Text(
+                              "Don't have an account?",
+                              style: TextStyle(
+                                color: Colors.grey[600],
+                                fontSize: 14,
+                              ),
+                            ),
+                            const SizedBox(width: 4),
+                            GestureDetector(
+                              onTap: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) => const RegistrationScreen(),
+                                  ),
+                                );
+                              },
+                              child: const Text(
+                                'Create Account',
+                                style: TextStyle(
+                                  color: AppTheme.quitxtTeal,
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 14,
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
                       ],
                     ),

@@ -26,8 +26,15 @@ class DashChatProvider extends ChangeNotifier {
   
   // Add debounce variables to prevent double sends
   bool _isSendingMessage = false;
+  bool get isSendingMessage => _isSendingMessage;
   String? _lastMessageSent;
   DateTime? _lastSendTime;
+  
+  // Delegate messages to ChatProvider
+  List<ChatMessage> get messages => _chatProvider?.messages ?? [];
+  
+  // Delegate isLoading to ChatProvider
+  bool get isLoading => _chatProvider?.isLoading ?? false;
 
   // Constructor
   DashChatProvider() {
@@ -55,9 +62,8 @@ class DashChatProvider extends ChangeNotifier {
     _authSubscription = _auth.authStateChanges().listen((User? user) {
       print('DashChatProvider: Auth state changed. User: ${user?.uid}');
       if (user == null) {
-        // User logged out
-        _currentUser = null;
-        notifyListeners();
+        // User logged out - clear all state
+        clearOnLogout();
       } else {
         // User logged in
         _currentUser = user;
@@ -131,9 +137,25 @@ class DashChatProvider extends ChangeNotifier {
   // Clear state on logout
   void clearOnLogout() {
     print('[DashChatProvider] Clearing state on logout.');
+    
+    // Cancel subscriptions
     _messageSubscription?.cancel();
     _messageSubscription = null;
+    
+    // Clear chat history from ChatProvider
+    _chatProvider?.clearChatHistory();
+    
+    // Dispose the messaging service
     _dashService.dispose();
+    
+    // Reset debounce flags
+    _isSendingMessage = false;
+    _lastMessageSent = null;
+    _lastSendTime = null;
+    
+    // Clear current user
+    _currentUser = null;
+    
     notifyListeners();
   }
 
@@ -297,5 +319,24 @@ class DashChatProvider extends ChangeNotifier {
     
     // Reset the last message time to force a full refresh
     _dashService.resetLastMessageTime();
+  }
+  
+  // Force reload messages from Firestore
+  void forceMessageReload() {
+    print('[DashChatProvider] Forcing message reload');
+    
+    if (!_dashService.isInitialized) {
+      print('[DashChatProvider] Cannot force reload - DashMessagingService not initialized');
+      return;
+    }
+    
+    // Clear current chat history
+    _chatProvider?.clearChatHistory();
+    
+    // Reset the last message time and reload
+    _dashService.resetLastMessageTime();
+    
+    // Re-setup message listener to get fresh messages
+    _setupMessageListener();
   }
 }

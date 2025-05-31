@@ -29,12 +29,15 @@ class DashMessagingService {
   final _uuid = Uuid();
   
   // Stream controller for receiving messages
-  final _messageStreamController = StreamController<ChatMessage>.broadcast();
+  StreamController<ChatMessage> _messageStreamController = StreamController<ChatMessage>.broadcast();
   Stream<ChatMessage> get messageStream => _messageStreamController.stream;
   
   // Flag to track initialization state
   bool _isInitialized = false;
   bool get isInitialized => _isInitialized;
+  
+  // Add flag to track if stream is closed
+  bool _isStreamClosed = false;
   
   // Track last response message to prevent duplicates
   String? _lastResponseId;
@@ -93,6 +96,9 @@ class DashMessagingService {
     if (_messageCache.isNotEmpty) {
       clearCache();
     }
+    
+    // Reinitialize stream controller if it's closed
+    _reinitializeStreamController();
     
     // Stop any existing listeners
     stopRealtimeMessageListener();
@@ -342,7 +348,7 @@ class DashMessagingService {
       
       // Add messages to the stream in batch for better performance
       for (var message in messages) {
-        _messageStreamController.add(message);
+        _safeAddToStream(message);
       }
       
       print('Added ${messages.length} messages to the stream');
@@ -413,41 +419,46 @@ class DashMessagingService {
         );
 
         // Add user message to stream
-        _messageStreamController.add(userMessage);
+        _safeAddToStream(userMessage);
 
         // Process server response
         try {
-          final responseData = jsonDecode(response.body);
-          if (responseData != null) {
-            final serverMessage = ChatMessage(
-              id: responseData['messageId'] ?? _uuid.v4(),
-              content: responseData['message'] ?? '',
-              timestamp: DateTime.now(),
-              isMe: false,
-              type: MessageType.text,
-            );
-
-            // Add server message to stream
-            _messageStreamController.add(serverMessage);
-
-            // Handle quick replies if present
-            if (responseData['quickReplies'] != null) {
-              final quickReplyMessage = ChatMessage(
-                id: '${serverMessage.id}_replies',
-                content: '',
-                timestamp: DateTime.now().add(const Duration(milliseconds: 100)),
+          final responseBody = response.body.trim();
+          if (responseBody.isNotEmpty) {
+            final responseData = jsonDecode(responseBody);
+            if (responseData != null) {
+              final serverMessage = ChatMessage(
+                id: responseData['messageId'] ?? _uuid.v4(),
+                content: responseData['message'] ?? '',
+                timestamp: DateTime.now(),
                 isMe: false,
-                type: MessageType.quickReply,
-                suggestedReplies: (responseData['quickReplies'] as List)
-                    .map((reply) => QuickReply(
-                          text: reply['text'] ?? '',
-                          value: reply['value'] ?? '',
-                        ))
-                    .toList(),
+                type: MessageType.text,
               );
 
-              _messageStreamController.add(quickReplyMessage);
+              // Add server message to stream
+              _safeAddToStream(serverMessage);
+
+              // Handle quick replies if present
+              if (responseData['quickReplies'] != null) {
+                final quickReplyMessage = ChatMessage(
+                  id: '${serverMessage.id}_replies',
+                  content: '',
+                  timestamp: DateTime.now().add(const Duration(milliseconds: 100)),
+                  isMe: false,
+                  type: MessageType.quickReply,
+                  suggestedReplies: (responseData['quickReplies'] as List)
+                      .map((reply) => QuickReply(
+                            text: reply['text'] ?? '',
+                            value: reply['value'] ?? '',
+                          ))
+                      .toList(),
+                );
+
+                _safeAddToStream(quickReplyMessage);
+              }
             }
+          } else {
+            print('Server returned empty response body');
           }
         } catch (e) {
           print('Error parsing server response: $e');
@@ -464,7 +475,7 @@ class DashMessagingService {
           type: MessageType.text,
         );
 
-        _messageStreamController.add(userMessage);
+        _safeAddToStream(userMessage);
         print('Failed to send message. Status: ${response.statusCode}, Body: ${response.body}');
         return false;
       }
@@ -578,7 +589,7 @@ class DashMessagingService {
             
             // Batch add new messages to stream
             for (var message in newMessages) {
-              _messageStreamController.add(message);
+              _safeAddToStream(message);
             }
             
             if (newMessages.isNotEmpty) {
@@ -708,7 +719,7 @@ class DashMessagingService {
       );
       
       // Add the main message first
-      _messageStreamController.add(message);
+      _safeAddToStream(message);
       
       // Add buttons as quick replies if available
       if (isPoll && buttons != null && buttons.isNotEmpty) {
@@ -730,7 +741,7 @@ class DashMessagingService {
             type: MessageType.quickReply,
             suggestedReplies: quickReplies,
           );
-          _messageStreamController.add(quickReplyMessage);
+          _safeAddToStream(quickReplyMessage);
           return;
         }
       }
@@ -754,7 +765,7 @@ class DashMessagingService {
               type: MessageType.quickReply,
               suggestedReplies: quickReplies,
             );
-            _messageStreamController.add(quickReplyMessage);
+            _safeAddToStream(quickReplyMessage);
           }
         }
       }
@@ -806,7 +817,7 @@ class DashMessagingService {
         isMe: false,
         type: MessageType.text,
       );
-      _messageStreamController.add(youtubeMessage);
+      _safeAddToStream(youtubeMessage);
     } 
     else if (userMessage.toLowerCase().contains('#deactivate')) {
       // Check if this is a duplicate message (same type sent in last 5 seconds)
@@ -830,7 +841,7 @@ class DashMessagingService {
         isMe: false,
         type: MessageType.text,
       );
-      _messageStreamController.add(gifMessage);
+      _safeAddToStream(gifMessage);
     }
     else if (userMessage == 'Better Health') {
       // Check if this is a duplicate message (same type sent in last 5 seconds)
@@ -854,7 +865,7 @@ class DashMessagingService {
         isMe: false,
         type: MessageType.text,
       );
-      _messageStreamController.add(pollMessage);
+      _safeAddToStream(pollMessage);
       
       // Add quick reply buttons
       await Future.delayed(const Duration(milliseconds: 200));
@@ -870,7 +881,7 @@ class DashMessagingService {
           QuickReply(text: 'More Energy', value: 'More Energy'),
         ],
       );
-      _messageStreamController.add(quickReplyMessage);
+      _safeAddToStream(quickReplyMessage);
     }
     else if (userMessage == 'Tell me more') {
       // Check if this is a duplicate message (same type sent in last 5 seconds)
@@ -894,7 +905,7 @@ class DashMessagingService {
         isMe: false,
         type: MessageType.text,
       );
-      _messageStreamController.add(anotherGifMessage);
+      _safeAddToStream(anotherGifMessage);
     }
     else {
       // Check if this is a duplicate default message (same ID generated in last 5 seconds)
@@ -918,7 +929,7 @@ class DashMessagingService {
         isMe: false,
         type: MessageType.text,
       );
-      _messageStreamController.add(defaultMessage);
+      _safeAddToStream(defaultMessage);
       
       // Add quick reply buttons for standard options
       await Future.delayed(const Duration(milliseconds: 200));
@@ -934,7 +945,7 @@ class DashMessagingService {
           QuickReply(text: 'Tell me more', value: 'Tell me more'),
         ],
       );
-      _messageStreamController.add(quickReplyMessage);
+      _safeAddToStream(quickReplyMessage);
     }
   }
   
@@ -949,7 +960,7 @@ class DashMessagingService {
       isMe: false,
       type: MessageType.text,
     );
-    _messageStreamController.add(youtubeMessage);
+    _safeAddToStream(youtubeMessage);
     await Future.delayed(const Duration(milliseconds: 1500));
     
     // Message 2: GIF link
@@ -960,7 +971,7 @@ class DashMessagingService {
       isMe: false,
       type: MessageType.text,
     );
-    _messageStreamController.add(gifMessage);
+    _safeAddToStream(gifMessage);
     await Future.delayed(const Duration(milliseconds: 1500));
     
     // Message 3: Poll with buttons
@@ -971,7 +982,7 @@ class DashMessagingService {
       isMe: false,
       type: MessageType.text,
     );
-    _messageStreamController.add(pollMessage);
+    _safeAddToStream(pollMessage);
     
     await Future.delayed(const Duration(milliseconds: 500));
     final quickReplyMessage = ChatMessage(
@@ -986,7 +997,7 @@ class DashMessagingService {
         QuickReply(text: 'More Energy', value: 'More Energy'),
       ],
     );
-    _messageStreamController.add(quickReplyMessage);
+    _safeAddToStream(quickReplyMessage);
     await Future.delayed(const Duration(milliseconds: 1500));
     
     // Message 4: Another GIF link
@@ -997,7 +1008,7 @@ class DashMessagingService {
       isMe: false,
       type: MessageType.text,
     );
-    _messageStreamController.add(anotherGifMessage);
+    _safeAddToStream(anotherGifMessage);
   }
   
   // Process sample test data
@@ -1087,7 +1098,7 @@ class DashMessagingService {
         final message = await processServerResponseJson(jsonResponse);
         
         // Add the message to the stream
-        _messageStreamController.add(message);
+        _safeAddToStream(message);
         
         // If the message is a poll, add quick replies as a separate message
         if (response["isPoll"] == true && message.suggestedReplies?.isNotEmpty == true) {
@@ -1103,7 +1114,7 @@ class DashMessagingService {
             suggestedReplies: message.suggestedReplies,
           );
           
-          _messageStreamController.add(quickReplyMessage);
+          _safeAddToStream(quickReplyMessage);
         }
       }
       
@@ -1154,7 +1165,7 @@ class DashMessagingService {
             suggestedReplies: quickReplies,
           );
           
-          _messageStreamController.add(message);
+          _safeAddToStream(message);
         } else {
           // Add regular text message
           final message = ChatMessage(
@@ -1165,7 +1176,7 @@ class DashMessagingService {
             type: MessageType.text,
           );
           
-          _messageStreamController.add(message);
+          _safeAddToStream(message);
         }
       }
     } catch (e) {
@@ -1195,8 +1206,22 @@ class DashMessagingService {
   
   // Dispose resources
   void dispose() {
-    _messageStreamController.close();
+    _isStreamClosed = true;
+    _firestoreSubscription?.cancel();
+    _firestoreSubscription = null;
+    if (!_messageStreamController.isClosed) {
+      _messageStreamController.close();
+    }
     _isInitialized = false;
+  }
+
+  // Reinitialize stream controller if it's closed
+  void _reinitializeStreamController() {
+    if (_isStreamClosed || _messageStreamController.isClosed) {
+      _messageStreamController = StreamController<ChatMessage>.broadcast();
+      _isStreamClosed = false;
+      print('Stream controller reinitialized');
+    }
   }
 
   // Reset the last message time to force a full refresh
@@ -1587,7 +1612,7 @@ class DashMessagingService {
       
       // Add messages to stream
       for (var message in messages) {
-        _messageStreamController.add(message);
+        _safeAddToStream(message);
       }
       
       print('Added ${messages.length} additional messages to stream');
@@ -1595,6 +1620,19 @@ class DashMessagingService {
     } catch (e) {
       print('Error loading additional messages: $e');
       _stopPerformanceTimer('Loading additional messages (error)');
+    }
+  }
+
+  // Helper method to safely add messages to stream
+  void _safeAddToStream(ChatMessage message) {
+    if (!_isStreamClosed && !_messageStreamController.isClosed) {
+      try {
+        _messageStreamController.add(message);
+      } catch (e) {
+        print('Error adding message to stream: $e');
+      }
+    } else {
+      print('Stream is closed, cannot add message: ${message.id}');
     }
   }
 }

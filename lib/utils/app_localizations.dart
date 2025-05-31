@@ -32,6 +32,21 @@ class AppLocalizations {
       'google_login': 'Sign in',
       'auth_error': 'Authentication failed',
 
+      // Registration screen
+      'register_title': 'Create Account',
+      'full_name_hint': 'Full Name',
+      'email_hint': 'Email',
+      'confirm_password_hint': 'Confirm Password',
+      'register_button': 'CREATE ACCOUNT',
+      'already_have_account': 'Already have an account?',
+      'sign_in_link': 'Sign In',
+      'please_enter_name': 'Please enter your name',
+      'please_enter_email': 'Please enter your email',
+      'invalid_email': 'Please enter a valid email',
+      'please_enter_password': 'Please enter a password',
+      'password_too_short': 'Password must be at least 6 characters',
+      'password_mismatch': 'Passwords do not match',
+
       // Home screen
       'app_title': 'QuitTXT Mobile',
       'type_message': 'Type a message...',
@@ -71,6 +86,21 @@ class AppLocalizations {
       'login_button': 'ENTRAR',
       'google_login': 'Iniciar con Google',
       'auth_error': 'Autenticación fallida',
+
+      // Registration screen
+      'register_title': 'Crear Cuenta',
+      'full_name_hint': 'Nombre Completo',
+      'email_hint': 'Correo Electrónico',
+      'confirm_password_hint': 'Confirmar Contraseña',
+      'register_button': 'CREAR CUENTA',
+      'already_have_account': '¿Ya tienes una cuenta?',
+      'sign_in_link': 'Iniciar Sesión',
+      'please_enter_name': 'Por favor ingresa tu nombre',
+      'please_enter_email': 'Por favor ingresa tu correo electrónico',
+      'invalid_email': 'Por favor ingresa un correo electrónico válido',
+      'please_enter_password': 'Por favor ingresa una contraseña',
+      'password_too_short': 'La contraseña debe tener al menos 6 caracteres',
+      'password_mismatch': 'Las contraseñas no coinciden',
 
       // Home screen
       'app_title': 'QuitTXT Móvil',

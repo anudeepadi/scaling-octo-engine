@@ -45,8 +45,8 @@ class UserProfileProvider with ChangeNotifier {
       }
       _analyticsService.trackEvent('profile_initialized', {
         'user_id': userId,
-        'has_completed_onboarding': hasCompletedOnboarding,
-        'has_completed_intake': hasCompletedIntake,
+        'has_completed_onboarding': hasCompletedOnboarding.toString(),
+        'has_completed_intake': hasCompletedIntake.toString(),
       });
       _clearError();
     } catch (e) {
@@ -68,7 +68,7 @@ class UserProfileProvider with ChangeNotifier {
       await _userProfileService.saveUserProfile(_userProfile!);
       _analyticsService.trackEvent('display_name_updated', {
         'user_id': _userProfile!.id,
-        'has_display_name': displayName != null,
+        'has_display_name': (displayName != null).toString(),
       });
       _clearError();
       notifyListeners();

@@ -70,9 +70,13 @@ class AuthProvider extends ChangeNotifier {
       // Use Firebase sign up
       UserCredential userCredential = await _auth.createUserWithEmailAndPassword(email: email, password: password);
       
-      // Optionally update display name (username isn't directly part of standard email/pass signup)
-      // You might store the username in Firestore linked to the userCredential.user.uid
-      // await userCredential.user?.updateDisplayName(username); 
+      // Update display name with the provided username
+      if (username.isNotEmpty) {
+        await userCredential.user?.updateDisplayName(username);
+        // Reload user to get updated profile
+        await userCredential.user?.reload();
+        _user = _auth.currentUser;
+      }
 
       // _onAuthStateChanged will handle updating state
       return true; // Indicate success

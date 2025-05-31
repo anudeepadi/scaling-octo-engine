@@ -299,7 +299,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   const SizedBox(height: 16),
                   // User info
                   Text(
-                    'User: ${userProfileProvider.displayName ?? authProvider.currentUser?.displayName ?? 'Sahak Kaghyan'}',
+                    'User: ${userProfileProvider.displayName ?? authProvider.currentUser?.displayName ?? authProvider.currentUser?.email ?? 'User'}',
                     style: const TextStyle(
                       color: Colors.white,
                       fontSize: 14,

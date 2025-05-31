@@ -19,7 +19,7 @@ class ProfileScreen extends StatelessWidget {
     
     // Get data from user profile and auth info
     final userId = user?.uid ?? 'pUuutN05eoYeWshsKyXBwrRoFW9u1';
-    final username = userProfileProvider.displayName ?? user?.displayName ?? 'Sahak Kaghyan';
+    final username = userProfileProvider.displayName ?? user?.displayName ?? user?.email ?? 'User';
     final signInMethod = user?.providerData.first.providerId ?? 'GOOGLE_SIGN_IN';
     
     // Format last access time

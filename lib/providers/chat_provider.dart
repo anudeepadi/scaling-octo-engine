@@ -211,6 +211,29 @@ class ChatProvider extends ChangeNotifier {
 
   // Add a text message
   void addTextMessage(String text, {bool isMe = false}) {
+    // Check for duplicate messages to prevent displaying multiple instances of the same message
+    if (_messages.isNotEmpty) {
+      final lastMessage = _messages.last;
+      // If the last message has the same content, is from the same user, and was sent within 2 seconds
+      if (lastMessage.content == text && 
+          lastMessage.isMe == isMe &&
+          DateTime.now().difference(lastMessage.timestamp).inSeconds < 2) {
+        print('Preventing duplicate message: $text from ${isMe ? "user" : "server"}');
+        return; // Skip adding this duplicate message
+      }
+      
+      // Also check if any message in the last 5 messages has the exact same content and sender
+      final recentMessages = _messages.length > 5 ? _messages.sublist(_messages.length - 5) : _messages;
+      for (final message in recentMessages) {
+        if (message.content == text && 
+            message.isMe == isMe &&
+            DateTime.now().difference(message.timestamp).inSeconds < 5) {
+          print('Preventing recent duplicate message: $text from ${isMe ? "user" : "server"}');
+          return; // Skip adding this duplicate message
+        }
+      }
+    }
+    
     _messages.add(
       ChatMessage(
         id: _uuid.v4(),
@@ -268,14 +291,37 @@ class ChatProvider extends ChangeNotifier {
 
   // Load demo messages
   void _loadDemoMessages() {
-    // Add welcome message
-    addTextMessage('Welcome to Dash Messaging! 👋', isMe: false);
+    // Add welcome message from Dr. Amelia Fuentes
+    addTextMessage('Are you ready to quit smoking tomorrow?', isMe: false);
     
-    // Add some quick replies
+    // Add quick reply options
     addQuickReplyMessage([
-      QuickReply(text: '👋 Hello!', value: 'Hello!'),
-      QuickReply(text: '🤔 What can you do?', value: 'What can you do?'),
-      QuickReply(text: '🔍 Tell me more', value: 'Tell me more'),
+      QuickReply(text: 'Yes, let\'s do it!', value: 'Yes, let\'s do it!'),
+      QuickReply(text: 'No, not yet', value: 'No, not yet'),
     ]);
+    
+    // Add user response
+    addTextMessage('Yes, let\'s do it!', isMe: true);
+    
+    // Add video message from Dr. Amelia Fuentes
+    final videoMessage = ChatMessage(
+      id: _uuid.v4(),
+      content: 'Dr. Amelia Fuentes - QuiTxt Director',
+      type: MessageType.video,
+      isMe: false,
+      timestamp: DateTime.now(),
+      mediaUrl: 'https://example.com/video.mp4', // Placeholder URL
+    );
+    _messages.add(videoMessage);
+    
+    // Add quit day message
+    addTextMessage('It\'s quit day! To start on the road to a smokefree life, get rid of cigarettes, butts, matches, lighters and ashtrays. Here is why you\'re ready:', isMe: false);
+    
+    // Add more user messages
+    addTextMessage('message 1', isMe: true);
+    addTextMessage('message 2', isMe: true);
+    addTextMessage('message 3', isMe: true);
+    
+    notifyListeners();
   }
 }

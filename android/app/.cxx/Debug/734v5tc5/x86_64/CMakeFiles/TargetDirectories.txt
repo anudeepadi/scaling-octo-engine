@@ -1,0 +1,2 @@
+/Users/vuc229/Downloads/Projects/rcs_application/android/app/.cxx/Debug/734v5tc5/x86_64/CMakeFiles/edit_cache.dir
+/Users/vuc229/Downloads/Projects/rcs_application/android/app/.cxx/Debug/734v5tc5/x86_64/CMakeFiles/rebuild_cache.dir

@@ -1,17 +1,16 @@
-# Uncomment this line to define a global platform for your project
-platform :ios, '12.0'
+platform :ios, min_ios_version = "13.0"
 
 # CocoaPods analytics sends network stats synchronously affecting flutter build latency.
-ENV['COCOAPODS_DISABLE_STATS'] = 'true'
+ENV["COCOAPODS_DISABLE_STATS"] = "true"
 
-project 'Runner', {
-  'Debug' => :debug,
-  'Profile' => :release,
-  'Release' => :release,
+project "Runner", {
+  "Debug" => :debug,
+  "Profile" => :release,
+  "Release" => :release,
 }
 
 def flutter_root
-  generated_xcode_build_settings_path = File.expand_path(File.join('..', 'Flutter', 'Generated.xcconfig'), __FILE__)
+  generated_xcode_build_settings_path = File.expand_path(File.join("..", "Flutter", "Generated.xcconfig"), __FILE__)
   unless File.exist?(generated_xcode_build_settings_path)
     raise "#{generated_xcode_build_settings_path} must exist. If you're running pod install manually, make sure flutter pub get is executed first"
   end
@@ -23,59 +22,38 @@ def flutter_root
   raise "FLUTTER_ROOT not found in #{generated_xcode_build_settings_path}. Try deleting Generated.xcconfig, then run flutter pub get"
 end
 
-require File.expand_path(File.join('packages', 'flutter_tools', 'bin', 'podhelper'), flutter_root)
+require File.expand_path(File.join("packages", "flutter_tools", "bin", "podhelper"), flutter_root)
 
 flutter_ios_podfile_setup
 
-target 'Runner' do
+target "Runner" do
   use_frameworks!
   use_modular_headers!
-
-  # Force the pod repo to update with specific Firebase versions
-  pod 'Firebase/Firestore', '10.25.0'
-  pod 'Firebase/Auth', '10.25.0'
   
-  # Add BoringSSL-GRPC with modular headers
-  pod 'BoringSSL-GRPC', :modular_headers => true
-
   flutter_install_all_ios_pods File.dirname(File.realpath(__FILE__))
-  target 'RunnerTests' do
+  target "RunnerTests" do
     inherit! :search_paths
   end
 end
 
 post_install do |installer|
-  # Add these lines to avoid deployment target warnings
+  # Apply Flutter additional iOS build settings
   installer.pods_project.targets.each do |target|
     flutter_additional_ios_build_settings(target)
-
-    # Set deployment target for all pods to iOS 12.0 or above
-    target.build_configurations.each do |config|
-      config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '12.0'
-
-      # Workaround for building issues with the latest Xcode
-      config.build_settings['DEAD_CODE_STRIPPING'] = 'YES'
-
-      # Workaround for pod issues with arm64 simulator
-      config.build_settings['EXCLUDED_ARCHS[sdk=iphonesimulator*]'] = 'arm64'
-
-      # Fix for unsupported -G option
-      if config.build_settings['OTHER_CFLAGS']
-        config.build_settings['OTHER_CFLAGS'] = config.build_settings['OTHER_CFLAGS'].reject { |flag| flag == '-G' }
-      end
-      if config.build_settings['OTHER_CPLUSPLUSFLAGS']
-        config.build_settings['OTHER_CPLUSPLUSFLAGS'] = config.build_settings['OTHER_CPLUSPLUSFLAGS'].reject { |flag| flag == '-G' }
+    
+    # Fix for abseil - GitHub issue #13996
+    if target.name == 'abseil'
+      puts "Workaround: Configuring abseil to use gnu++14 language standard for cocoapods 1.16+ compatibility"
+      puts "            Remove workaround when upstream issue fixed https://github.com/firebase/firebase-ios-sdk/issues/13996"
+      target.build_configurations.each do |config|
+        config.build_settings['CLANG_CXX_LANGUAGE_STANDARD'] = 'gnu++14'
       end
     end
     
-    # Additional fix specifically for BoringSSL-GRPC
-    if target.name == 'BoringSSL-GRPC'
-      target.source_build_phase.files.each do |file|
-        if file.settings && file.settings['COMPILER_FLAGS']
-          flags = file.settings['COMPILER_FLAGS'].split
-          flags.reject! { |flag| flag == '-GCC_WARN_INHIBIT_ALL_WARNINGS' }
-          file.settings['COMPILER_FLAGS'] = flags.join(' ')
-        end
+    # Xcode 15 issues fix
+    if target.respond_to?(:product_type) and target.product_type == "com.apple.product-type.bundle"
+      target.build_configurations.each do |config|
+        config.build_settings['CODE_SIGNING_ALLOWED'] = 'NO'
       end
     end
   end

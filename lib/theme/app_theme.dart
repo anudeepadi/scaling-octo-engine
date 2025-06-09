@@ -1,91 +1,73 @@
 import 'package:flutter/material.dart';
 
 class AppTheme {
-  static const Color primaryLight = Color(0xFF1A73E8);
-  static const Color secondaryLight = Color(0xFF4285F4);
-  static const Color backgroundLight = Color(0xFFF8F9FA);
-  static const Color surfaceLight = Color(0xFFFFFFFF);
-  static const Color errorLight = Color(0xFFDC3545);
-  static const Color accentLight = Color(0xFF34A853);
-
-  static const Color primaryDark = Color(0xFF8AB4F8);
-  static const Color secondaryDark = Color(0xFF669DF6);
-  static const Color backgroundDark = Color(0xFF202124);
-  static const Color surfaceDark = Color(0xFF292A2D);
-  static const Color errorDark = Color(0xFFE84040);
-  static const Color accentDark = Color(0xFF81C995);
-
+  // QuitTXT Color Scheme
+  static const Color quitxtPurple = Color(0xFF8100C0);   // Header bar color
+  static const Color quitxtTeal = Color(0xFF009688);     // Chat bubbles, navigation drawer
+  static const Color quitxtGreen = Color(0xFF90C418);    // Login background
+  static const Color quitxtBlack = Color(0xFF000000);    // QuitTXT logo background
+  static const Color quitxtWhite = Color(0xFFFFFFFF);    // Text and card background
+  static const Color quitxtGray = Color(0xFF757575);     // Received messages
+  
   static final ThemeData lightTheme = ThemeData(
     useMaterial3: true,
-    colorScheme: const ColorScheme.light(
-      primary: primaryLight,
-      secondary: secondaryLight,
-      background: backgroundLight,
-      surface: surfaceLight,
-      error: errorLight,
+    colorScheme: ColorScheme.light(
+      primary: quitxtTeal,
+      secondary: quitxtPurple,
+      background: quitxtWhite,
+      surface: quitxtWhite,
+      error: Colors.red,
+      onPrimary: quitxtWhite,
+      onSecondary: quitxtWhite,
     ),
-    scaffoldBackgroundColor: backgroundLight,
+    scaffoldBackgroundColor: quitxtWhite,
     cardTheme: CardTheme(
       elevation: 2,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
     ),
     appBarTheme: const AppBarTheme(
       elevation: 0,
-      centerTitle: true,
-      backgroundColor: surfaceLight,
-      foregroundColor: primaryLight,
+      centerTitle: false,
+      backgroundColor: quitxtPurple,
+      foregroundColor: quitxtWhite,
     ),
     inputDecorationTheme: InputDecorationTheme(
       filled: true,
-      fillColor: surfaceLight,
+      fillColor: quitxtWhite,
       border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
-        borderSide: BorderSide.none,
+        borderRadius: BorderRadius.circular(24),
+        borderSide: BorderSide(color: quitxtTeal),
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(24),
+        borderSide: BorderSide(color: quitxtTeal),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(24),
+        borderSide: BorderSide(color: quitxtTeal, width: 2),
       ),
       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
     ),
     elevatedButtonTheme: ElevatedButtonThemeData(
       style: ElevatedButton.styleFrom(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        foregroundColor: quitxtWhite,
+        backgroundColor: quitxtTeal,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
         padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
       ),
+    ),
+    textButtonTheme: TextButtonThemeData(
+      style: TextButton.styleFrom(
+        foregroundColor: quitxtTeal,
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      ),
+    ),
+    drawerTheme: DrawerThemeData(
+      backgroundColor: quitxtTeal,
+      scrimColor: Colors.black54,
     ),
   );
 
-  static final ThemeData darkTheme = ThemeData(
-    useMaterial3: true,
-    colorScheme: const ColorScheme.dark(
-      primary: primaryDark,
-      secondary: secondaryDark,
-      background: backgroundDark,
-      surface: surfaceDark,
-      error: errorDark,
-    ),
-    scaffoldBackgroundColor: backgroundDark,
-    cardTheme: CardTheme(
-      elevation: 2,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-    ),
-    appBarTheme: const AppBarTheme(
-      elevation: 0,
-      centerTitle: true,
-      backgroundColor: surfaceDark,
-      foregroundColor: primaryDark,
-    ),
-    inputDecorationTheme: InputDecorationTheme(
-      filled: true,
-      fillColor: surfaceDark,
-      border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
-        borderSide: BorderSide.none,
-      ),
-      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-    ),
-    elevatedButtonTheme: ElevatedButtonThemeData(
-      style: ElevatedButton.styleFrom(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-      ),
-    ),
-  );
+  // Since the app appears to use light theme only, we'll keep dark theme similar but aligned
+  static final ThemeData darkTheme = lightTheme;
 }

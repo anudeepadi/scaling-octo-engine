@@ -1,50 +1,46 @@
-import 'dart:async'; // Import async library
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../models/chat_message.dart';
 import '../models/quick_reply.dart';
-// Remove DashMessagingService import if only used for sending
-// import '../services/dash_messaging_service.dart';
-import '../utils/firebase_utils.dart';
+import '../services/dash_messaging_service.dart';
+import '../utils/app_localizations.dart';
+import '../utils/context_holder.dart';
 import 'chat_provider.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
-// Remove FirebaseConnectionService import
-// import '../services/firebase_connection_service.dart';
-import 'package:firebase_auth/firebase_auth.dart'; // Add FirebaseAuth import
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:uuid/uuid.dart';
-import '../services/server_message_service.dart';
 
 class DashChatProvider extends ChangeNotifier {
-  // Remove DashMessagingService instance if only used for sending
-  // final DashMessagingService _dashService = DashMessagingService();
-  // Ensure _firestore is typed correctly
-  final FirebaseFirestore _firestore;
-  // Remove FirebaseConnectionService instance
-  // final FirebaseConnectionService? _firebaseService;
-  // Add FirebaseAuth instance
-  final FirebaseAuth _auth;
-  ChatProvider? _chatProvider; // Add reference to ChatProvider
+  final DashMessagingService _dashService = DashMessagingService();
+  final FirebaseAuth _auth = FirebaseAuth.instance;
+  
+  ChatProvider? _chatProvider;
   StreamSubscription? _authSubscription;
-  StreamSubscription<QuerySnapshot>? _messageSubscription;
+  StreamSubscription? _messageSubscription;
   User? _currentUser;
-  ServerMessageService? _serverMessageService;
-  bool _isServerServiceInitialized = false; // Add this field
-
+  
   bool _isTyping = false;
   bool get isTyping => _isTyping;
-  bool get isServerServiceInitialized => _isServerServiceInitialized; // Add this getter
+  bool get isServerServiceInitialized => _dashService.isInitialized;
+  
+  // Add debounce variables to prevent double sends
+  bool _isSendingMessage = false;
+  bool get isSendingMessage => _isSendingMessage;
+  String? _lastMessageSent;
+  DateTime? _lastSendTime;
+  
+  // Delegate messages to ChatProvider
+  List<ChatMessage> get messages => _chatProvider?.messages ?? [];
+  
+  // Delegate isLoading to ChatProvider
+  bool get isLoading => _chatProvider?.isLoading ?? false;
 
-  // Constructor for use with Firebase
-  DashChatProvider()
-      : _firestore = FirebaseFirestore.instance,
-        _auth = FirebaseAuth.instance {
+  // Constructor
+  DashChatProvider() {
     print('DashChatProvider: Initializing...');
-    // Add null check immediately after initialization
     if (_auth == null) {
-      print('FATAL ERROR: DashChatProvider._auth is NULL immediately after assignment!');
-      // Optionally throw an error to make it obvious
-      // throw StateError('FirebaseAuth instance is null after initialization.');
+      print('ERROR: DashChatProvider._auth is NULL immediately after assignment!');
     } else {
       print('DashChatProvider: _auth initialized successfully.');
     }
@@ -55,9 +51,10 @@ class DashChatProvider extends ChangeNotifier {
   void setChatProvider(ChatProvider chatProvider) {
     _chatProvider = chatProvider;
     print('DashChatProvider: Linked with ChatProvider.');
-    // If user is already logged in when linked, setup listeners immediately
+    
+    // If user is already logged in when linked, setup listeners
     if (_currentUser != null) {
-      _setupFirebaseListeners(_currentUser!);
+      _setupMessageListener();
     }
   }
 
@@ -65,346 +62,248 @@ class DashChatProvider extends ChangeNotifier {
     _authSubscription = _auth.authStateChanges().listen((User? user) {
       print('DashChatProvider: Auth state changed. User: ${user?.uid}');
       if (user == null) {
-        // User logged out
-        _currentUser = null;
-        // _messageSubscription?.cancel(); // Moved cancellation to clearOnLogout
-        // _chatProvider?.clearChatHistory(); // Moved clearing to clearOnLogout (via proxy provider call)
-        // clearOnLogout(); // Let the proxy provider call this
-        notifyListeners(); // Notify if provider state depends on auth
+        // User logged out - clear all state
+        clearOnLogout();
       } else {
         // User logged in
         _currentUser = user;
-        // Only setup listeners if chatProvider is linked
         if (_chatProvider != null) {
-           _setupFirebaseListeners(user);
+           _setupMessageListener();
         } else {
            print('DashChatProvider: User logged in, but ChatProvider not linked yet.');
         }
-        notifyListeners(); // Notify if provider state depends on auth
+        notifyListeners();
       }
     });
   }
         
-  void _setupFirebaseListeners(User user) {
+  void _setupMessageListener() {
     // Cancel any previous message subscription
     _messageSubscription?.cancel();
 
-    // <<< Clear existing messages BEFORE setting up new listener >>>
+    // Clear existing messages
     _chatProvider?.clearChatHistory();
     print('DashChatProvider: Cleared chat history before setting up new listener.');
 
-    final userId = user.uid;
-    final collectionPath = 'messages/$userId/messages'; // Corrected path
-    print('DashChatProvider: Setting up Firestore message listener for user $userId at /$collectionPath');
-
-    _messageSubscription = _firestore
-        .collection(collectionPath) // Use the corrected path variable
-        .orderBy('timestamp', descending: false) // Order by timestamp
-        .snapshots()
-        .listen((snapshot) {
-      if (_chatProvider == null) return; // Don't process if chatProvider isn't linked
-
-      print('DashChatProvider: Received ${snapshot.docs.length} messages from Firestore (/$collectionPath).');
-      final messages = snapshot.docs.map((doc) {
-          print('\n[QuickReplyDebug] Processing doc ID: ${doc.id}'); // Log Doc ID
-          final data = doc.data(); 
-          
-          // --- Correctly handle Firestore Timestamp --- 
-          final timestampData = data['timestamp']; // Check for 'timestamp'
-          DateTime timestamp;
-          if (timestampData is Timestamp) {
-              timestamp = timestampData.toDate(); // Convert Firestore Timestamp to DateTime
-          } else {
-              // Fallback or error handling if it's not a Timestamp (or null)
-              print('Warning: timestamp field is not a Firestore Timestamp or is null for doc ${doc.id}.');
-              timestamp = DateTime.now(); // Default to now or handle as error
-          }
-          // --- End of Timestamp handling --- 
-          
-          final messageContent = data['messageBody'] as String? ?? data['content'] as String? ?? ''; // Check both fields
-          final source = data['source'] as String?;
-          final senderId = data['senderId'] as String?;
-          // Determine isMe based on senderId matching current user, or lack of 'server' source
-          final isMe = (senderId != null && senderId == _currentUser?.uid) || (source == null && senderId == null); 
-          print('[QuickReplyDebug] isMe: $isMe (senderId: $senderId, source: $source)'); // Log isMe calculation
-          print('[QuickReplyDebug] Message Content: "$messageContent"'); // Log Content
-
-          List<QuickReply>? suggestedReplies;
-          List<String>? answersFromData;
-          // Extract existing quick replies (answers) first
-          if (data.containsKey('answers') && data['answers'] is List) {
-            answersFromData = List<String>.from(data['answers']);
-            print("[QuickReplyDebug] Found 'answers' field: $answersFromData"); // Use double quotes
-            if (answersFromData.isNotEmpty) { 
-               suggestedReplies = answersFromData.map((text) => QuickReply(text: text, value: text)).toList();
-               print("[QuickReplyDebug] Created suggestedReplies from 'answers' field: ${suggestedReplies?.length ?? 0} replies"); // Use double quotes
-            }
-          } else {
-             print("[QuickReplyDebug] 'answers' field not found or not a List."); // Use double quotes
-          }
-
-          // ---- Add keyword-based quick replies if message is from server and no 'answers' were provided ----
-          final shouldCheckKeywords = !isMe && (suggestedReplies == null || suggestedReplies.isEmpty);
-          print('[QuickReplyDebug] Should check keywords? $shouldCheckKeywords (!isMe: ${!isMe}, repliesEmpty: ${(suggestedReplies == null || suggestedReplies.isEmpty)}) ');
-          if (shouldCheckKeywords) {
-            final messageContentLower = messageContent.toLowerCase();
-            final List<Map<String, List<String>>> keywordGroups = [
-              {'keywords': ['hello', 'hi'], 'replies': ['hello', 'hi']},
-              {'keywords': ['how', 'help'], 'replies': ['how', 'help']},
-              {'keywords': ['why', 'reason'], 'replies': ['why', 'reason']},
-              {'keywords': ['smoke', 'cigarette'], 'replies': ['smoke', 'cigarette']},
-              {'keywords': ['drink', 'alcohol'], 'replies': ['drink', 'alcohol']},
-            ];
-
-            bool keywordMatchFound = false; // Flag to track if any keyword matched
-            for (var group in keywordGroups) {
-              bool matchFoundInGroup = group['keywords']!.any((keyword) => messageContentLower.contains(keyword));
-              if (matchFoundInGroup) {
-                 print('[QuickReplyDebug] Keyword match found in group: ${group['keywords']}'); // Log which group matched
-                 suggestedReplies = group['replies']!
-                    .map((replyText) => QuickReply(text: replyText, value: replyText))
-                    .toList();
-                 keywordMatchFound = true;
-                 break; 
-              }
-            }
-            if (!keywordMatchFound) {
-                 print('[QuickReplyDebug] No keyword match found in message content.');
-            }
-          } else if (!isMe) {
-             print("[QuickReplyDebug] Not checking keywords because replies already exist from 'answers' field."); // Use double quotes
-          }
-          // ---- End of keyword-based quick replies ----
-          
-          print('[QuickReplyDebug] Final suggestedReplies count: ${suggestedReplies?.length ?? 0}'); // Log final reply count
-
-          // Determine type and status based on available data
-          final messageType = data.containsKey('type') && data['type'] is int
-                ? MessageType.values[data['type']]
-                : MessageType.text;
-          final messageStatus = data.containsKey('status') && data['status'] is int
-                ? MessageStatus.values[data['status']]
-                : (isMe ? MessageStatus.sent : MessageStatus.delivered); // Sensible defaults
-
-          // Perform robust mapping
-          return ChatMessage(
-              id: doc.id, // Use Firestore doc ID
-              content: messageContent,
-              isMe: isMe,
-              timestamp: timestamp, 
-              suggestedReplies: suggestedReplies, // Include replies (either from 'answers' or keywords)
-              type: messageType,
-              status: messageStatus,
-              // Map other ChatMessage fields if corresponding data exists in Firestore
-          );
-      }).toList();
-
-      // Update the linked ChatProvider
-      _chatProvider!.setMessages(messages);
-
+    // Subscribe to the DashMessagingService message stream
+    _messageSubscription = _dashService.messageStream.listen((message) {
+      if (_chatProvider == null) {
+        print('DashChatProvider: ChatProvider is null, cannot add message.');
+        return;
+      }
+      
+      print('DashChatProvider: Received message from stream: ${message.id}, type: ${message.type}, content: ${message.content.substring(0, message.content.length > 30 ? 30 : message.content.length)}...');
+      
+      // Add message to chat provider
+      // Use the appropriate method based on message type
+      if (message.type == MessageType.quickReply) {
+        print('DashChatProvider: Adding quick reply message with ${message.suggestedReplies?.length ?? 0} options');
+        _chatProvider!.addQuickReplyMessage(message.suggestedReplies ?? []);
+      } else {
+        // Skip server status messages
+        if (message.content.startsWith('Using server:')) {
+          print('DashChatProvider: Skipping server status message');
+          return;
+        }
+        print('DashChatProvider: Adding text message (from ${message.isMe ? "user" : "server"})');
+        _chatProvider!.addTextMessage(message.content, isMe: message.isMe);
+      }
+      
     }, onError: (error) {
-      print('DashChatProvider: Error listening to messages (/$collectionPath): $error');
-      // Optionally update ChatProvider with an error state
+      print('DashChatProvider: Error listening to messages: $error');
     });
+    
+    print('DashChatProvider: Message listener set up successfully');
   }
 
   // Initialize the server message service
   void initializeServerService(String userId, String fcmToken) {
-    print('[DashChatProvider] Initializing ServerMessageService for user $userId'); // Added log
-    _serverMessageService = ServerMessageService(
-      userId: userId,
-      fcmToken: fcmToken,
-    );
-    _isServerServiceInitialized = true; // Set flag
-    print('[DashChatProvider] ServerMessageService Initialized. Flag set: $_isServerServiceInitialized'); // Added log
-    notifyListeners(); // Notify potentially interested listeners
+    print('[DashChatProvider] Initializing DashMessagingService for user $userId');
+    _dashService.initialize(userId).then((_) {
+      print('[DashChatProvider] DashMessagingService initialized successfully');
+      // Setup message listener after successful initialization
+      if (_chatProvider != null) {
+        _setupMessageListener();
+        print('[DashChatProvider] Message listener set up');
+      } else {
+        print('[DashChatProvider] Warning: ChatProvider is null, cannot set up message listener');
+      }
+      notifyListeners();
+    }).catchError((error) {
+      print('[DashChatProvider] Error initializing DashMessagingService: $error');
+    });
   }
 
-  // Add the clearOnLogout method
+  // Clear state on logout
   void clearOnLogout() {
     print('[DashChatProvider] Clearing state on logout.');
+    
+    // Cancel subscriptions
     _messageSubscription?.cancel();
-    _messageSubscription = null; // Ensure it's null after cancelling
-    _serverMessageService = null; // Clear the service instance
-    _isServerServiceInitialized = false; // Reset the flag
-    // Note: _chatProvider?.clearChatHistory() is likely handled by ChatProvider itself
-    // listening to AuthProvider or called separately. Avoid duplicate clears.
-    print('[DashChatProvider] State cleared. Subscription cancelled: ${_messageSubscription == null}, Service cleared: ${_serverMessageService == null}, Flag reset: $_isServerServiceInitialized');
-    notifyListeners(); // Notify listeners about the state change
+    _messageSubscription = null;
+    
+    // Clear chat history from ChatProvider - defer to avoid setState during build
+    if (_chatProvider != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _chatProvider?.clearChatHistory();
+      });
+    }
+    
+    // Dispose the messaging service
+    _dashService.dispose();
+    
+    // Reset debounce flags
+    _isSendingMessage = false;
+    _lastMessageSent = null;
+    _lastSendTime = null;
+    
+    // Clear current user
+    _currentUser = null;
+    
+    // Defer notifyListeners to avoid setState during build
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      notifyListeners();
+    });
   }
 
-  // Send a message directly to Firestore
+  // Send a message 
   Future<void> sendMessage(String message) async {
-    final authInstance = FirebaseAuth.instance;
-    final currentUser = authInstance.currentUser; 
-    if (message.trim().isEmpty || currentUser == null) {
+    if (message.trim().isEmpty || _currentUser == null) {
       print('Message empty or user not logged in. Cannot send.');
       return;
     }
-    final userId = currentUser.uid;
+    
     final messageContent = message.trim();
+    final userId = _currentUser!.uid;
     
-    // Log the userId being used
-    print('[SendMessage] Using userId: $userId');
-
-    DocumentReference? userDocRef;
-    try {
-      userDocRef = _firestore.collection('messages').doc(userId);
-      
-      print('[SendMessage] Attempting to ensure document exists: ${userDocRef.path}');
-      await userDocRef.set({'_placeholder': FieldValue.serverTimestamp()}, SetOptions(merge: true))
-        .then((_) {
-           print('[SendMessage] .then(): Document set/merge completed.');
-        })
-        .catchError((error, stackTrace) {
-           print('[SendMessage] .catchError() during userDocRef.set(): $error\n$stackTrace');
-           throw error;
-        });
-      print('[SendMessage] Post-set: Document ensured/created successfully: ${userDocRef.path}');
-
-      // Generate a unique message ID
-      final messageId = const Uuid().v4();
-      
-      print('[SendMessage] Attempting to add message to subcollection: ${userDocRef.collection("messages").path}');
-      await userDocRef.collection('messages')
-          .doc(messageId)
-          .set({
-            'content': messageContent,
-            'senderId': userId,
-            'timestamp': FieldValue.serverTimestamp(),
-            'type': MessageType.text.index,
-            'status': MessageStatus.sending.index,
-            'eventTypeCode': 1,
-          })
-          .then((_) {
-             print('[SendMessage] .then(): Message added successfully with ID: $messageId');
-          })
-          .catchError((error, stackTrace) {
-             print('[SendMessage] .catchError() during collection.add(): $error\n$stackTrace');
-             throw error;
-          });
-      print('[SendMessage] Post-add: Message added successfully to subcollection.');
-
-      // Process the message using ServerMessageService
-      if (_serverMessageService != null) {
-        await _serverMessageService!.processMessage(
-          messageText: messageContent,
-          messageId: messageId,
-          eventTypeCode: 1,
-        );
-      } else {
-        print('Warning: ServerMessageService not initialized');
-      }
-
-    } catch (e, s) {
-      if (userDocRef == null) {
-         print('[SendMessage] Error initializing DocumentReference: $e\n$s');
-      } else if (await userDocRef.get().then((_) => false).catchError((_) => true)) {
-         print('[SendMessage] Error likely during userDocRef.set(): $e\n$s');
-      } else {
-         print('[SendMessage] Error likely during collection.add(): $e\n$s');
-      }
-      print('[SendMessage] Outer catch block details: $e\nStack trace:\n$s');
-    }
-  }
-
-  // Handle quick reply selection by sending a message to Firestore
-  Future<void> handleQuickReply(QuickReply reply) async {
-    print("[HandleQuickReply] Method called with reply: text='${reply.text}', value='${reply.value}'"); // Log entry and reply
-    
-    final authInstance = FirebaseAuth.instance;
-    final currentUser = authInstance.currentUser;
-    if (reply.value.isEmpty || currentUser == null) {
-       print('[HandleQuickReply] Error: Reply value empty or user not logged in. Cannot send.');
+    // Prevent duplicate sends (debounce)
+    if (_isSendingMessage) {
+      print('Already sending a message. Ignoring duplicate request.');
       return;
     }
-    final userId = currentUser.uid;
-    final replyContent = reply.value;
     
-    print('[HandleQuickReply] Using userId: $userId, Reply Content: "$replyContent"');
-
-    DocumentReference? userDocRef;
-    final replyMessageId = const Uuid().v4(); // Generate ID early for logging
-    print('[HandleQuickReply] Generated Reply Message ID: $replyMessageId');
-
+    // Check for rapid duplicate messages
+    if (_lastMessageSent == messageContent && _lastSendTime != null) {
+      final timeSinceLastSend = DateTime.now().difference(_lastSendTime!);
+      if (timeSinceLastSend.inSeconds < 2) {
+        print('Duplicate message detected within 2 seconds. Ignoring: $messageContent');
+        return;
+      }
+    }
+    
+    // Set debounce flags
+    _isSendingMessage = true;
+    _lastMessageSent = messageContent;
+    _lastSendTime = DateTime.now();
+    
     try {
-       userDocRef = _firestore.collection('messages').doc(userId);
-       final messageSubcollectionPath = userDocRef.collection("messages").path;
-       print('[HandleQuickReply] User doc path: ${userDocRef.path}');
-       print('[HandleQuickReply] Message subcollection path: $messageSubcollectionPath');
-
-       // --- Firestore Write --- 
-       print('[HandleQuickReply] Attempting to add reply message to Firestore...');
-       await userDocRef.collection('messages') 
-          .doc(replyMessageId)
-          .set({
-            'content': replyContent, // Use 'content' for user replies
-            'senderId': userId,
-            'timestamp': FieldValue.serverTimestamp(), // Use 'timestamp'
-            'type': MessageType.text.index,
-            'status': MessageStatus.sending.index,
-            'eventTypeCode': 1, // Change eventTypeCode from 2 to 1
-          });
-       print('[HandleQuickReply] Successfully added reply message to Firestore (ID: $replyMessageId).');
-
-       // --- Server Processing --- 
-       if (_serverMessageService != null) {
-         print('[HandleQuickReply] Attempting to process reply message via ServerMessageService...');
-         await _serverMessageService!.processMessage(
-           messageText: replyContent,
-           messageId: replyMessageId,
-           eventTypeCode: 1, // Change eventTypeCode from 2 to 1
-         );
-         print('[HandleQuickReply] Successfully processed reply message via ServerMessageService.');
-       } else {
-         print('[HandleQuickReply] Warning: ServerMessageService not initialized, cannot process quick reply.');
-       }
-
-       print('[HandleQuickReply] Method completed successfully.');
-
-    } catch (e, s) {
-      print('[HandleQuickReply] !!! ERROR occurred !!!');
-      print('[HandleQuickReply] Error details: $e');
-      print('[HandleQuickReply] Stack trace:\n$s');
+      // If the messaging service is not initialized, initialize it now
+      if (!_dashService.isInitialized && _currentUser != null) {
+        print('DashMessagingService not initialized. Initializing now.');
+        await _dashService.initialize(_currentUser!.uid);
+      }
+      
+      // Send message to the server via DashMessagingService
+      try {
+        final success = await _dashService.sendMessage(messageContent);
+        if (success) {
+          print('Message sent successfully to server');
+        } else {
+          print('Failed to send message to server - check server logs');
+        }
+      } catch (e) {
+        print('Error sending message to server: $e');
+      }
+    } catch (e) {
+      print('Error in DashChatProvider.sendMessage: $e');
+    } finally {
+      // Reset debounce flags
+      _isSendingMessage = false;
+    }
+  }
+  
+  // Handle quick reply selection
+  Future<void> handleQuickReply(QuickReply reply) async {
+    print("[HandleQuickReply] Selected reply: text='${reply.text}', value='${reply.value}'");
+    
+    if (reply.value.isEmpty || _currentUser == null) {
+      print('[HandleQuickReply] Reply value empty or user not logged in. Cannot send.');
+      return;
+    }
+    
+    // Prevent duplicate sends
+    if (_isSendingMessage) {
+      print('Already sending a message. Ignoring duplicate quick reply.');
+      return;
+    }
+    
+    _isSendingMessage = true;
+    
+    try {
+      // Add the reply to the chat UI
+      if (_chatProvider != null) {
+        _chatProvider!.addTextMessage(reply.text, isMe: true);
+      }
+      
+      // If in demo mode or testing, simulate response
+      if (!_dashService.isInitialized) {
+        print('DashMessagingService not initialized. Using simulation mode.');
+        await _dashService.simulateServerResponse(reply.text);
+        return;
+      }
+      
+      // Send the quick reply to the server
+      final success = await _dashService.sendQuickReply(reply.value, reply.text);
+      if (success) {
+        print('Quick reply sent successfully to server');
+      } else {
+        print('Failed to send quick reply to server');
+        // If server send failed, simulate response in demo mode
+        await _dashService.simulateServerResponse(reply.text);
+      }
+    } catch (e) {
+      print('Error sending quick reply: $e');
+      // On error, use simulation as fallback
+      await _dashService.simulateServerResponse(reply.text);
+    } finally {
+      _isSendingMessage = false;
     }
   }
 
-  // Determine message type based on content (This seems like display logic, maybe belongs elsewhere?)
-  MessageType _determineMessageType(String content) {
-    // Check for YouTube links
-    if (content.contains('youtube.com/') || content.contains('youtu.be/')) {
-      return MessageType.youtube;
+  // Method to update the host URL
+  Future<void> updateHostUrl(String newUrl) async {
+    try {
+      await _dashService.updateHostUrl(newUrl);
+      print('Host URL updated successfully');
+    } catch (e) {
+      print('Error updating host URL: $e');
+      throw Exception('Failed to update host URL: $e');
     }
-
-    // Check for GIF links
-    if (content.toLowerCase().endsWith('.gif') || content.contains('.gif?')) {
-      return MessageType.gif;
-    }
-
-    // Check for image links
-    if (_isImageUrl(content)) {
-      return MessageType.image;
-    }
-
-    // Check for other URLs
-    if (_containsUrl(content)) {
-      return MessageType.linkPreview;
-    }
-
-    return MessageType.text;
   }
 
-  // Helper to check if string is an image URL
-  bool _isImageUrl(String url) {
-    final imageExtensions = ['.jpg', '.jpeg', '.png', '.webp', '.bmp'];
-    return imageExtensions.any((ext) => url.toLowerCase().contains(ext));
-  }
-
-  // Helper to check if string contains a URL
-  bool _containsUrl(String text) {
-    return Uri.tryParse(text)?.isAbsolute == true ||
-           text.contains('http://') ||
-           text.contains('https://');
+  // Process custom JSON input
+  Future<void> processCustomJsonInput(String jsonInput) async {
+    if (jsonInput.trim().isEmpty || _currentUser == null) {
+      print('JSON input empty or user not logged in. Cannot process.');
+      return;
+    }
+    
+    _isSendingMessage = true;
+    
+    try {
+      print('[DashChatProvider] Processing custom JSON input');
+      
+      // Call the service method to process the custom JSON
+      if (_dashService.isInitialized) {
+        await _dashService.processCustomJsonInput(jsonInput);
+      } else {
+        print('DashMessagingService not initialized. Cannot process custom JSON.');
+      }
+    } catch (e) {
+      print('Error processing custom JSON input: $e');
+    } finally {
+      _isSendingMessage = false;
+    }
   }
 
   @override
@@ -412,18 +311,39 @@ class DashChatProvider extends ChangeNotifier {
     print('DashChatProvider: Disposing...');
     _authSubscription?.cancel();
     _messageSubscription?.cancel();
+    _dashService.dispose();
     super.dispose();
   }
-
-  // Remove constructors for withoutFirebase if demo mode is not needed
-  /*
-  factory DashChatProvider.withoutFirebase() {
-    print('DashChatProvider: Creating without Firebase (DEMO MODE)');
-    return DashChatProvider._internal();
+  
+  // Force a manual sync of messages from Firestore
+  void forceMessageSync() {
+    print('[DashChatProvider] Manually forcing message sync');
+    
+    if (!_dashService.isInitialized) {
+      print('[DashChatProvider] Cannot force sync - DashMessagingService not initialized');
+      return;
+    }
+    
+    // Reset the last message time to force a full refresh
+    _dashService.resetLastMessageTime();
   }
-
-  DashChatProvider._internal() 
-      : _firestore = FirebaseFirestore.instance,
-        _auth = FirebaseAuth.instance;
-  */
+  
+  // Force reload messages from Firestore
+  void forceMessageReload() {
+    print('[DashChatProvider] Forcing message reload');
+    
+    if (!_dashService.isInitialized) {
+      print('[DashChatProvider] Cannot force reload - DashMessagingService not initialized');
+      return;
+    }
+    
+    // Clear current chat history
+    _chatProvider?.clearChatHistory();
+    
+    // Reset the last message time and reload
+    _dashService.resetLastMessageTime();
+    
+    // Re-setup message listener to get fresh messages
+    _setupMessageListener();
+  }
 }

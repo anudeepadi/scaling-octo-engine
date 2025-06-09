@@ -162,21 +162,28 @@ class _IosChatMessageWidgetState extends State<IosChatMessageWidget> {
                 widget.message.suggestedReplies!.isNotEmpty)
               Padding(
                 padding: const EdgeInsets.only(top: 8),
-                child: Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: widget.message.suggestedReplies!
-                      .map((reply) => CupertinoButton(
-                            padding: EdgeInsets.zero,
-                            child: Text(
-                              reply.text,
-                              style: TextStyle(
-                                color: widget.message.isMe
-                                    ? CupertinoColors.white
-                                    : CupertinoColors.activeBlue,
+                      .map((reply) => Container(
+                            margin: const EdgeInsets.only(bottom: 8),
+                            child: CupertinoButton(
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                              color: widget.message.isMe
+                                  ? CupertinoColors.white.withOpacity(0.2)
+                                  : CupertinoColors.activeBlue.withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(16),
+                              child: Text(
+                                reply.text,
+                                style: TextStyle(
+                                  color: widget.message.isMe
+                                      ? CupertinoColors.white
+                                      : CupertinoColors.activeBlue,
+                                ),
+                                textAlign: TextAlign.center,
                               ),
+                              onPressed: () => widget.onQuickReplyTap?.call(reply.value),
                             ),
-                            onPressed: () => widget.onQuickReplyTap?.call(reply.value),
                           ))
                       .toList(),
                 ),

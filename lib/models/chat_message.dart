@@ -37,6 +37,20 @@ class MessageReaction {
   });
 }
 
+bool isMessagePoll(dynamic isPollValue) {
+  if (isPollValue == null) return false;
+  if (isPollValue is bool) {
+    return isPollValue;
+  } else if (isPollValue is String) {
+    return isPollValue.toLowerCase() == 'y' ||
+           isPollValue.toLowerCase() == 'yes' ||
+           isPollValue.toLowerCase() == 'true';
+  } else if (isPollValue is int) {
+    return isPollValue > 0;
+  }
+  return false;
+}
+
 class ChatMessage {
   final String id;
   final String content;
@@ -80,6 +94,73 @@ class ChatMessage {
     this.eventTypeCode = 1,
   });
 
+  factory ChatMessage.fromFirestore(Map<String, dynamic> data, String documentId) {
+    // Parse createdAt timestamp
+    DateTime timestamp;
+    try {
+      var createdAt = data['createdAt'];
+      if (createdAt != null) {
+        if (createdAt is String) {
+          int timeValue = int.tryParse(createdAt) ?? 0;
+          timestamp = DateTime.fromMillisecondsSinceEpoch(timeValue);
+        } else if (createdAt is int) {
+          timestamp = DateTime.fromMillisecondsSinceEpoch(createdAt);
+        } else {
+          timestamp = DateTime.now();
+        }
+      } else {
+        timestamp = DateTime.now();
+      }
+    } catch (e) {
+      print('Error parsing timestamp: $e');
+      timestamp = DateTime.now();
+    }
+    
+    // Get message content
+    String content = data['messageBody'] ?? '';
+    
+    // Determine if message is from the user
+    bool isMe = data['source'] == 'client';
+    
+    // Get message ID
+    String messageId = data['serverMessageId'] ?? documentId;
+    
+    // Check for quick replies
+    List<QuickReply>? suggestedReplies;
+    final isPoll = data['isPoll'];
+    final answers = data['answers'];
+    
+    if (isMessagePoll(isPoll) && answers != null) {
+      suggestedReplies = [];
+      
+      if (answers is String && answers != 'None' && answers.isNotEmpty) {
+        // Parse comma-separated answers string
+        final answerList = answers.split(',').map((e) => e.trim()).where((e) => e.isNotEmpty).toList();
+        suggestedReplies = answerList.map((item) => QuickReply(text: item, value: item)).toList();
+      } else if (answers is List) {
+        suggestedReplies = List<String>.from(answers)
+            .map((item) => QuickReply(text: item, value: item))
+            .toList();
+      }
+    }
+    
+    // Determine message type
+    MessageType type = MessageType.text;
+    if (suggestedReplies != null && suggestedReplies.isNotEmpty) {
+      type = MessageType.quickReply;
+    }
+    
+    return ChatMessage(
+      id: messageId,
+      content: content,
+      timestamp: timestamp,
+      isMe: isMe,
+      type: type,
+      suggestedReplies: suggestedReplies,
+      status: MessageStatus.sent,
+    );
+  }
+  
   factory ChatMessage.fromJson(Map<String, dynamic> json) {
     return ChatMessage(
       id: json['id'] as String,

@@ -20,63 +20,56 @@ class QuickReplyWidget extends StatelessWidget {
     }
 
     return Container(
-      margin: const EdgeInsets.only(bottom: 4),
-      height: 36,
-      child: ListView.builder(
-        scrollDirection: Axis.horizontal,
-        itemCount: quickReplies.length,
-        itemBuilder: (context, index) {
-          if (Platform.isIOS) {
-            return _buildIOSQuickReply(quickReplies[index], context);
-          } else {
-            return _buildAndroidQuickReply(quickReplies[index], context);
-          }
-        },
+      margin: const EdgeInsets.only(bottom: 2),
+      child: Wrap(
+        spacing: 4.0,
+        runSpacing: 4.0,
+        children: quickReplies.map((reply) {
+          return Platform.isIOS 
+            ? _buildIOSQuickReply(reply, context)
+            : _buildAndroidQuickReply(reply, context);
+        }).toList(),
       ),
     );
   }
 
   Widget _buildIOSQuickReply(QuickReply reply, BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 4),
-      child: CupertinoButton(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-        color: CupertinoColors.systemBlue.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(16),
-        minSize: 20,
-        onPressed: () => onReplySelected(reply.value),
-        child: Text(
-          reply.text,
-          style: const TextStyle(
-            color: CupertinoColors.systemBlue,
-            fontSize: 13,
-          ),
+    return CupertinoButton(
+      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+      color: CupertinoColors.systemBlue.withOpacity(0.1),
+      borderRadius: BorderRadius.circular(6),
+      minSize: 20,
+      onPressed: () => onReplySelected(reply.value),
+      child: Text(
+        reply.text,
+        style: const TextStyle(
+          color: CupertinoColors.systemBlue,
+          fontSize: 10,
         ),
+        textAlign: TextAlign.center,
       ),
     );
   }
 
   Widget _buildAndroidQuickReply(QuickReply reply, BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 4),
-      child: TextButton(
-        style: TextButton.styleFrom(
-          backgroundColor: Theme.of(context).primaryColor.withOpacity(0.1),
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-          ),
-          minimumSize: const Size(10, 20),
-          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+    return TextButton(
+      style: TextButton.styleFrom(
+        backgroundColor: Theme.of(context).primaryColor.withOpacity(0.1),
+        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(6),
         ),
-        onPressed: () => onReplySelected(reply.value),
-        child: Text(
-          reply.text,
-          style: TextStyle(
-            color: Theme.of(context).primaryColor,
-            fontSize: 13,
-          ),
+        minimumSize: const Size(30, 20),
+        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+      ),
+      onPressed: () => onReplySelected(reply.value),
+      child: Text(
+        reply.text,
+        style: TextStyle(
+          color: Theme.of(context).primaryColor,
+          fontSize: 10,
         ),
+        textAlign: TextAlign.center,
       ),
     );
   }

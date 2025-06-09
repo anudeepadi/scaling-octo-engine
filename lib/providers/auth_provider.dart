@@ -1,9 +1,13 @@
 import 'package:flutter/foundation.dart';
-import 'package:firebase_auth/firebase_auth.dart'; // Add Firebase Auth import
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 
 // Update class to use Firebase Authentication
 class AuthProvider extends ChangeNotifier {
   final FirebaseAuth _auth = FirebaseAuth.instance; // Get Firebase Auth instance
+  final GoogleSignIn _googleSignIn = GoogleSignIn(
+    scopes: ['email', 'profile'],
+  );
   User? _user; // Hold the current Firebase User
 
   bool _isLoading = false;
@@ -69,9 +73,13 @@ class AuthProvider extends ChangeNotifier {
       // Use Firebase sign up
       UserCredential userCredential = await _auth.createUserWithEmailAndPassword(email: email, password: password);
       
-      // Optionally update display name (username isn't directly part of standard email/pass signup)
-      // You might store the username in Firestore linked to the userCredential.user.uid
-      // await userCredential.user?.updateDisplayName(username); 
+      // Update display name with the provided username
+      if (username.isNotEmpty) {
+        await userCredential.user?.updateDisplayName(username);
+        // Reload user to get updated profile
+        await userCredential.user?.reload();
+        _user = _auth.currentUser;
+      }
 
       // _onAuthStateChanged will handle updating state
       return true; // Indicate success
@@ -107,6 +115,97 @@ class AuthProvider extends ChangeNotifier {
        notifyListeners();
     }
     // Loading state is reset within _onAuthStateChanged after sign out completes
+  }
+
+  Future<bool> signInWithGoogle() async {
+    _isLoading = true;
+    _error = null;
+    notifyListeners();
+    
+    try {
+      // First check if user is already signed in to Google
+      GoogleSignInAccount? currentUser = _googleSignIn.currentUser;
+      
+      // If no current user, trigger the authentication flow
+      if (currentUser == null) {
+        currentUser = await _googleSignIn.signIn();
+      }
+      
+      if (currentUser == null) {
+        // User canceled the sign-in process
+        _isLoading = false;
+        notifyListeners();
+        return false;
+      }
+
+      // Obtain the auth details from the request
+      final GoogleSignInAuthentication googleAuth = await currentUser.authentication;
+
+      // Validate that we got the required tokens
+      if (googleAuth.accessToken == null || googleAuth.idToken == null) {
+        _error = 'Failed to get Google authentication tokens.';
+        print('AuthProvider: Missing Google tokens - AccessToken: ${googleAuth.accessToken != null}, IdToken: ${googleAuth.idToken != null}');
+        await _googleSignIn.signOut();
+        _isLoading = false;
+        notifyListeners();
+        return false;
+      }
+
+      // Create a new credential
+      final credential = GoogleAuthProvider.credential(
+        accessToken: googleAuth.accessToken,
+        idToken: googleAuth.idToken,
+      );
+
+      print('AuthProvider: Attempting Firebase sign in with Google credential');
+      
+      // Sign in to Firebase with the Google user credential
+      final UserCredential userCredential = await _auth.signInWithCredential(credential);
+      
+      print('AuthProvider: Google SignIn successful - User: ${userCredential.user?.uid}');
+      
+      // Success - _onAuthStateChanged will handle the rest
+      return true;
+    } on FirebaseAuthException catch (e) {
+      _error = _getFirebaseErrorMessage(e);
+      print('AuthProvider: Google SignIn FirebaseAuthException - ${e.code}: ${e.message}');
+      // Clean up Google Sign-In state on error
+      await _googleSignIn.signOut();
+      _isLoading = false;
+      notifyListeners();
+      return false;
+    } catch (e) {
+      _error = 'An unexpected error occurred during Google sign in: $e';
+      print('AuthProvider: Google SignIn Unexpected Error - $e');
+      // Clean up Google Sign-In state on error
+      await _googleSignIn.signOut();
+      _isLoading = false;
+      notifyListeners();
+      return false;
+    }
+  }
+
+  String _getFirebaseErrorMessage(FirebaseAuthException e) {
+    switch (e.code) {
+      case 'account-exists-with-different-credential':
+        return 'An account already exists with a different sign-in method.';
+      case 'invalid-credential':
+        return 'The Google sign-in credential is invalid.';
+      case 'operation-not-allowed':
+        return 'Google sign-in is not enabled for this project.';
+      case 'user-disabled':
+        return 'This user account has been disabled.';
+      case 'user-not-found':
+        return 'No user found with this credential.';
+      case 'wrong-password':
+        return 'Wrong password provided.';
+      case 'invalid-verification-code':
+        return 'Invalid verification code.';
+      case 'invalid-verification-id':
+        return 'Invalid verification ID.';
+      default:
+        return e.message ?? 'Google sign-in failed. Please try again.';
+    }
   }
 
   Future<void> updateUserProfile({String? displayName, String? photoURL}) async {

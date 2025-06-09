@@ -10,9 +10,7 @@ import '../models/quick_reply.dart';
 import '../providers/dash_chat_provider.dart';
 import 'video_player_widget.dart';
 import 'youtube_player_widget.dart';
-import 'platform/ios_chat_message_widget.dart';
-import 'quick_reply_widget.dart';
-import 'improved_message_item.dart';
+import '../theme/app_theme.dart';
 
 class ChatMessageWidget extends StatefulWidget {
   final ChatMessage message;
@@ -46,6 +44,22 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
     return null;
   }
 
+  // Helper function to check if a URL points to a known image/gif type
+  bool _isImageUrl(String url) {
+    final lowerUrl = url.toLowerCase();
+    return lowerUrl.endsWith('.jpg') ||
+           lowerUrl.endsWith('.jpeg') ||
+           lowerUrl.endsWith('.png') ||
+           lowerUrl.endsWith('.webp') ||
+           lowerUrl.endsWith('.gif');
+  }
+
+  // Helper function to check if content is a local asset path
+  bool _isLocalAssetGif(String content) {
+     final trimmedContent = content.trim();
+     return trimmedContent.startsWith('assets/') && trimmedContent.toLowerCase().endsWith('.gif');
+  }
+
   // Helper to launch URL
   Future<void> _launchURL(String url) async {
     final uri = Uri.parse(url);
@@ -53,7 +67,6 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
       await launchUrl(uri);
     } else {
       print('Could not launch $url');
-      // Optionally show a snackbar
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Could not open link')),
@@ -63,23 +76,120 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
   }
 
   Widget _buildContent() {
-    // <<< Add Logging Here >>>
-    print("ChatMessageWidget (${widget.message.id}): Building content. isMe=${widget.message.isMe}");
-    print("ChatMessageWidget (${widget.message.id}): Raw content = '${widget.message.content}'");
+    // Handle video messages first
+    if (widget.message.type == MessageType.video) {
+      return Container(
+        width: 250,
+        height: 150,
+        decoration: BoxDecoration(
+          color: Colors.black,
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Stack(
+          children: [
+            // Video thumbnail background
+            Container(
+              width: double.infinity,
+              height: double.infinity,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(8),
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [
+                    Colors.red.withOpacity(0.7),
+                    Colors.red.withOpacity(0.9),
+                  ],
+                ),
+              ),
+            ),
+            // Doctor's image placeholder
+            Positioned(
+              top: 20,
+              left: 20,
+              right: 20,
+              child: Container(
+                height: 80,
+                decoration: BoxDecoration(
+                  color: Colors.grey[200],
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Center(
+                  child: Icon(
+                    Icons.person,
+                    size: 40,
+                    color: Colors.grey,
+                  ),
+                ),
+              ),
+            ),
+            // Doctor's name and title
+            Positioned(
+              bottom: 10,
+              left: 10,
+              right: 10,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: Colors.black.withOpacity(0.7),
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: Text(
+                  widget.message.content,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+              ),
+            ),
+            // Play button
+            const Center(
+              child: Icon(
+                Icons.play_circle_fill,
+                color: Colors.white,
+                size: 50,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
 
-    // Regex to find the first http/https URL in the string
-    // This regex is simple and might catch false positives, but good for common URLs
+    // --- Check for Local Asset GIF First --- 
+    if (_isLocalAssetGif(widget.message.content)) {
+       try {
+          return Image.asset(
+             widget.message.content.trim(),
+             height: 150,
+             fit: BoxFit.contain,
+             errorBuilder: (context, error, stackTrace) {
+                print("Image.asset Error loading ${widget.message.content}: $error");
+                return Container(
+                   height: 150,
+                   color: Colors.grey[300],
+                   child: const Center(child: Icon(Icons.error, color: Colors.red))
+                );
+             },
+          );
+       } catch (e) {
+           print("Error loading asset ${widget.message.content}: $e");
+           return Text("[Error loading asset: ${widget.message.content}]", style: const TextStyle(color: Colors.red));
+       }
+    }
+
+    // --- Network URL Processing --- 
     final urlRegex = RegExp(
       r'https?://(?:[a-zA-Z]|[0-9]|[$-_@.&+]|[!*\(\),]|(?:%[0-9a-fA-F][0-9a-fA-F]))+',
       caseSensitive: false,
     );
     final match = urlRegex.firstMatch(widget.message.content);
     String? firstUrl = match?.group(0);
-    print("ChatMessageWidget (${widget.message.id}): Found URL = $firstUrl");
 
     // Try to get videoId ONLY from the found URL
     String? videoId = (firstUrl != null) ? _getYoutubeVideoId(firstUrl) : null;
-    print("ChatMessageWidget (${widget.message.id}): Extracted videoId = $videoId");
 
     if (videoId != null && firstUrl != null && match != null) {
       final thumbnailUrl = 'https://img.youtube.com/vi/$videoId/0.jpg';
@@ -94,23 +204,144 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
               child: Text(
                 widget.message.content.substring(0, match.start).trimRight(),
                 style: TextStyle(
-                  color: widget.message.isMe
-                      ? Theme.of(context).colorScheme.onPrimary
-                      : Theme.of(context).colorScheme.onSurface,
+                  color: widget.message.isMe ? Colors.white : Colors.black,
                 ),
               ),
             ),
+          // Always display the YouTube URL above the thumbnail
+          Padding(
+            padding: const EdgeInsets.only(bottom: 8.0),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
+              decoration: BoxDecoration(
+                color: widget.message.isMe 
+                    ? Colors.white.withOpacity(0.2) 
+                    : Colors.grey.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(6.0),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.play_circle_outline,
+                    size: 16,
+                    color: widget.message.isMe ? Colors.white70 : Colors.grey[600],
+                  ),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      firstUrl,
+                      style: TextStyle(
+                        color: widget.message.isMe ? Colors.white70 : Colors.grey[600],
+                        fontSize: 12,
+                        fontStyle: FontStyle.italic,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
           // Display the tappable thumbnail
           GestureDetector(
-            onTap: () => _launchURL(firstUrl), // Launch the found URL
+            onTap: () => _launchURL(firstUrl),
+            child: Stack(
+              children: [
+                Image.network(
+                  thumbnailUrl,
+                  height: 150,
+                  width: double.infinity,
+                  fit: BoxFit.cover,
+                  loadingBuilder: (context, child, loadingProgress) {
+                    if (loadingProgress == null) return child;
+                    return Container(
+                      height: 150,
+                      width: double.infinity,
+                      color: Colors.grey[300],
+                      child: Center(
+                        child: CircularProgressIndicator(
+                          value: loadingProgress.expectedTotalBytes != null
+                              ? loadingProgress.cumulativeBytesLoaded /
+                                  loadingProgress.expectedTotalBytes!
+                              : null,
+                        ),
+                      ),
+                    );
+                  },
+                  errorBuilder: (context, error, stackTrace) {
+                    print("Error loading $thumbnailUrl: $error");
+                    return Container(
+                        height: 150,
+                        width: double.infinity,
+                        color: Colors.grey[300],
+                        child: const Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(Icons.error),
+                            SizedBox(height: 4),
+                            Text('Tap to open link', style: TextStyle(fontSize: 12)),
+                          ],
+                        ));
+                  },
+                ),
+                // YouTube play button overlay
+                Positioned.fill(
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: Colors.black.withOpacity(0.3),
+                    ),
+                    child: const Center(
+                      child: Icon(
+                        Icons.play_circle_filled,
+                        color: Colors.white,
+                        size: 60,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          // Display text after the URL if any
+          if (match.end < widget.message.content.length)
+            Padding(
+              padding: const EdgeInsets.only(top: 4.0),
+              child: Text(
+                widget.message.content.substring(match.end).trimLeft(),
+                style: TextStyle(
+                  color: widget.message.isMe ? Colors.white : Colors.black,
+                ),
+              ),
+            ),
+        ],
+      );
+    } else if (firstUrl != null && _isImageUrl(firstUrl) && match != null) {
+      // It's an image/GIF URL
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Display text before the URL if any
+          if (match.start > 0)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 4.0),
+              child: Text(
+                widget.message.content.substring(0, match.start).trimRight(),
+                style: TextStyle(
+                  color: widget.message.isMe ? Colors.white : Colors.black,
+                ),
+              ),
+            ),
+          // Display the tappable image
+          GestureDetector(
+            onTap: () => _launchURL(firstUrl),
             child: Image.network(
-              thumbnailUrl,
-              height: 150, // Maintain approximate size
+              firstUrl,
+              height: 150,
               width: double.infinity,
               fit: BoxFit.cover,
-              // Basic placeholder/error handling for Image.network
               loadingBuilder: (context, child, loadingProgress) {
-                if (loadingProgress == null) return child; // Image loaded
+                if (loadingProgress == null) return child;
                 return Container(
                   height: 150,
                   width: double.infinity,
@@ -126,7 +357,7 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
                 );
               },
               errorBuilder: (context, error, stackTrace) {
-                print("Image.network Error loading $thumbnailUrl: $error"); // Add error logging
+                print("Error loading $firstUrl: $error");
                 return Container(
                     height: 150,
                     width: double.infinity,
@@ -149,28 +380,24 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
               child: Text(
                 widget.message.content.substring(match.end).trimLeft(),
                 style: TextStyle(
-                  color: widget.message.isMe
-                      ? Theme.of(context).colorScheme.onPrimary
-                      : Theme.of(context).colorScheme.onSurface,
+                  color: widget.message.isMe ? Colors.white : Colors.black,
                 ),
               ),
             ),
         ],
       );
     } else {
-      // Default: Use Linkify for the whole message if no YouTube link found or error
+      // Default text with linkify
       return Linkify(
         onOpen: (link) => _launchURL(link.url),
         text: widget.message.content,
         style: TextStyle(
-          color: widget.message.isMe
-              ? Theme.of(context).colorScheme.onPrimary
-              : Theme.of(context).colorScheme.onSurface,
+          color: widget.message.isMe ? Colors.white : Colors.black,
         ),
         linkStyle: TextStyle(
           color: widget.message.isMe
-              ? Theme.of(context).colorScheme.onPrimary // Or a different color for links
-              : Theme.of(context).colorScheme.primary, // Usually primary color for links
+              ? Colors.white
+              : AppTheme.quitxtPurple,
           decoration: TextDecoration.underline,
         ),
       );
@@ -179,59 +406,72 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
 
   @override
   Widget build(BuildContext context) {
-    // Skip rendering if it's a quick reply message
-    if (widget.message.type == MessageType.quickReply) {
-      return const SizedBox.shrink();
+    // Render quick reply buttons if this is a quick reply message
+    final replies = (widget.message.suggestedReplies != null && widget.message.suggestedReplies!.isNotEmpty)
+        ? widget.message.suggestedReplies
+        : (widget.message.quickReplies != null && widget.message.quickReplies!.isNotEmpty)
+            ? widget.message.quickReplies
+            : null;
+    if (widget.message.type == MessageType.quickReply && replies != null && replies.isNotEmpty) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: 2.0, horizontal: 8.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: replies.map((reply) {
+            return Container(
+              margin: const EdgeInsets.only(bottom: 4),
+              child: ElevatedButton(
+                onPressed: () {
+                  final dashChatProvider = Provider.of<DashChatProvider>(context, listen: false);
+                  dashChatProvider.handleQuickReply(reply);
+                },
+                style: ElevatedButton.styleFrom(
+                  foregroundColor: Colors.white,
+                  backgroundColor: AppTheme.quitxtTeal,
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  elevation: 1,
+                  minimumSize: const Size(0, 24),
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                ),
+                child: Text(
+                  reply.text,
+                  style: const TextStyle(fontSize: 10),
+                  textAlign: TextAlign.center,
+                ),
+              ),
+            );
+          }).toList(),
+        ),
+      );
     }
+
+    // Build content bubble
+    Widget contentBubble = Container(
+      constraints: BoxConstraints(
+        maxWidth: MediaQuery.of(context).size.width * 0.75,
+      ),
+      margin: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
+      padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+      decoration: BoxDecoration(
+        color: widget.message.isMe
+            ? AppTheme.quitxtTeal
+            : Colors.grey[300],
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: _buildContent(),
+    );
 
     return Align(
       alignment: widget.message.isMe ? Alignment.centerRight : Alignment.centerLeft,
-      child: Container(
-        constraints: BoxConstraints(
-          maxWidth: MediaQuery.of(context).size.width * 0.75, // Limit bubble width
-        ),
-        margin: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
-        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
-        decoration: BoxDecoration(
-          color: widget.message.isMe
-              ? Theme.of(context).colorScheme.primary
-              : Theme.of(context).colorScheme.surface,
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min, // Prevent column from taking full width
-          children: [
-            _buildContent(), // Use the helper method to build content
-            if (widget.message.suggestedReplies != null &&
-                widget.message.suggestedReplies!.isNotEmpty)
-              Padding(
-                padding: const EdgeInsets.only(top: 8),
-                child: Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: widget.message.suggestedReplies!
-                      .map((reply) => TextButton(
-                            onPressed: () {
-                              print("[ChatMessageWidget] Quick Reply Button Tapped! Reply: ${reply.value}");
-                              final dashChatProvider = Provider.of<DashChatProvider>(context, listen: false);
-                              dashChatProvider.handleQuickReply(reply);
-                            },
-                            child: Text(reply.text),
-                            style: TextButton.styleFrom(
-                              foregroundColor: Theme.of(context).colorScheme.primary, // Text color
-                              backgroundColor: Theme.of(context).colorScheme.surfaceVariant, // Button bg
-                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(16),
-                              ),
-                            ),
-                          ))
-                      .toList(),
-                ),
-              ),
-          ],
-        ),
+      child: Column(
+         mainAxisSize: MainAxisSize.min,
+         crossAxisAlignment: widget.message.isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+         children: [
+            contentBubble,
+         ],
       ),
     );
   }

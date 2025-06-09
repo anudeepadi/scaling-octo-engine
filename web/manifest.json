@@ -1,6 +1,6 @@
 {
-    "name": "rcs_demo_app",
-    "short_name": "rcs_demo_app",
+    "name": "QuitTxT_App",
+    "short_name": "QuitTxT_App",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",

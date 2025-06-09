@@ -3,7 +3,9 @@ import 'package:flutter/cupertino.dart';
 import 'package:provider/provider.dart';
 import 'dart:io' show Platform;
 import '../providers/auth_provider.dart';
-import 'package:gradient_borders/gradient_borders.dart';
+import '../theme/app_theme.dart';
+import '../utils/app_localizations.dart';
+import 'registration_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -14,24 +16,15 @@ class LoginScreen extends StatefulWidget {
 
 class _LoginScreenState extends State<LoginScreen> {
   final _formKey = GlobalKey<FormState>();
-  final _emailController = TextEditingController();
-  final _passwordController = TextEditingController();
   final _usernameController = TextEditingController();
-  bool _isSignUp = false;
+  final _passwordController = TextEditingController();
   bool _isPasswordVisible = false;
 
   @override
   void dispose() {
-    _emailController.dispose();
-    _passwordController.dispose();
     _usernameController.dispose();
+    _passwordController.dispose();
     super.dispose();
-  }
-
-  void _toggleMode() {
-    setState(() {
-      _isSignUp = !_isSignUp;
-    });
   }
 
   void _togglePasswordVisibility() {
@@ -42,40 +35,56 @@ class _LoginScreenState extends State<LoginScreen> {
 
   Future<void> _submitForm() async {
     if (_formKey.currentState?.validate() ?? false) {
-      final authProvider = Provider.of<AuthProvider>(context, listen: false);
-
-      bool success;
-      if (_isSignUp) {
-        success = await authProvider.signUp(
-          _emailController.text.trim(),
-          _passwordController.text.trim(),
-          _usernameController.text.trim(),
+      // Check for signup backdoor
+      if (_usernameController.text.trim().toLowerCase() == "signup" && 
+          _passwordController.text.trim().toLowerCase() == "signup") {
+        // Navigate to registration screen instead of authenticating
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => const RegistrationScreen(),
+          ),
         );
-      } else {
-        success = await authProvider.signIn(
-          _emailController.text.trim(),
-          _passwordController.text.trim(),
-        );
+        return;
       }
 
+      final authProvider = Provider.of<AuthProvider>(context, listen: false);
+
+      bool success = await authProvider.signIn(
+        _usernameController.text.trim(),
+        _passwordController.text.trim(),
+      );
+
       if (!success && mounted) {
-        final errorMessage = authProvider.error ?? 'Authentication failed';
+        final errorMessage = authProvider.error ?? AppLocalizations.of(context).translate('auth_error');
         _showErrorDialog(errorMessage);
       }
     }
   }
 
+  Future<void> _handleGoogleSignIn() async {
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    bool success = await authProvider.signInWithGoogle();
+
+    if (!success && mounted) {
+      final errorMessage = authProvider.error ?? 'Google sign-in failed';
+      _showErrorDialog(errorMessage);
+    }
+  }
+
   void _showErrorDialog(String message) {
+    final localizations = AppLocalizations.of(context);
+    
     if (Platform.isIOS) {
       showCupertinoDialog(
         context: context,
         builder: (context) => CupertinoAlertDialog(
-          title: const Text('Error'),
+          title: Text(localizations.translate('error')),
           content: Text(message),
           actions: [
             CupertinoDialogAction(
               onPressed: () => Navigator.of(context).pop(),
-              child: const Text('OK'),
+              child: Text(localizations.translate('ok')),
             ),
           ],
         ),
@@ -84,12 +93,12 @@ class _LoginScreenState extends State<LoginScreen> {
       showDialog(
         context: context,
         builder: (context) => AlertDialog(
-          title: const Text('Error'),
+          title: Text(localizations.translate('error')),
           content: Text(message),
           actions: [
             TextButton(
               onPressed: () => Navigator.of(context).pop(),
-              child: const Text('OK'),
+              child: Text(localizations.translate('ok')),
             ),
           ],
         ),
@@ -99,47 +108,209 @@ class _LoginScreenState extends State<LoginScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
-    return Platform.isIOS
-        ? CupertinoPageScaffold(
-            child: _buildContent(theme),
-          )
-        : Scaffold(
-            body: _buildContent(theme),
-          );
-  }
-
-  Widget _buildContent(ThemeData theme) {
-    return Center(
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.all(24.0),
-        child: Form(
-          key: _formKey,
+    final localizations = AppLocalizations.of(context);
+    
+    return Scaffold(
+      backgroundColor: AppTheme.quitxtGreen, // Green background
+      appBar: AppBar(
+        backgroundColor: AppTheme.quitxtPurple, // Purple header
+        title: Text(localizations.translate('app_title')),
+        centerTitle: false,
+      ),
+      body: Center(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(24.0),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              _buildHeader(theme),
-              const SizedBox(height: 48),
-              if (_isSignUp) _buildUsernameField(),
-              _buildEmailField(),
+              // QuitTXT Logo
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: AppTheme.quitxtBlack,
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: const Text(
+                  'QUITXT',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 32,
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: 2.0,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 40),
+              
+              // Login Card
+              Card(
+                elevation: 4,
+                margin: EdgeInsets.zero,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.all(24.0),
+                  child: Form(
+                    key: _formKey,
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        // Sign In Text
+                        Text(
+                          localizations.translate('login_title'),
+                          style: const TextStyle(
+                            fontSize: 24,
+                            fontWeight: FontWeight.bold,
+                            color: AppTheme.quitxtTeal,
+                          ),
+                        ),
+                        const SizedBox(height: 24),
+                        
+                        // Username Field
+                        TextFormField(
+                          controller: _usernameController,
+                          decoration: InputDecoration(
+                            hintText: localizations.translate('username_hint'),
+                            prefixIcon: const Icon(Icons.person, color: Colors.grey),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(24),
+                              borderSide: const BorderSide(color: Colors.grey),
+                            ),
+                            contentPadding: const EdgeInsets.symmetric(vertical: 0, horizontal: 16),
+                          ),
+                          validator: (value) {
+                            if (value == null || value.trim().isEmpty) {
+                              return 'Please enter a username';
+                            }
+                            return null;
+                          },
+                        ),
+                        const SizedBox(height: 16),
+                        
+                        // Password Field
+                        TextFormField(
+                          controller: _passwordController,
+                          obscureText: !_isPasswordVisible,
+                          decoration: InputDecoration(
+                            hintText: localizations.translate('password_hint'),
+                            prefixIcon: const Icon(Icons.lock, color: Colors.grey),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(24),
+                              borderSide: const BorderSide(color: Colors.grey),
+                            ),
+                            contentPadding: const EdgeInsets.symmetric(vertical: 0, horizontal: 16),
+                            suffixIcon: IconButton(
+                              icon: Icon(
+                                _isPasswordVisible ? Icons.visibility_off : Icons.visibility,
+                                color: Colors.grey,
+                              ),
+                              onPressed: _togglePasswordVisibility,
+                            ),
+                          ),
+                          validator: (value) {
+                            if (value == null || value.isEmpty) {
+                              return 'Please enter a password';
+                            }
+                            return null;
+                          },
+                        ),
+                        const SizedBox(height: 24),
+                        
+                        // Login Button
+                        SizedBox(
+                          width: double.infinity,
+                          child: ElevatedButton(
+                            onPressed: _submitForm,
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AppTheme.quitxtTeal,
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(24),
+                              ),
+                            ),
+                            child: Text(
+                              localizations.translate('login_button'),
+                              style: const TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        
+                        // Google Sign In Button
+                        OutlinedButton.icon(
+                          onPressed: _handleGoogleSignIn,
+                          icon: Image.asset(
+                            'assets/images/google_logo.png',
+                            height: 18,
+                            width: 18,
+                            errorBuilder: (ctx, obj, _) => const Icon(Icons.g_mobiledata, size: 18),
+                          ),
+                          label: Text(
+                            localizations.translate('google_login'),
+                            style: const TextStyle(
+                              color: Colors.black87,
+                              fontSize: 14,
+                            ),
+                          ),
+                          style: OutlinedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
+                            side: const BorderSide(color: Colors.grey),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 24),
+                        
+                        // Create Account Link
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Text(
+                              "Don't have an account?",
+                              style: TextStyle(
+                                color: Colors.grey[600],
+                                fontSize: 14,
+                              ),
+                            ),
+                            const SizedBox(width: 4),
+                            GestureDetector(
+                              onTap: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) => const RegistrationScreen(),
+                                  ),
+                                );
+                              },
+                              child: const Text(
+                                'Create Account',
+                                style: TextStyle(
+                                  color: AppTheme.quitxtTeal,
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 14,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+              
               const SizedBox(height: 16),
-              _buildPasswordField(),
-              const SizedBox(height: 24),
-              _buildSubmitButton(),
-              const SizedBox(height: 16),
-              _buildToggleButton(),
-              const SizedBox(height: 16),
-              _buildDemoLoginButton(),
-              const SizedBox(height: 24),
               Consumer<AuthProvider>(
                 builder: (context, authProvider, _) {
                   if (authProvider.isLoading) {
-                    return Center(
-                      child: Platform.isIOS
-                          ? const CupertinoActivityIndicator()
-                          : const CircularProgressIndicator(),
+                    return const CircularProgressIndicator(
+                      valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
                     );
                   }
                   return const SizedBox.shrink();
@@ -150,281 +321,5 @@ class _LoginScreenState extends State<LoginScreen> {
         ),
       ),
     );
-  }
-
-  Widget _buildHeader(ThemeData theme) {
-    return Column(
-      children: [
-        Container(
-          width: 100,
-          height: 100,
-          decoration: BoxDecoration(
-            color: theme.primaryColor.withOpacity(0.1),
-            borderRadius: BorderRadius.circular(50),
-            border: GradientBoxBorder(
-              gradient: LinearGradient(
-                colors: [
-                  theme.primaryColor.withOpacity(0.5),
-                  theme.colorScheme.secondary.withOpacity(0.5),
-                ],
-              ),
-              width: 2,
-            ),
-          ),
-          child: Icon(
-            Icons.chat_rounded,
-            size: 50,
-            color: theme.primaryColor,
-          ),
-        ),
-        const SizedBox(height: 24),
-        Text(
-          'RCS Demo App',
-          style: theme.textTheme.headlineMedium?.copyWith(
-            fontWeight: FontWeight.bold,
-            color: theme.primaryColor,
-          ),
-        ),
-        const SizedBox(height: 8),
-        Text(
-          _isSignUp ? 'Create your account' : 'Sign in to your account',
-          style: theme.textTheme.titleMedium?.copyWith(
-            color: theme.colorScheme.onBackground.withOpacity(0.7),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildUsernameField() {
-    if (Platform.isIOS) {
-      return Padding(
-        padding: const EdgeInsets.only(bottom: 16.0),
-        child: CupertinoTextFormFieldRow(
-          controller: _usernameController,
-          placeholder: 'Username',
-          prefix: const Icon(CupertinoIcons.person),
-          validator: (value) {
-            if (value == null || value.trim().isEmpty) {
-              return 'Please enter a username';
-            }
-            return null;
-          },
-          decoration: BoxDecoration(
-            border: Border.all(color: CupertinoColors.systemGrey4),
-            borderRadius: BorderRadius.circular(8),
-          ),
-          padding: const EdgeInsets.all(12),
-        ),
-      );
-    } else {
-      return Padding(
-        padding: const EdgeInsets.only(bottom: 16.0),
-        child: TextFormField(
-          controller: _usernameController,
-          decoration: InputDecoration(
-            labelText: 'Username',
-            prefixIcon: const Icon(Icons.person),
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-            ),
-          ),
-          validator: (value) {
-            if (value == null || value.trim().isEmpty) {
-              return 'Please enter a username';
-            }
-            return null;
-          },
-        ),
-      );
-    }
-  }
-
-  Widget _buildEmailField() {
-    if (Platform.isIOS) {
-      return CupertinoTextFormFieldRow(
-        controller: _emailController,
-        placeholder: 'Email',
-        prefix: const Icon(CupertinoIcons.mail),
-        keyboardType: TextInputType.emailAddress,
-        validator: (value) {
-          if (value == null || value.trim().isEmpty) {
-            return 'Please enter an email';
-          }
-          if (!RegExp(r'^[^@]+@[^@]+\.[^@]+').hasMatch(value)) {
-            return 'Please enter a valid email';
-          }
-          return null;
-        },
-        decoration: BoxDecoration(
-          border: Border.all(color: CupertinoColors.systemGrey4),
-          borderRadius: BorderRadius.circular(8),
-        ),
-        padding: const EdgeInsets.all(12),
-      );
-    } else {
-      return TextFormField(
-        controller: _emailController,
-        decoration: InputDecoration(
-          labelText: 'Email',
-          prefixIcon: const Icon(Icons.email),
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
-        ),
-        keyboardType: TextInputType.emailAddress,
-        validator: (value) {
-          if (value == null || value.trim().isEmpty) {
-            return 'Please enter an email';
-          }
-          if (!RegExp(r'^[^@]+@[^@]+\.[^@]+').hasMatch(value)) {
-            return 'Please enter a valid email';
-          }
-          return null;
-        },
-      );
-    }
-  }
-
-  Widget _buildPasswordField() {
-    if (Platform.isIOS) {
-      return Stack(
-        alignment: Alignment.centerRight,
-        children: [
-          CupertinoTextFormFieldRow(
-            controller: _passwordController,
-            placeholder: 'Password',
-            prefix: const Icon(CupertinoIcons.lock),
-            obscureText: !_isPasswordVisible,
-            validator: (value) {
-              if (value == null || value.isEmpty) {
-                return 'Please enter a password';
-              }
-              if (_isSignUp && value.length < 6) {
-                return 'Password must be at least 6 characters';
-              }
-              return null;
-            },
-            decoration: BoxDecoration(
-              border: Border.all(color: CupertinoColors.systemGrey4),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            padding: const EdgeInsets.all(12),
-          ),
-          Positioned(
-            right: 10,
-            child: GestureDetector(
-              onTap: _togglePasswordVisibility,
-              child: Icon(
-                _isPasswordVisible ? CupertinoIcons.eye_slash : CupertinoIcons.eye,
-                color: CupertinoColors.systemGrey,
-              ),
-            ),
-          ),
-        ],
-      );
-    } else {
-      return TextFormField(
-        controller: _passwordController,
-        decoration: InputDecoration(
-          labelText: 'Password',
-          prefixIcon: const Icon(Icons.lock),
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
-          suffixIcon: IconButton(
-            icon: Icon(
-              _isPasswordVisible
-                  ? Icons.visibility
-                  : Icons.visibility_off,
-            ),
-            onPressed: _togglePasswordVisibility,
-          ),
-        ),
-        obscureText: !_isPasswordVisible,
-        validator: (value) {
-          if (value == null || value.isEmpty) {
-            return 'Please enter a password';
-          }
-          if (_isSignUp && value.length < 6) {
-            return 'Password must be at least 6 characters';
-          }
-          return null;
-        },
-      );
-    }
-  }
-
-  Widget _buildSubmitButton() {
-    if (Platform.isIOS) {
-      return CupertinoButton.filled(
-        onPressed: _submitForm,
-        child: Text(_isSignUp ? 'Sign Up' : 'Sign In'),
-      );
-    } else {
-      return ElevatedButton(
-        onPressed: _submitForm,
-        style: ElevatedButton.styleFrom(
-          padding: const EdgeInsets.symmetric(vertical: 16),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
-        ),
-        child: Text(
-          _isSignUp ? 'Sign Up' : 'Sign In',
-          style: const TextStyle(fontSize: 16),
-        ),
-      );
-    }
-  }
-
-  Widget _buildToggleButton() {
-    final toggleText = _isSignUp
-        ? 'Already have an account? Sign In'
-        : 'Don\'t have an account? Sign Up';
-
-    if (Platform.isIOS) {
-      return CupertinoButton(
-        onPressed: _toggleMode,
-        child: Text(toggleText),
-      );
-    } else {
-      return TextButton(
-        onPressed: _toggleMode,
-        child: Text(toggleText),
-      );
-    }
-  }
-  
-  // Simple function to handle demo login
-  void _handleDemoLogin() {
-    final authProvider = Provider.of<AuthProvider>(context, listen: false);
-    // Set authentication state to true (this is a simplified demo approach)
-    authProvider.signIn('demo@example.com', 'password');
-  }
-
-  Widget _buildDemoLoginButton() {
-    if (Platform.isIOS) {
-      return CupertinoButton(
-        onPressed: _handleDemoLogin,
-        color: CupertinoColors.systemGrey5,
-        child: const Text('Continue in Demo Mode'),
-      );
-    } else {
-      return OutlinedButton(
-        onPressed: _handleDemoLogin,
-        style: OutlinedButton.styleFrom(
-          padding: const EdgeInsets.symmetric(vertical: 16),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
-          side: BorderSide(color: Theme.of(context).colorScheme.secondary.withOpacity(0.5)),
-        ),
-        child: const Text(
-          'Continue in Demo Mode',
-          style: TextStyle(fontSize: 16),
-        ),
-      );
-    }
   }
 }

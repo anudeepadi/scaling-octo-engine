@@ -1,6 +1,6 @@
-# QuitTxT_App
+# RCS Application
 
-A Flutter-based mobile application for smoking cessation support with advanced AI features.
+A Flutter-based RCS (Rich Communication Services) messaging application with advanced AI features.
 
 ## Features
 
@@ -22,34 +22,6 @@ This project uses the following branching strategy:
 -   **`staging`**: Represents the code deployed to a staging/testing environment. Updated periodically from `development`.
 -   **`production`**: Represents the stable code deployed to production. Updated periodically from `staging` after testing.
 -   **Feature/Fix Branches**: Temporary branches (like `fix/build-errors`) created from `development` for specific tasks and merged back into `development` via Pull Requests.
-
-## Deployment Process
-
-For detailed information on the deployment process, please refer to the [DEPLOYMENT.md](DEPLOYMENT.md) guide.
-
-### Quick Deployment Reference
-
-1. Development changes are pushed to the `development` branch
-2. When ready for testing, merge to `staging` branch to deploy to TestFlight and Google Play internal testing
-3. After successful testing, merge to `production` branch to deploy to App Store and Google Play Store
-
-### Version Management
-
-We use a versioning script to manage app versions:
-
-```bash
-# Bump patch version (e.g., 1.0.0 -> 1.0.1)
-./scripts/bump_version.sh --type patch
-
-# Bump minor version (e.g., 1.0.0 -> 1.1.0)
-./scripts/bump_version.sh --type minor
-
-# Bump major version (e.g., 1.0.0 -> 2.0.0)
-./scripts/bump_version.sh --type major
-
-# Bump build number only (e.g., 1.0.0+1 -> 1.0.0+2)
-./scripts/bump_version.sh --build
-```
 
 ## Recent Updates (April 2024)
 

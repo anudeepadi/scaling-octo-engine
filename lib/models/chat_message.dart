@@ -1,4 +1,3 @@
-import 'package:flutter/material.dart';
 import 'quick_reply.dart';
 import 'link_preview.dart';
 
@@ -11,6 +10,7 @@ enum MessageType {
   file,
   linkPreview,
   quickReply,
+  geminiQuickReply,
   suggestion,
   voice,
   threadReply,

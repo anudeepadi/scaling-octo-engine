@@ -1,7 +1,6 @@
 import 'package:flutter/foundation.dart';
 import '../models/chat_message.dart';
 import '../models/quick_reply.dart';
-import '../models/link_preview.dart';
 import 'package:uuid/uuid.dart';
 import 'dart:async';
 
@@ -262,7 +261,7 @@ class ChatProvider extends ChangeNotifier {
   }
 
   // Add a media message
-  void sendMedia(String path, MessageType type) {
+  Future<void> sendMedia(String path, MessageType type) async {
     _messages.add(
       ChatMessage(
         id: _uuid.v4(),
@@ -287,6 +286,37 @@ class ChatProvider extends ChangeNotifier {
       ),
     );
     notifyListeners();
+  }
+
+  // Send a text message (for compatibility with firebase_chat_service calls)
+  Future<void> sendTextMessage(String content, {String? replyToMessageId}) async {
+    addTextMessage(content, isMe: true);
+  }
+
+  // Send a file message (for compatibility with firebase_chat_service calls)
+  Future<void> sendFile(String path, String filename, int size) async {
+    _messages.add(
+      ChatMessage(
+        id: _uuid.v4(),
+        content: filename,
+        type: MessageType.file,
+        isMe: true,
+        timestamp: DateTime.now(),
+        mediaUrl: path,
+      ),
+    );
+    notifyListeners();
+  }
+
+  // Add reaction to a message (for compatibility with firebase_chat_service calls)
+  Future<void> addReaction(String messageId, String emoji) async {
+    // Find the message and add the reaction
+    final messageIndex = _messages.indexWhere((msg) => msg.id == messageId);
+    if (messageIndex >= 0) {
+      // In a real implementation, you would add reactions to the message
+      // For now, just print for debugging
+      print('Adding reaction $emoji to message $messageId');
+    }
   }
 
   // Load demo messages

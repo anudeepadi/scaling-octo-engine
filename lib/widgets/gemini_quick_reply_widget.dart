@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
 import 'dart:io' show Platform;
 import '../models/quick_reply.dart';
-import 'dart:math' as math;
 
 class GeminiQuickReplyWidget extends StatelessWidget {
   final List<QuickReply> quickReplies;
@@ -43,7 +42,7 @@ class GeminiQuickReplyWidget extends StatelessWidget {
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
           BoxShadow(
-            color: Colors.blue.withOpacity(0.1),
+            color: Colors.blue.withValues(alpha: 0.1),
             blurRadius: 3,
             offset: const Offset(0, 1),
           ),
@@ -107,7 +106,7 @@ class GeminiQuickReplyWidget extends StatelessWidget {
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
             decoration: BoxDecoration(
-              color: CupertinoColors.systemBlue.withOpacity(0.15),
+              color: CupertinoColors.systemBlue.withValues(alpha: 0.15),
               borderRadius: BorderRadius.circular(8),
             ),
             child: Text(
@@ -140,9 +139,9 @@ class GeminiQuickReplyWidget extends StatelessWidget {
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
             decoration: BoxDecoration(
-              color: geminiBlue.withOpacity(0.1),
+              color: geminiBlue.withValues(alpha: 0.1),
               border: Border.all(
-                color: geminiBlue.withOpacity(0.3),
+                color: geminiBlue.withValues(alpha: 0.3),
                 width: 0.5,
               ),
               borderRadius: BorderRadius.circular(8),

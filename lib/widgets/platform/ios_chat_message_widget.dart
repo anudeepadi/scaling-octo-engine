@@ -1,5 +1,4 @@
 import 'package:flutter/cupertino.dart';
-import 'package:flutter/material.dart';
 import 'dart:io';
 import '../../models/chat_message.dart';
 import '../video_player_widget.dart';
@@ -170,8 +169,8 @@ class _IosChatMessageWidgetState extends State<IosChatMessageWidget> {
                             child: CupertinoButton(
                               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                               color: widget.message.isMe
-                                  ? CupertinoColors.white.withOpacity(0.2)
-                                  : CupertinoColors.activeBlue.withOpacity(0.1),
+                                  ? CupertinoColors.white.withValues(alpha: 0.2)
+                                  : CupertinoColors.activeBlue.withValues(alpha: 0.1),
                               borderRadius: BorderRadius.circular(16),
                               child: Text(
                                 reply.text,

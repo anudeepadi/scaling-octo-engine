@@ -97,8 +97,8 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
                   begin: Alignment.topCenter,
                   end: Alignment.bottomCenter,
                   colors: [
-                    Colors.red.withOpacity(0.7),
-                    Colors.red.withOpacity(0.9),
+                    Colors.red.withValues(alpha: 0.7),
+                    Colors.red.withValues(alpha: 0.9),
                   ],
                 ),
               ),
@@ -131,7 +131,7 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
-                  color: Colors.black.withOpacity(0.7),
+                  color: Colors.black.withValues(alpha: 0.7),
                   borderRadius: BorderRadius.circular(4),
                 ),
                 child: Text(
@@ -215,8 +215,8 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
               padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
               decoration: BoxDecoration(
                 color: widget.message.isMe 
-                    ? Colors.white.withOpacity(0.2) 
-                    : Colors.grey.withOpacity(0.1),
+                    ? Colors.white.withValues(alpha: 0.2) 
+                    : Colors.grey.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(6.0),
               ),
               child: Row(
@@ -289,7 +289,7 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
                 Positioned.fill(
                   child: Container(
                     decoration: BoxDecoration(
-                      color: Colors.black.withOpacity(0.3),
+                      color: Colors.black.withValues(alpha: 0.3),
                     ),
                     child: const Center(
                       child: Icon(

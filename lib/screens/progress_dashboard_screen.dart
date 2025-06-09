@@ -99,8 +99,8 @@ class _ProgressDashboardScreenState extends State<ProgressDashboardScreen> with 
 
   Widget _buildHeaderCard(UserProfile profile, AppLocalizations localizations, ThemeData theme) {
     final daysSmokeFree = profile.daysSmokeFree;
-    final isPreQuit = profile.isInPreQuitPhase();
-    final isQuitDay = profile.isOnQuitDay();
+    final isPreQuit = profile.isInPreQuitPhase;
+    final isQuitDay = profile.isOnQuitDay;
     
     return ScaleTransition(
       scale: _slideAnimation,
@@ -148,7 +148,7 @@ class _ProgressDashboardScreenState extends State<ProgressDashboardScreen> with 
             const SizedBox(height: 8),
             Text(
               isPreQuit 
-                  ? '${profile.daysUntilQuitDate()}'
+                  ? '${profile.daysUntilQuitDate}'
                   : isQuitDay
                       ? '🎉'
                       : '$daysSmokeFree',

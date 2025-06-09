@@ -433,4 +433,23 @@ class UserProfileProvider with ChangeNotifier {
     
     return null;
   }
+
+  // Refresh profile data
+  Future<void> refreshProfile() async {
+    if (_userProfile == null) return;
+    
+    _setLoading(true);
+    try {
+      final refreshedProfile = await _userProfileService.getUserProfile(_userProfile!.id);
+      if (refreshedProfile != null) {
+        _userProfile = refreshedProfile;
+        _clearError();
+        notifyListeners();
+      }
+    } catch (e) {
+      _setError('Failed to refresh profile: $e');
+    } finally {
+      _setLoading(false);
+    }
+  }
 } 

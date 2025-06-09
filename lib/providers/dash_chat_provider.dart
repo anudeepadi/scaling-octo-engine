@@ -19,6 +19,7 @@ class DashChatProvider extends ChangeNotifier {
   StreamSubscription? _authSubscription;
   StreamSubscription? _messageSubscription;
   User? _currentUser;
+  String? _fcmToken;
   
   bool _isTyping = false;
   bool get isTyping => _isTyping;
@@ -304,6 +305,20 @@ class DashChatProvider extends ChangeNotifier {
     } finally {
       _isSendingMessage = false;
     }
+  }
+
+  // Get Android debug info
+  String getAndroidDebugInfo() {
+    final buffer = StringBuffer();
+    buffer.writeln('User ID: ${_currentUser?.uid ?? "null"}');
+    buffer.writeln('FCM Token: ${_fcmToken ?? "null"}');
+    buffer.writeln('Service Initialized: ${_dashService.isInitialized}');
+    buffer.writeln('Is Sending: $_isSendingMessage');
+    buffer.writeln('Messages Count: ${messages.length}');
+    buffer.writeln('Auth State: ${_currentUser != null ? "logged in" : "logged out"}');
+    buffer.writeln('Last Message: $_lastMessageSent');
+    buffer.writeln('Last Send Time: $_lastSendTime');
+    return buffer.toString();
   }
 
   @override

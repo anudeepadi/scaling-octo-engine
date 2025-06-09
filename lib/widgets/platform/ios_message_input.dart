@@ -1,6 +1,4 @@
 import 'package:flutter/cupertino.dart';
-import 'package:flutter/material.dart';
-import '../../services/media_picker_service.dart';
 
 class IosMessageInput extends StatelessWidget {
   final TextEditingController controller;

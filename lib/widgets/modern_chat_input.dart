@@ -86,7 +86,7 @@ class _ModernChatInputState extends State<ModernChatInput>
           BoxShadow(
             offset: const Offset(0, -1),
             blurRadius: 8,
-            color: theme.colorScheme.shadow.withOpacity(0.05),
+            color: theme.colorScheme.shadow.withValues(alpha: 0.05),
           ),
         ],
       ),
@@ -124,11 +124,11 @@ class _ModernChatInputState extends State<ModernChatInput>
                 child: AnimatedContainer(
                   duration: const Duration(milliseconds: 200),
                   decoration: BoxDecoration(
-                    color: theme.colorScheme.surfaceVariant.withOpacity(0.5),
+                    color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
                     borderRadius: BorderRadius.circular(24),
                     border: Border.all(
                       color: _focusNode.hasFocus 
-                          ? theme.colorScheme.primary.withOpacity(0.5)
+                          ? theme.colorScheme.primary.withValues(alpha: 0.5)
                           : Colors.transparent,
                       width: 2,
                     ),
@@ -167,7 +167,7 @@ class _ModernChatInputState extends State<ModernChatInput>
                           decoration: InputDecoration(
                             hintText: 'Type a message...',
                             hintStyle: TextStyle(
-                              color: theme.colorScheme.onSurfaceVariant.withOpacity(0.6),
+                              color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
                             ),
                             border: InputBorder.none,
                             contentPadding: const EdgeInsets.symmetric(
@@ -234,12 +234,12 @@ class _ModernChatInputState extends State<ModernChatInput>
                           : null,
                       color: widget.isComposing 
                           ? null 
-                          : theme.colorScheme.surfaceVariant,
+                          : theme.colorScheme.surfaceContainerHighest,
                       borderRadius: BorderRadius.circular(24),
                       boxShadow: widget.isComposing
                           ? [
                               BoxShadow(
-                                color: theme.colorScheme.primary.withOpacity(0.3),
+                                color: theme.colorScheme.primary.withValues(alpha: 0.3),
                                 blurRadius: 8,
                                 offset: const Offset(0, 2),
                               ),

@@ -1635,4 +1635,29 @@ class DashMessagingService {
       print('Stream is closed, cannot add message: ${message.id}');
     }
   }
+
+  // Test stream controller functionality
+  void testStreamController() {
+    print('Testing stream controller...');
+    print('Stream controller closed: ${_messageStreamController.isClosed}');
+    print('Stream has listener: ${_messageStreamController.hasListener}');
+    print('Is stream closed flag: $_isStreamClosed');
+    print('Service initialized: $_isInitialized');
+    print('User ID: $_userId');
+    
+    // Test adding a message to the stream
+    try {
+      final testMessage = ChatMessage(
+        id: 'test-${DateTime.now().millisecondsSinceEpoch}',
+        content: 'Stream controller test message',
+        timestamp: DateTime.now(),
+        isMe: false,
+        type: MessageType.text,
+      );
+      _safeAddToStream(testMessage);
+      print('Successfully added test message to stream');
+    } catch (e) {
+      print('Error testing stream controller: $e');
+    }
+  }
 }

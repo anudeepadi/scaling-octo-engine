@@ -76,7 +76,7 @@ class FirebaseChatService {
           linkPreview = LinkPreview(
             url: previewData['url'] as String,
             title: previewData['title'] as String,
-            description: previewData['description'] as String?,
+            description: previewData['description'] as String? ?? '',
             imageUrl: previewData['imageUrl'] as String?,
           );
         }
@@ -91,7 +91,6 @@ class FirebaseChatService {
           isMe: data['senderId'] == userId,
           timestamp: timestamp,
           type: type,
-          isUser: data['isUser'] as bool? ?? false,
           suggestedReplies: suggestedReplies,
           mediaUrl: data['mediaUrl'] as String?,
           thumbnailUrl: data['thumbnailUrl'] as String?,
@@ -120,7 +119,7 @@ class FirebaseChatService {
       'content': message.content,
       'timestamp': Timestamp.fromDate(message.timestamp),
       'type': message.type.index,
-      'isUser': message.isUser,
+      'isUser': message.isMe,
       'mediaUrl': message.mediaUrl,
       'thumbnailUrl': message.thumbnailUrl,
       'fileName': message.fileName,

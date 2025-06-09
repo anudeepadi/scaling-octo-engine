@@ -36,7 +36,7 @@ class QuickReplyWidget extends StatelessWidget {
   Widget _buildIOSQuickReply(QuickReply reply, BuildContext context) {
     return CupertinoButton(
       padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-      color: CupertinoColors.systemBlue.withOpacity(0.1),
+      color: CupertinoColors.systemBlue.withValues(alpha: 0.1),
       borderRadius: BorderRadius.circular(6),
       minSize: 20,
       onPressed: () => onReplySelected(reply.value),
@@ -54,7 +54,7 @@ class QuickReplyWidget extends StatelessWidget {
   Widget _buildAndroidQuickReply(QuickReply reply, BuildContext context) {
     return TextButton(
       style: TextButton.styleFrom(
-        backgroundColor: Theme.of(context).primaryColor.withOpacity(0.1),
+        backgroundColor: Theme.of(context).primaryColor.withValues(alpha: 0.1),
         padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(6),

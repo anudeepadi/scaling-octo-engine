@@ -179,8 +179,11 @@ class MyApp extends StatelessWidget {
                  developer.log('Cannot initialize Server Service: User ID is null even though authenticated.', name: 'App');
               }
             } else if (!authProvider.isAuthenticated) {
-               dashChatProvider.clearOnLogout();
-               developer.log('User logged out, cleared DashChatProvider state.', name: 'App');
+               // Defer the logout clearing to avoid setState during build
+               WidgetsBinding.instance.addPostFrameCallback((_) {
+                 dashChatProvider.clearOnLogout();
+                 developer.log('User logged out, cleared DashChatProvider state.', name: 'App');
+               });
             }
 
             return dashChatProvider;

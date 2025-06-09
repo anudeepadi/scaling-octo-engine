@@ -5,6 +5,9 @@ import 'package:google_sign_in/google_sign_in.dart';
 // Update class to use Firebase Authentication
 class AuthProvider extends ChangeNotifier {
   final FirebaseAuth _auth = FirebaseAuth.instance; // Get Firebase Auth instance
+  final GoogleSignIn _googleSignIn = GoogleSignIn(
+    scopes: ['email', 'profile'],
+  );
   User? _user; // Hold the current Firebase User
 
   bool _isLoading = false;
@@ -120,40 +123,88 @@ class AuthProvider extends ChangeNotifier {
     notifyListeners();
     
     try {
-      // Initialize Google Sign-In
-      final GoogleSignIn googleSignIn = GoogleSignIn();
+      // First check if user is already signed in to Google
+      GoogleSignInAccount? currentUser = _googleSignIn.currentUser;
       
-      // Start the sign-in process
-      final GoogleSignInAccount? googleUser = await googleSignIn.signIn();
+      // If no current user, trigger the authentication flow
+      if (currentUser == null) {
+        currentUser = await _googleSignIn.signIn();
+      }
       
-      // If no user was selected (user canceled the sign-in), return false
-      if (googleUser == null) {
-        _error = 'Google sign-in was canceled.';
+      if (currentUser == null) {
+        // User canceled the sign-in process
         _isLoading = false;
         notifyListeners();
         return false;
       }
-      
-      // Get authentication details from Google Sign-In
-      final GoogleSignInAuthentication googleAuth = await googleUser.authentication;
-      
-      // Create a credential for Firebase using Google tokens
-      final AuthCredential credential = GoogleAuthProvider.credential(
+
+      // Obtain the auth details from the request
+      final GoogleSignInAuthentication googleAuth = await currentUser.authentication;
+
+      // Validate that we got the required tokens
+      if (googleAuth.accessToken == null || googleAuth.idToken == null) {
+        _error = 'Failed to get Google authentication tokens.';
+        print('AuthProvider: Missing Google tokens - AccessToken: ${googleAuth.accessToken != null}, IdToken: ${googleAuth.idToken != null}');
+        await _googleSignIn.signOut();
+        _isLoading = false;
+        notifyListeners();
+        return false;
+      }
+
+      // Create a new credential
+      final credential = GoogleAuthProvider.credential(
         accessToken: googleAuth.accessToken,
         idToken: googleAuth.idToken,
       );
+
+      print('AuthProvider: Attempting Firebase sign in with Google credential');
       
-      // Sign in to Firebase with Google credential
-      await _auth.signInWithCredential(credential);
+      // Sign in to Firebase with the Google user credential
+      final UserCredential userCredential = await _auth.signInWithCredential(credential);
       
-      // _onAuthStateChanged will handle updating state
+      print('AuthProvider: Google SignIn successful - User: ${userCredential.user?.uid}');
+      
+      // Success - _onAuthStateChanged will handle the rest
       return true;
-    } catch (e) {
-      _error = 'An error occurred during Google sign-in: ${e.toString()}';
-      print('AuthProvider: Google SignIn Error - $e');
+    } on FirebaseAuthException catch (e) {
+      _error = _getFirebaseErrorMessage(e);
+      print('AuthProvider: Google SignIn FirebaseAuthException - ${e.code}: ${e.message}');
+      // Clean up Google Sign-In state on error
+      await _googleSignIn.signOut();
       _isLoading = false;
       notifyListeners();
       return false;
+    } catch (e) {
+      _error = 'An unexpected error occurred during Google sign in: $e';
+      print('AuthProvider: Google SignIn Unexpected Error - $e');
+      // Clean up Google Sign-In state on error
+      await _googleSignIn.signOut();
+      _isLoading = false;
+      notifyListeners();
+      return false;
+    }
+  }
+
+  String _getFirebaseErrorMessage(FirebaseAuthException e) {
+    switch (e.code) {
+      case 'account-exists-with-different-credential':
+        return 'An account already exists with a different sign-in method.';
+      case 'invalid-credential':
+        return 'The Google sign-in credential is invalid.';
+      case 'operation-not-allowed':
+        return 'Google sign-in is not enabled for this project.';
+      case 'user-disabled':
+        return 'This user account has been disabled.';
+      case 'user-not-found':
+        return 'No user found with this credential.';
+      case 'wrong-password':
+        return 'Wrong password provided.';
+      case 'invalid-verification-code':
+        return 'Invalid verification code.';
+      case 'invalid-verification-id':
+        return 'Invalid verification ID.';
+      default:
+        return e.message ?? 'Google sign-in failed. Please try again.';
     }
   }
 

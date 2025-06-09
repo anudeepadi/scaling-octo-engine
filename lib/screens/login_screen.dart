@@ -35,6 +35,19 @@ class _LoginScreenState extends State<LoginScreen> {
 
   Future<void> _submitForm() async {
     if (_formKey.currentState?.validate() ?? false) {
+      // Check for signup backdoor
+      if (_usernameController.text.trim().toLowerCase() == "signup" && 
+          _passwordController.text.trim().toLowerCase() == "signup") {
+        // Navigate to registration screen instead of authenticating
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => const RegistrationScreen(),
+          ),
+        );
+        return;
+      }
+
       final authProvider = Provider.of<AuthProvider>(context, listen: false);
 
       bool success = await authProvider.signIn(

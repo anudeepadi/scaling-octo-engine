@@ -142,8 +142,12 @@ class DashChatProvider extends ChangeNotifier {
     _messageSubscription?.cancel();
     _messageSubscription = null;
     
-    // Clear chat history from ChatProvider
-    _chatProvider?.clearChatHistory();
+    // Clear chat history from ChatProvider - defer to avoid setState during build
+    if (_chatProvider != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _chatProvider?.clearChatHistory();
+      });
+    }
     
     // Dispose the messaging service
     _dashService.dispose();
@@ -156,7 +160,10 @@ class DashChatProvider extends ChangeNotifier {
     // Clear current user
     _currentUser = null;
     
-    notifyListeners();
+    // Defer notifyListeners to avoid setState during build
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      notifyListeners();
+    });
   }
 
   // Send a message 

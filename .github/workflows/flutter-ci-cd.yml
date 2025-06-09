@@ -16,20 +16,104 @@ on:
           - development
           - staging
           - production
+      version_increment:
+        description: 'Version increment type'
+        required: false
+        default: 'patch'
+        type: choice
+        options:
+          - patch
+          - minor
+          - major
 
 permissions:
-  contents: read
+  contents: write  # Changed from read to write for version bumps
   packages: read
-  # Limit permissions to only what's needed
 
 jobs:
+  # Add version bump job
+  version_bump:
+    name: Auto-increment Version
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/staging' || github.ref == 'refs/heads/production'
+    outputs:
+      new_version: ${{ steps.version.outputs.new_version }}
+      build_number: ${{ steps.version.outputs.build_number }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 0
+      
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.16.x'
+          channel: 'stable'
+      
+      - name: Auto-increment version
+        id: version
+        run: |
+          # Get current version from pubspec.yaml
+          current_version=$(grep "version:" pubspec.yaml | cut -d' ' -f2 | cut -d'+' -f1)
+          current_build=$(grep "version:" pubspec.yaml | cut -d' ' -f2 | cut -d'+' -f2)
+          
+          echo "Current version: $current_version+$current_build"
+          
+          # Increment build number
+          new_build=$((current_build + 1))
+          
+          # For production, also increment patch version
+          if [[ "${{ github.ref }}" == "refs/heads/production" ]]; then
+            IFS='.' read -ra VERSION_PARTS <<< "$current_version"
+            major=${VERSION_PARTS[0]}
+            minor=${VERSION_PARTS[1]}
+            patch=${VERSION_PARTS[2]}
+            
+            increment_type="${{ github.event.inputs.version_increment || 'patch' }}"
+            
+            case $increment_type in
+              "major")
+                major=$((major + 1))
+                minor=0
+                patch=0
+                ;;
+              "minor")
+                minor=$((minor + 1))
+                patch=0
+                ;;
+              "patch")
+                patch=$((patch + 1))
+                ;;
+            esac
+            
+            new_version="$major.$minor.$patch"
+          else
+            new_version="$current_version"
+          fi
+          
+          echo "New version: $new_version+$new_build"
+          
+          # Update pubspec.yaml
+          sed -i "s/version: .*/version: $new_version+$new_build/" pubspec.yaml
+          
+          # Commit version bump
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git add pubspec.yaml
+          git commit -m "Bump version to $new_version+$new_build [skip ci]" || exit 0
+          git push
+          
+          echo "new_version=$new_version" >> $GITHUB_OUTPUT
+          echo "build_number=$new_build" >> $GITHUB_OUTPUT
+
   # Add this job at the beginning to verify repository access
   check_repo_access:
     name: Verify Repository Access
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           repository: ${{ github.repository }}
           token: ${{ secrets.QUITXT_REPO_TOKEN || secrets.GITHUB_TOKEN }}
@@ -43,7 +127,7 @@ jobs:
     needs: check_repo_access
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           repository: ${{ github.repository }}
           token: ${{ secrets.QUITXT_REPO_TOKEN || secrets.GITHUB_TOKEN }}
@@ -57,14 +141,22 @@ jobs:
 
   build_android:
     name: Build Android Package
-    needs: flutter_test
+    needs: [flutter_test, version_bump]
+    if: always() && needs.flutter_test.result == 'success' && (needs.version_bump.result == 'success' || needs.version_bump.result == 'skipped')
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           repository: ${{ github.repository }}
           token: ${{ secrets.QUITXT_REPO_TOKEN || secrets.GITHUB_TOKEN }}
-      - uses: actions/setup-java@v3
+          fetch-depth: 0
+      
+      # Pull latest changes if version was bumped
+      - name: Pull latest changes
+        if: needs.version_bump.result == 'success'
+        run: git pull origin ${{ github.ref_name }}
+        
+      - uses: actions/setup-java@v4
         with:
           distribution: 'zulu'
           java-version: '17'
@@ -95,14 +187,14 @@ jobs:
         
       # Upload build artifacts
       - name: Upload Android App Bundle
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: android-release
           path: build/app/outputs/bundle/release/app-release.aab
           retention-days: 7
           
       # Deploy to Google Play Store if on production branch
-      - name: Deploy to Google Play Store
+      - name: Deploy to Google Play Store Production
         if: github.ref == 'refs/heads/production'
         uses: r0adkll/upload-google-play@v1
         with:
@@ -112,26 +204,34 @@ jobs:
           track: production
           status: completed
 
-      # Deploy to internal testing if on staging branch
-      - name: Deploy to Google Play Internal Testing
+      # Deploy to closed alpha testing if on staging branch
+      - name: Deploy to Google Play Closed Alpha Testing
         if: github.ref == 'refs/heads/staging'
         uses: r0adkll/upload-google-play@v1
         with:
           serviceAccountJson: ${{ secrets.PLAYSTORE_SERVICE_ACCOUNT_JSON }}
           packageName: com.utsascns.quitTxTapp
           releaseFiles: build/app/outputs/bundle/release/app-release.aab
-          track: internal
+          track: alpha  # Changed from internal to alpha for closed alpha testing
           status: completed
 
   build_ios:
     name: Build iOS Package
-    needs: flutter_test
+    needs: [flutter_test, version_bump]
+    if: always() && needs.flutter_test.result == 'success' && (needs.version_bump.result == 'success' || needs.version_bump.result == 'skipped')
     runs-on: macos-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           repository: ${{ github.repository }}
           token: ${{ secrets.QUITXT_REPO_TOKEN || secrets.GITHUB_TOKEN }}
+          fetch-depth: 0
+      
+      # Pull latest changes if version was bumped
+      - name: Pull latest changes
+        if: needs.version_bump.result == 'success'
+        run: git pull origin ${{ github.ref_name }}
+        
       - uses: subosito/flutter-action@v2
         with:
           flutter-version: '3.16.x'
@@ -156,7 +256,7 @@ jobs:
       # Setup iOS code signing
       - name: Install Apple Certificate
         if: github.ref == 'refs/heads/staging' || github.ref == 'refs/heads/production'
-        uses: apple-actions/import-codesign-certs@v1
+        uses: apple-actions/import-codesign-certs@v2
         with:
           p12-file-base64: ${{ secrets.IOS_DISTRIBUTION_P12_BASE64 }}
           p12-password: ${{ secrets.IOS_DISTRIBUTION_P12_PASSWORD }}
@@ -210,7 +310,7 @@ jobs:
       # Upload build artifacts
       - name: Upload iOS App
         if: github.ref == 'refs/heads/staging' || github.ref == 'refs/heads/production'
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: ios-release
           path: ios/build/*.ipa
@@ -238,11 +338,11 @@ jobs:
 
   notify:
     name: Notify Team of Deployment
-    needs: [build_android, build_ios]
+    needs: [build_android, build_ios, version_bump]
     runs-on: ubuntu-latest
     if: success() && (github.ref == 'refs/heads/staging' || github.ref == 'refs/heads/production')
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           repository: ${{ github.repository }}
           token: ${{ secrets.QUITXT_REPO_TOKEN || secrets.GITHUB_TOKEN }}
@@ -254,7 +354,10 @@ jobs:
           SLACK_COLOR: ${{ github.ref == 'refs/heads/production' && 'good' || 'warning' }}
           SLACK_TITLE: Deployment Status
           SLACK_MESSAGE: |
-            Environment: ${{ github.ref == 'refs/heads/production' && 'Production' || 'Staging' }}
+            Environment: ${{ github.ref == 'refs/heads/production' && 'Production' || 'Staging (Testing)' }}
             Status: Success
+            Version: ${{ needs.version_bump.outputs.new_version || 'No version change' }}+${{ needs.version_bump.outputs.build_number || 'N/A' }}
             Commit: ${{ github.sha }}
-            Triggered by: ${{ github.actor }} 
+            Triggered by: ${{ github.actor }}
+            
+            ${{ github.ref == 'refs/heads/staging' && '📱 Available on TestFlight and Google Play Alpha Testing' || '🚀 Deployed to App Store and Google Play Production' }} 

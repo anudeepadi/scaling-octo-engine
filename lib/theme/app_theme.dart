@@ -9,6 +9,12 @@ class AppTheme {
   static const Color quitxtWhite = Color(0xFFFFFFFF);    // Text and card background
   static const Color quitxtGray = Color(0xFF757575);     // Received messages
   
+  // Gradient definitions
+  static const List<Color> primaryGradient = [
+    quitxtTeal,
+    quitxtPurple,
+  ];
+  
   static final ThemeData lightTheme = ThemeData(
     useMaterial3: true,
     colorScheme: ColorScheme.light(

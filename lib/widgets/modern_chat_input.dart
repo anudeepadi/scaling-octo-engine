@@ -28,7 +28,6 @@ class _ModernChatInputState extends State<ModernChatInput>
   late AnimationController _animationController;
   late Animation<double> _sendButtonAnimation;
   final FocusNode _focusNode = FocusNode();
-  bool _isExpanded = false;
 
   @override
   void initState() {

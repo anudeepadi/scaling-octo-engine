@@ -8,9 +8,9 @@ class YouTubePlayerWidget extends StatelessWidget {
   final String videoUrl;
 
   const YouTubePlayerWidget({
-    Key? key,
+    super.key,
     required this.videoUrl,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -103,7 +103,7 @@ class YouTubePlayerWidget extends StatelessWidget {
     try {
       await launchUrl(url, mode: LaunchMode.externalApplication);
     } catch (e) {
-      print('Error launching YouTube video: $e');
+      // Note: YouTube video launch error - consider logging in production
     }
   }
 }

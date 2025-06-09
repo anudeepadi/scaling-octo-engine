@@ -11,12 +11,12 @@ class VideoPlayerWidget extends StatefulWidget {
   final bool showControls;
 
   const VideoPlayerWidget({
-    Key? key,
+    super.key,
     required this.videoUrl,
     this.autoPlay = false,
     this.looping = false,
     this.showControls = true,
-  }) : super(key: key);
+  });
 
   @override
   State<VideoPlayerWidget> createState() => _VideoPlayerWidgetState();
@@ -92,7 +92,7 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget> {
         _hasError = true;
         _errorMessage = 'Error loading video: $e';
       });
-      print('Error initializing video player: $e');
+      // Note: Video player initialization error - consider logging in production
     }
   }
 

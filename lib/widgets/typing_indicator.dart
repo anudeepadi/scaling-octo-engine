@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 class TypingIndicator extends StatefulWidget {
-  const TypingIndicator({Key? key}) : super(key: key);
+  const TypingIndicator({super.key});
 
   @override
   State<TypingIndicator> createState() => _TypingIndicatorState();
@@ -60,7 +60,7 @@ class _TypingIndicatorState extends State<TypingIndicator>
         margin: const EdgeInsets.only(left: 8, right: 80, bottom: 8),
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         decoration: BoxDecoration(
-          color: theme.colorScheme.surfaceVariant.withOpacity(0.7),
+          color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.7),
           borderRadius: const BorderRadius.only(
             topLeft: Radius.circular(20),
             topRight: Radius.circular(20),
@@ -83,7 +83,7 @@ class _TypingIndicatorState extends State<TypingIndicator>
                       height: 8,
                       decoration: BoxDecoration(
                         color: theme.colorScheme.onSurfaceVariant
-                            .withOpacity(0.6 + (_animations[index].value * 0.4)),
+                            .withValues(alpha: 0.6 + (_animations[index].value * 0.4)),
                         shape: BoxShape.circle,
                       ),
                     ),

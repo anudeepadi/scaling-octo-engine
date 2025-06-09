@@ -9,11 +9,11 @@ class VideoPreview extends StatefulWidget {
   final String title;
 
   const VideoPreview({
-    Key? key,
+    super.key,
     required this.videoUrl,
     required this.thumbnailUrl,
     required this.title,
-  }) : super(key: key);
+  });
 
   @override
   State<VideoPreview> createState() => _VideoPreviewState();
@@ -32,7 +32,7 @@ class _VideoPreviewState extends State<VideoPreview> {
   }
 
   Future<void> _initializePlayer() async {
-    _videoPlayerController = VideoPlayerController.network(widget.videoUrl);
+    _videoPlayerController = VideoPlayerController.networkUrl(Uri.parse(widget.videoUrl));
     await _videoPlayerController!.initialize();
     
     _chewieController = ChewieController(
@@ -89,7 +89,7 @@ class _VideoPreviewState extends State<VideoPreview> {
             Positioned.fill(
               child: Container(
                 decoration: BoxDecoration(
-                  color: Colors.black.withOpacity(0.5),
+                  color: Colors.black.withValues(alpha: 0.5),
                   borderRadius: BorderRadius.circular(12),
                 ),
               ),
@@ -120,7 +120,7 @@ class _VideoPreviewState extends State<VideoPreview> {
                     end: Alignment.bottomCenter,
                     colors: [
                       Colors.transparent,
-                      Colors.black.withOpacity(0.7),
+                      Colors.black.withValues(alpha: 0.7),
                     ],
                   ),
                   borderRadius: const BorderRadius.vertical(

@@ -48,7 +48,7 @@ jobs:
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.16.x'
+          flutter-version: '3.27.x'
           channel: 'stable'
       
       - name: Auto-increment version
@@ -133,7 +133,7 @@ jobs:
           token: ${{ secrets.QUITXT_REPO_TOKEN || secrets.GITHUB_TOKEN }}
       - uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.16.x'
+          flutter-version: '3.27.x'
           channel: 'stable'
       - run: flutter pub get
       - run: flutter analyze
@@ -162,7 +162,7 @@ jobs:
           java-version: '17'
       - uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.16.x'
+          flutter-version: '3.27.x'
           channel: 'stable'
       
       # Set up environment variables based on branch
@@ -234,7 +234,7 @@ jobs:
         
       - uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.16.x'
+          flutter-version: '3.27.x'
           channel: 'stable'
           
       # Set up environment variables based on branch

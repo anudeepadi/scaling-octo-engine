@@ -20,7 +20,7 @@ class AppTheme {
     colorScheme: ColorScheme.light(
       primary: quitxtTeal,
       secondary: quitxtPurple,
-      background: quitxtWhite,
+      surface: quitxtWhite,
       surface: quitxtWhite,
       error: Colors.red,
       onPrimary: quitxtWhite,

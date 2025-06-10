@@ -40,6 +40,7 @@ dependencies:
   firebase_messaging: ^15.1.0
   firebase_storage: ^12.1.1
   firebase_analytics: ^11.2.1
+  html: ^0.15.4
   # flutter_local_notifications: ^16.3.2  # Uncomment and run flutter pub get
 
 dev_dependencies:

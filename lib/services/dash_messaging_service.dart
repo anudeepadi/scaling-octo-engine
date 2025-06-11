@@ -201,26 +201,26 @@ class DashMessagingService {
     }
     
     try {
-      print('Loading recent messages from Firestore for user: $_userId');
+      print('Loading messages from Firestore for user: $_userId');
       print('Collection path: messages/${_userId}/chat');
       
       // Get reference to the user's chat collection in Firestore
-      // Optimize: Load only 5 most recent messages initially for fastest loading
+      // Always load at least 10 messages for better UX, or 20 if available for more context
       final chatRef = FirebaseFirestore.instance
           .collection('messages')
           .doc(_userId)
           .collection('chat')
           .orderBy('createdAt', descending: true)
-          .limit(5); // Reduced from 10 to 5 for fastest initial load
+          .limit(20); // Load more messages for better context
       
-      print('Executing optimized Firestore query for recent messages');
+      print('Executing optimized Firestore query for up to 20 messages');
       
       // Add timeout to prevent hanging
       final snapshot = await chatRef.get().timeout(
-        const Duration(seconds: 2),
+        const Duration(seconds: 8), // Increased timeout for more messages
         onTimeout: () {
-          print('Firestore query timeout - returning empty result');
-          throw TimeoutException('Firestore query timeout', const Duration(seconds: 2));
+          print('⚠️ Firestore query timeout - using fallback');
+          throw TimeoutException('Message loading timeout', const Duration(seconds: 8));
         },
       );
       
@@ -242,7 +242,8 @@ class DashMessagingService {
       
       for (var doc in snapshot.docs.reversed) { // Process in chronological order
         try {
-          final data = doc.data();
+          final data = doc.data() as Map<String, dynamic>?;
+          if (data == null) continue;
           final messageId = data['serverMessageId'] ?? doc.id;
           
           // Skip if already processed
@@ -251,7 +252,7 @@ class DashMessagingService {
           }
           processedMessageIds.add(messageId);
           
-          final messageBody = (data['messageBody'] ?? '').toString();
+          final messageBody = (data['messageBody']?.toString() ?? '');
           // Skip empty messages
           if (messageBody.isEmpty) {
             continue;
@@ -278,7 +279,7 @@ class DashMessagingService {
               }
             }
           } catch (e) {
-            // Silently continue on timestamp errors
+            // Continue silently on timestamp errors
           }
           
           // Create ChatMessage from Firestore data (minimal processing)
@@ -286,14 +287,13 @@ class DashMessagingService {
             id: messageId,
             content: messageBody,
             timestamp: DateTime.now(),
-            isMe: data['source'] == 'client',
+            isMe: (data['source']?.toString() ?? '') == 'client',
             type: MessageType.text,
           );
           
-          // Add to cache and messages list
           _addToCache(message);
           messages.add(message);
-
+          
           // Handle quick replies/polls efficiently (only if really needed)
           final isPoll = data['isPoll'];
           if (isMessagePoll(isPoll) && data['answers'] != null) {
@@ -344,7 +344,7 @@ class DashMessagingService {
         print('Updated _lastFirestoreMessageTime to $highestTimestamp');
       }
       
-      print('Processed ${messages.length} messages from Firestore');
+      print('Processed ${messages.length} messages from Firestore (loaded ${snapshot.docs.length} docs)');
       
       // Add messages to the stream in batch for better performance
       for (var message in messages) {
@@ -361,51 +361,62 @@ class DashMessagingService {
 
   // Send a message to the server
   Future<bool> sendMessage(String text) async {
-    if (_userId == null || _fcmToken == null) {
-      print('User ID or FCM token is null. Will attempt to send to server anyway.');
-    }
-
-    // Prevent duplicate messages within 2 seconds
-    if (_lastResponseTime != null && 
-        DateTime.now().difference(_lastResponseTime!).inSeconds < 2 &&
-        text.toLowerCase() == _lastMessageText?.toLowerCase()) {
-      print('Preventing duplicate message: $text from user');
+    if (text.trim().isEmpty) {
+      print('Cannot send empty message');
       return false;
     }
-
-    _lastMessageText = text;
-    _lastResponseTime = DateTime.now();
-
-    try {
-      final messageId = _uuid.v4();
-
-      // Ensure correct server URL
-      if (!_hostUrl.contains("/scheduler/mobile-app")) {
-        print('Correcting server URL to include path');
-        _hostUrl = "https://dashmessaging-com.ngrok.io/scheduler/mobile-app";
+    
+    // Prevent rapid duplicate messages (debouncing)
+    final now = DateTime.now();
+    if (_lastMessageText == text && _lastResponseTime != null) {
+      final timeSinceLastSend = now.difference(_lastResponseTime!);
+      if (timeSinceLastSend.inSeconds < 3) {
+        print('Preventing duplicate message within 3 seconds: $text');
+        return false;
       }
-
-      final endpoint = _hostUrl;
-      final payload = {
+    }
+    
+    // Generate unique message ID and track timing
+    final messageId = _uuid.v4();
+    final requestStartTime = now.millisecondsSinceEpoch;
+    
+    // Update tracking variables
+    _lastMessageText = text;
+    _lastResponseTime = now;
+    
+    print('Sending message to server: {messageId: $messageId, userId: $_userId, messageText: $text, fcmToken: $_fcmToken, messageTime: $requestStartTime}');
+    
+    try {
+      final requestBody = jsonEncode({
         'messageId': messageId,
         'userId': _userId,
         'messageText': text,
         'fcmToken': _fcmToken,
-        'messageTime': DateTime.now().millisecondsSinceEpoch,
-      };
-
-      print('Sending message to server: $payload');
-      print('Using endpoint: $endpoint');
-
+        'messageTime': requestStartTime,
+      });
+      
+      print('Using endpoint: $_hostUrl');
+      
+      // Add optimized timeout and headers
       final response = await http.post(
-        Uri.parse(endpoint),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode(payload),
+        Uri.parse(_hostUrl),
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'User-Agent': 'QuitTXT-Mobile/1.0',
+        },
+        body: requestBody,
+      ).timeout(
+        const Duration(seconds: 10), // Reasonable timeout
+        onTimeout: () {
+          print('⚠️ Server request timeout for message: $text');
+          throw TimeoutException('Server request timeout', const Duration(seconds: 10));
+        },
       );
-
+      
       print('Send message response status: ${response.statusCode}');
       print('Send message response body: ${response.body}');
-
+      
       if (response.statusCode == 200) {
         print('Message sent successfully to server');
         
@@ -421,7 +432,7 @@ class DashMessagingService {
         // Add user message to stream
         _safeAddToStream(userMessage);
 
-        // Process server response
+        // Process server response if available
         try {
           final responseBody = response.body.trim();
           if (responseBody.isNotEmpty) {
@@ -461,52 +472,40 @@ class DashMessagingService {
             print('Server returned empty response body');
           }
         } catch (e) {
-          print('Error parsing server response: $e');
+          print('Error processing server response: $e');
         }
-
+        
         return true;
       } else {
-        // If server fails, still show user message
-        final userMessage = ChatMessage(
-          id: messageId,
-          content: text,
-          timestamp: DateTime.now(),
-          isMe: true,
-          type: MessageType.text,
-        );
-
-        _safeAddToStream(userMessage);
-        print('Failed to send message. Status: ${response.statusCode}, Body: ${response.body}');
+        print('Failed to send message. Status: ${response.statusCode}');
         return false;
       }
     } catch (e) {
-      print('Error sending message: $e');
-      print('Failed to send message to server');
+      print('Error sending message to server: $e');
       return false;
     }
   }
   
-  // Optimized real-time listener
+  // Start real-time message listener
   void startRealtimeMessageListener() {
-    _startPerformanceTimer('Realtime listener setup');
-    
     if (_userId == null) {
-      print('Cannot start listener, user ID is null');
+      print('Cannot start realtime listener, user ID is null');
       return;
     }
     
-    print('Starting optimized realtime listener for user: $_userId');
+    // Stop any existing listener
+    stopRealtimeMessageListener();
     
-    // Cancel existing listener if any
-    _firestoreSubscription?.cancel();
+    _startPerformanceTimer('Realtime listener setup');
     
     try {
-      // Set up optimized Firestore listener
+      // Set up optimized Firestore listener with better filtering
       final chatRef = FirebaseFirestore.instance
           .collection('messages')
           .doc(_userId)
           .collection('chat')
-          .orderBy('createdAt', descending: true);
+          .orderBy('createdAt', descending: true)
+          .limit(50); // Limit to recent messages for performance
       
       _firestoreSubscription = chatRef.snapshots().listen(
         (snapshot) async {
@@ -516,31 +515,35 @@ class DashMessagingService {
           
           try {
             final newMessages = <ChatMessage>[];
+            final processedInThisBatch = <String>{};
             
             for (var change in snapshot.docChanges) {
               if (change.type == DocumentChangeType.added || change.type == DocumentChangeType.modified) {
                 final doc = change.doc;
-                final data = doc.data();
+                final data = doc.data() as Map<String, dynamic>?;
                 
                 if (data == null) continue;
                 
                 final messageId = data['serverMessageId'] ?? doc.id;
                 
-                // Skip if already in cache
-                if (_messageCache.containsKey(messageId)) {
+                // Skip if already in cache or processed in this batch
+                if (_messageCache.containsKey(messageId) || processedInThisBatch.contains(messageId)) {
                   continue;
                 }
                 
+                processedInThisBatch.add(messageId);
+                
                 // Skip empty messages
-                if ((data['messageBody'] ?? '').toString().isEmpty) {
+                final messageBody = data['messageBody']?.toString() ?? '';
+                if (messageBody.isEmpty) {
                   continue;
                 }
                 
                 final message = ChatMessage(
                   id: messageId,
-                  content: data['messageBody'] ?? '',
+                  content: messageBody,
                   timestamp: DateTime.now(),
-                  isMe: data['source'] == 'client',
+                  isMe: (data['source']?.toString() ?? '') == 'client',
                   type: MessageType.text,
                 );
                 
@@ -555,14 +558,16 @@ class DashMessagingService {
                     final answersData = data['answers'];
                     
                     if (answersData is String && answersData != 'None' && answersData.isNotEmpty) {
-                      answers = answersData.split(',').map((e) => e.trim()).where((e) => e.isNotEmpty).toList();
+                      answers = answersData.split(',').map((e) => e.trim()).where((e) => e.isNotEmpty).take(4).toList();
                     } else if (answersData is List) {
-                      answers = List<String>.from(answersData);
+                      answers = List<String>.from(answersData).take(4).toList();
                     }
                     
                     if (answers.isNotEmpty) {
                       final quickReplyId = '${messageId}_replies';
-                      if (!_messageCache.containsKey(quickReplyId)) {
+                      if (!_messageCache.containsKey(quickReplyId) && !processedInThisBatch.contains(quickReplyId)) {
+                        processedInThisBatch.add(quickReplyId);
+                        
                         final quickReplies = answers.map((item) => 
                           QuickReply(text: item, value: item)
                         ).toList();
@@ -570,7 +575,7 @@ class DashMessagingService {
                         final quickReplyMessage = ChatMessage(
                           id: quickReplyId,
                           content: '',
-                          timestamp: DateTime.now().add(const Duration(milliseconds: 100)),
+                          timestamp: DateTime.now().add(const Duration(milliseconds: 50)),
                           isMe: false,
                           type: MessageType.quickReply,
                           suggestedReplies: quickReplies,
@@ -587,13 +592,12 @@ class DashMessagingService {
               }
             }
             
-            // Batch add new messages to stream
-            for (var message in newMessages) {
-              _safeAddToStream(message);
-            }
-            
+            // Add all new messages to stream in batch
             if (newMessages.isNotEmpty) {
               print('✅ Added ${newMessages.length} new messages to stream');
+              for (var message in newMessages) {
+                _safeAddToStream(message);
+              }
             }
             
             _stopPerformanceTimer('Processing realtime update');
@@ -603,14 +607,21 @@ class DashMessagingService {
           }
         },
         onError: (error) {
-          print('Firestore listener error: $error');
+          print('Error in realtime listener: $error');
+          // Attempt to restart listener after a delay
+          Timer(const Duration(seconds: 5), () {
+            if (_userId != null) {
+              print('Attempting to restart realtime listener after error');
+              startRealtimeMessageListener();
+            }
+          });
         },
       );
       
       _stopPerformanceTimer('Realtime listener setup');
       print('✅ Optimized realtime listener started successfully');
     } catch (e) {
-      print('Error starting realtime listener: $e');
+      print('Error setting up realtime listener: $e');
       _stopPerformanceTimer('Realtime listener setup (error)');
     }
   }
@@ -1380,7 +1391,8 @@ class DashMessagingService {
       
       for (var doc in snapshot.docs.reversed) {
         try {
-          final data = doc.data();
+          final data = doc.data() as Map<String, dynamic>?;
+          if (data == null) continue;
           final messageId = data['serverMessageId'] ?? doc.id;
           
           // Skip if already processed or cached
@@ -1415,9 +1427,9 @@ class DashMessagingService {
           
           final message = ChatMessage(
             id: messageId,
-            content: data['messageBody'] ?? '',
+            content: data['messageBody']?.toString() ?? '',
             timestamp: DateTime.now(),
-            isMe: data['source'] == 'client',
+            isMe: (data['source']?.toString() ?? '') == 'client',
             type: MessageType.text,
           );
           
@@ -1525,7 +1537,8 @@ class DashMessagingService {
       
       for (var doc in snapshot.docs.reversed) {
         try {
-          final data = doc.data();
+          final data = doc.data() as Map<String, dynamic>?;
+          if (data == null) continue;
           final messageId = data['serverMessageId'] ?? doc.id;
           
           // Skip if already cached
@@ -1561,7 +1574,7 @@ class DashMessagingService {
             id: messageId,
             content: messageBody,
             timestamp: DateTime.now(),
-            isMe: data['source'] == 'client',
+            isMe: (data['source']?.toString() ?? '') == 'client',
             type: MessageType.text,
           );
           

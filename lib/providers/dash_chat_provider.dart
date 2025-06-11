@@ -82,9 +82,7 @@ class DashChatProvider extends ChangeNotifier {
     // Cancel any previous message subscription
     _messageSubscription?.cancel();
 
-    // Clear existing messages
-    _chatProvider?.clearChatHistory();
-    print('DashChatProvider: Cleared chat history before setting up new listener.');
+    print('DashChatProvider: Setting up message listener (keeping existing messages).');
 
     // Subscribe to the DashMessagingService message stream
     _messageSubscription = _dashService.messageStream.listen((message) {

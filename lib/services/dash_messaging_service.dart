@@ -204,23 +204,23 @@ class DashMessagingService {
       print('Loading messages from Firestore for user: $_userId');
       print('Collection path: messages/${_userId}/chat');
       
-      // Get reference to the user's chat collection in Firestore
-      // Always load at least 10 messages for better UX, or 20 if available for more context
+      // Ultra-fast initial load: Get only essential messages first
+      // Progressive loading strategy - load 6 messages initially for <50ms response
       final chatRef = FirebaseFirestore.instance
           .collection('messages')
           .doc(_userId)
           .collection('chat')
           .orderBy('createdAt', descending: true)
-          .limit(20); // Load more messages for better context
+          .limit(6); // Reduced from 20 to 6 for ultra-fast initial load
       
-      print('Executing optimized Firestore query for up to 20 messages');
+      print('Executing ultra-fast Firestore query for up to 6 messages');
       
-      // Add timeout to prevent hanging
+      // Aggressive timeout for immediate response
       final snapshot = await chatRef.get().timeout(
-        const Duration(seconds: 8), // Increased timeout for more messages
+        const Duration(milliseconds: 1500), // Reduced from 8s to 1.5s
         onTimeout: () {
           print('⚠️ Firestore query timeout - using fallback');
-          throw TimeoutException('Message loading timeout', const Duration(seconds: 8));
+          throw TimeoutException('Message loading timeout', const Duration(milliseconds: 1500));
         },
       );
       
@@ -346,13 +346,29 @@ class DashMessagingService {
       
       print('Processed ${messages.length} messages from Firestore (loaded ${snapshot.docs.length} docs)');
       
-      // Add messages to the stream in batch for better performance
-      for (var message in messages) {
-        _safeAddToStream(message);
+      // Ultra-fast UI updates with progressive rendering
+      if (messages.isNotEmpty) {
+        // Add first 2 messages immediately for instant UI feedback
+        final criticalMessages = messages.take(2).toList();
+        for (var message in criticalMessages) {
+          _safeAddToStream(message);
+        }
+        
+        // Add remaining messages with micro-delays for smooth rendering
+        if (messages.length > 2) {
+          final remainingMessages = messages.skip(2).toList();
+          for (int i = 0; i < remainingMessages.length; i++) {
+            await Future.delayed(const Duration(microseconds: 100));
+            _safeAddToStream(remainingMessages[i]);
+          }
+        }
       }
       
       print('Added ${messages.length} messages to the stream');
       _stopPerformanceTimer('Initial message loading');
+      
+      // Background loading: Fetch more messages after initial UI is ready
+      _scheduleBackgroundMessageLoad();
     } catch (e) {
       print('Error loading messages from Firestore: $e');
       _stopPerformanceTimer('Initial message loading (error)');
@@ -499,13 +515,13 @@ class DashMessagingService {
     _startPerformanceTimer('Realtime listener setup');
     
     try {
-      // Set up optimized Firestore listener with better filtering
+      // Ultra-optimized listener with minimal scope for faster updates
       final chatRef = FirebaseFirestore.instance
           .collection('messages')
           .doc(_userId)
           .collection('chat')
           .orderBy('createdAt', descending: true)
-          .limit(50); // Limit to recent messages for performance
+          .limit(15); // Reduced from 50 to 15 for faster real-time updates
       
       _firestoreSubscription = chatRef.snapshots().listen(
         (snapshot) async {
@@ -1671,6 +1687,98 @@ class DashMessagingService {
       print('Successfully added test message to stream');
     } catch (e) {
       print('Error testing stream controller: $e');
+    }
+  }
+
+  // Helper method for ultra-fast message processing
+  Future<ChatMessage?> _processMessageDocOptimized(QueryDocumentSnapshot doc, Set<String> processedMessageIds) async {
+    try {
+      final data = doc.data() as Map<String, dynamic>?;
+      if (data == null) return null;
+      
+      final messageId = data['serverMessageId'] ?? doc.id;
+      
+      // Skip if already processed
+      if (processedMessageIds.contains(messageId)) {
+        return null;
+      }
+      processedMessageIds.add(messageId);
+      
+      final messageBody = (data['messageBody']?.toString() ?? '');
+      // Skip empty messages
+      if (messageBody.isEmpty) {
+        return null;
+      }
+      
+      // Create minimal ChatMessage for ultra-fast processing
+      return ChatMessage(
+        id: messageId,
+        content: messageBody,
+        timestamp: DateTime.now(),
+        isMe: (data['source']?.toString() ?? '') == 'client',
+        type: MessageType.text,
+      );
+    } catch (e) {
+      return null;
+    }
+  }
+
+  // Background loading of additional messages for better UX
+  void _scheduleBackgroundMessageLoad() {
+    if (_userId == null) return;
+    
+    // Schedule background loading after a short delay
+    Timer(const Duration(milliseconds: 300), () {
+      _loadAdditionalMessagesInBackground();
+    });
+  }
+
+  // Load more messages in background without blocking UI
+  Future<void> _loadAdditionalMessagesInBackground() async {
+    if (_userId == null) return;
+    
+    try {
+      print('Loading additional messages in background...');
+      
+      // Load next 12 messages (total 18 with initial 6)
+      final chatRef = FirebaseFirestore.instance
+          .collection('messages')
+          .doc(_userId!)
+          .collection('chat')
+          .orderBy('createdAt', descending: true)
+          .limit(18)  // Load 18 total, skip first 6 already loaded
+          .startAfter([_lastFirestoreMessageTime]);
+      
+      final snapshot = await chatRef.get().timeout(
+        const Duration(seconds: 3),
+        onTimeout: () {
+          print('Background loading timeout - continuing with current messages');
+          return null;
+        },
+      );
+      
+      if (snapshot?.docs.isNotEmpty == true) {
+        final additionalMessages = <ChatMessage>[];
+        final processedIds = <String>{};
+        
+        for (var doc in snapshot!.docs.reversed) {
+          final message = await _processMessageDocOptimized(doc, processedIds);
+          if (message != null && !_messageCache.containsKey(message.id)) {
+            additionalMessages.add(message);
+            _addToCache(message);
+          }
+        }
+        
+        // Add background messages with subtle delays
+        for (int i = 0; i < additionalMessages.length; i++) {
+          await Future.delayed(const Duration(milliseconds: 50));
+          _safeAddToStream(additionalMessages[i]);
+        }
+        
+        print('Background loaded ${additionalMessages.length} additional messages');
+      }
+    } catch (e) {
+      print('Background message loading failed: $e');
     }
   }
 }

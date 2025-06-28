@@ -17,7 +17,7 @@ class DashChatScreen extends StatefulWidget {
 class _DashChatScreenState extends State<DashChatScreen> {
   final ScrollController _scrollController = ScrollController();
   final TextEditingController _messageController = TextEditingController();
-  bool _showDebugInfo = false;
+  bool _showDebugInfo = false; // Keep debug panel hidden by default
 
   @override
   void initState() {

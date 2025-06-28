@@ -112,31 +112,9 @@ class ServerMessageService {
 
   // Generate and store local response when server unavailable
   Future<void> _generateLocalResponse(String messageText, int eventTypeCode) async {
-    try {
-      final response = _generateServerResponse(messageText, eventTypeCode);
-      
-      if (response['text'] != null) {
-        final serverMessageId = const Uuid().v4();
-        final serverMessagePayload = {
-          'messageBody': response['text'],
-          'source': 'server',
-          'createdAt': FieldValue.serverTimestamp(),
-        };
-
-        // Add options if they exist
-        if (response['options'] != null && response['options'].isNotEmpty) {
-          serverMessagePayload['answers'] = response['options'];
-          serverMessagePayload['isPoll'] = 'y';
-        }
-
-        await _firestore.collection('messages').doc(_userId).collection('chat')
-            .doc(serverMessageId).set(serverMessagePayload);
-            
-        print('Local response stored with ID: $serverMessageId');
-      }
-    } catch (e) {
-      print('Error generating local response: $e');
-    }
+    print('Local fallback responses disabled - no local responses will be generated');
+    print('Message received but not processed: $messageText');
+    return;
   }
 
   // Local fallback response generator

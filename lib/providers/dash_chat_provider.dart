@@ -6,6 +6,7 @@ import '../models/quick_reply.dart';
 import '../services/dash_messaging_service.dart';
 import '../utils/app_localizations.dart';
 import '../utils/context_holder.dart';
+import '../utils/debug_config.dart';
 import 'chat_provider.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
@@ -39,11 +40,11 @@ class DashChatProvider extends ChangeNotifier {
 
   // Constructor
   DashChatProvider() {
-    print('DashChatProvider: Initializing...');
+    DebugConfig.debugPrint('DashChatProvider: Initializing...');
     if (_auth == null) {
-      print('ERROR: DashChatProvider._auth is NULL immediately after assignment!');
+      DebugConfig.errorPrint('DashChatProvider._auth is NULL immediately after assignment!');
     } else {
-      print('DashChatProvider: _auth initialized successfully.');
+      DebugConfig.debugPrint('DashChatProvider: _auth initialized successfully.');
     }
     _listenToAuthChanges();
   }
@@ -51,7 +52,7 @@ class DashChatProvider extends ChangeNotifier {
   // Method to link to the ChatProvider instance
   void setChatProvider(ChatProvider chatProvider) {
     _chatProvider = chatProvider;
-    print('DashChatProvider: Linked with ChatProvider.');
+    DebugConfig.debugPrint('DashChatProvider: Linked with ChatProvider.');
     
     // If user is already logged in when linked, setup listeners
     if (_currentUser != null) {
@@ -61,7 +62,7 @@ class DashChatProvider extends ChangeNotifier {
 
   void _listenToAuthChanges() {
     _authSubscription = _auth.authStateChanges().listen((User? user) {
-      print('DashChatProvider: Auth state changed. User: ${user?.uid}');
+      DebugConfig.debugPrint('DashChatProvider: Auth state changed. User: ${user?.uid}');
       if (user == null) {
         // User logged out - clear all state
         clearOnLogout();
@@ -71,7 +72,7 @@ class DashChatProvider extends ChangeNotifier {
         if (_chatProvider != null) {
            _setupMessageListener();
         } else {
-           print('DashChatProvider: User logged in, but ChatProvider not linked yet.');
+           DebugConfig.debugPrint('DashChatProvider: User logged in, but ChatProvider not linked yet.');
         }
         notifyListeners();
       }
@@ -91,20 +92,20 @@ class DashChatProvider extends ChangeNotifier {
         return;
       }
       
-      print('DashChatProvider: Received message from stream: ${message.id}, type: ${message.type}, content: ${message.content.substring(0, message.content.length > 30 ? 30 : message.content.length)}...');
+      DebugConfig.messagingPrint('DashChatProvider: Received message from stream: ${message.id}, type: ${message.type}, content: ${message.content.substring(0, message.content.length > 30 ? 30 : message.content.length)}...');
       
       // Add message to chat provider
       // Use the appropriate method based on message type
       if (message.type == MessageType.quickReply) {
-        print('DashChatProvider: Adding quick reply message with ${message.suggestedReplies?.length ?? 0} options');
+        DebugConfig.debugPrint('DashChatProvider: Adding quick reply message with ${message.suggestedReplies?.length ?? 0} options');
         _chatProvider!.addQuickReplyMessage(message.suggestedReplies ?? []);
       } else {
         // Skip server status messages
         if (message.content.startsWith('Using server:')) {
-          print('DashChatProvider: Skipping server status message');
+          DebugConfig.debugPrint('DashChatProvider: Skipping server status message');
           return;
         }
-        print('DashChatProvider: Adding text message (from ${message.isMe ? "user" : "server"})');
+        DebugConfig.debugPrint('DashChatProvider: Adding text message (from ${message.isMe ? "user" : "server"})');
         _chatProvider!.addTextMessage(message.content, isMe: message.isMe);
       }
       

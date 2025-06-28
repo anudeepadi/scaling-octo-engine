@@ -9,6 +9,7 @@ import '../models/quick_reply.dart';
 import '../utils/app_localizations.dart';
 import '../utils/context_holder.dart';
 import '../utils/platform_utils.dart';
+import '../utils/debug_config.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
@@ -60,13 +61,13 @@ class DashMessagingService {
   void _startPerformanceTimer(String operation) {
     _performanceStopwatch.reset();
     _performanceStopwatch.start();
-    print('⏱️ Starting performance timer for: $operation');
+    DebugConfig.performancePrint('Starting performance timer for: $operation');
   }
   
   void _stopPerformanceTimer(String operation) {
     _performanceStopwatch.stop();
     final elapsedMs = _performanceStopwatch.elapsedMilliseconds;
-    print('⏱️ $operation completed in ${elapsedMs}ms');
+    DebugConfig.performancePrint('$operation completed in ${elapsedMs}ms');
   }
   
   void _addToCache(ChatMessage message) {
@@ -79,17 +80,17 @@ class DashMessagingService {
   
   void clearCache() {
     _messageCache.clear();
-    print('Message cache cleared');
+    DebugConfig.debugPrint('Message cache cleared');
   }
 
   // Initialize the service with user info
   Future<void> initialize(String userId) async {
     if (_isInitialized && _userId == userId) {
-      print('DashMessagingService already initialized for user: $userId');
+      DebugConfig.debugPrint('DashMessagingService already initialized for user: $userId');
       return;
     }
     
-    print('Initializing DashMessagingService for user: $userId');
+    DebugConfig.infoPrint('Initializing DashMessagingService for user: $userId');
     _userId = userId;
     
     // Clear cache when switching users
@@ -104,7 +105,7 @@ class DashMessagingService {
     stopRealtimeMessageListener();
     
     // Reset timestamp tracking
-    print('Reset _lastFirestoreMessageTime to 0 during initialization');
+    DebugConfig.debugPrint('Reset _lastFirestoreMessageTime to 0 during initialization');
     _lastFirestoreMessageTime = 0;
     
     try {
@@ -121,9 +122,9 @@ class DashMessagingService {
       _testConnectionInBackground();
       
       _isInitialized = true;
-      print('DashMessagingService initialized for user: $userId');
+      DebugConfig.infoPrint('DashMessagingService initialized for user: $userId');
     } catch (e) {
-      print('Error during DashMessagingService initialization: $e');
+      DebugConfig.errorPrint('Error during DashMessagingService initialization: $e');
       _isInitialized = false;
       rethrow;
     }
@@ -201,49 +202,35 @@ class DashMessagingService {
     }
     
     try {
-      print('Loading messages from Firestore for user: $_userId');
-      print('Collection path: messages/${_userId}/chat');
+      print('Loading first 10 messages from Firestore for user: $_userId');
       
-      // Ultra-fast initial load: Get only essential messages first
-      // Progressive loading strategy - load 6 messages initially for <50ms response
+      // Query the first 10 messages ordered by creation time (most recent first)
       final chatRef = FirebaseFirestore.instance
           .collection('messages')
           .doc(_userId)
           .collection('chat')
           .orderBy('createdAt', descending: true)
-          .limit(6); // Reduced from 20 to 6 for ultra-fast initial load
+          .limit(10);
       
-      print('Executing ultra-fast Firestore query for up to 6 messages');
-      
-      // Aggressive timeout for immediate response
-      final snapshot = await chatRef.get().timeout(
-        const Duration(milliseconds: 1500), // Reduced from 8s to 1.5s
-        onTimeout: () {
-          print('⚠️ Firestore query timeout - using fallback');
-          throw TimeoutException('Message loading timeout', const Duration(milliseconds: 1500));
-        },
-      );
+      final snapshot = await chatRef.get();
       
       if (snapshot.docs.isEmpty) {
-        print('No existing messages found for user $_userId');
+        print('No existing messages found in Firestore');
         _stopPerformanceTimer('Initial message loading (no messages)');
         return;
       }
       
       print('Found ${snapshot.docs.length} existing messages in Firestore');
       
-      // Track the highest and lowest timestamps for pagination
-      int highestTimestamp = 0;
-      int lowestTimestamp = 0;
-      
-      // Process messages efficiently with minimal processing
       final messages = <ChatMessage>[];
       final processedMessageIds = <String>{};
       
-      for (var doc in snapshot.docs.reversed) { // Process in chronological order
+      // Process messages in reverse order to maintain chronological order
+      for (var doc in snapshot.docs.reversed) {
         try {
           final data = doc.data() as Map<String, dynamic>?;
           if (data == null) continue;
+          
           final messageId = data['serverMessageId'] ?? doc.id;
           
           // Skip if already processed
@@ -252,127 +239,94 @@ class DashMessagingService {
           }
           processedMessageIds.add(messageId);
           
-          final messageBody = (data['messageBody']?.toString() ?? '');
-          // Skip empty messages
-          if (messageBody.isEmpty) {
-            continue;
+          // Extract message content
+          final content = data['messageBody']?.toString() ?? '';
+          if (content.isEmpty) {
+            continue; // Skip empty messages
           }
           
-          // Track timestamps efficiently (simplified)
-          try {
-            var createdAt = data['createdAt'];
-            if (createdAt != null) {
-              int timeValue = 0;
-              if (createdAt is String) {
-                timeValue = int.tryParse(createdAt) ?? 0;
-              } else if (createdAt is int) {
-                timeValue = createdAt;
-              }
-              
-              if (timeValue > 0) {
-                if (highestTimestamp == 0 || timeValue > highestTimestamp) {
-                  highestTimestamp = timeValue;
-                }
-                if (lowestTimestamp == 0 || timeValue < lowestTimestamp) {
-                  lowestTimestamp = timeValue;
-                }
-              }
-            }
-          } catch (e) {
-            // Continue silently on timestamp errors
-          }
-          
-          // Create ChatMessage from Firestore data (minimal processing)
+          // Create ChatMessage object
           final message = ChatMessage(
             id: messageId,
-            content: messageBody,
-            timestamp: DateTime.now(),
-            isMe: (data['source']?.toString() ?? '') == 'client',
-            type: MessageType.text,
+            content: content,
+            timestamp: _extractTimestamp(data),
+            isMe: data['senderId'] == _userId, // Determine if message is from current user
+            type: _determineMessageType(data),
+            suggestedReplies: _extractQuickReplies(data),
           );
           
-          _addToCache(message);
           messages.add(message);
           
-          // Handle quick replies/polls efficiently (only if really needed)
-          final isPoll = data['isPoll'];
-          if (isMessagePoll(isPoll) && data['answers'] != null) {
-            try {
-              List<String> answers = [];
-              final answersData = data['answers'];
-              
-              if (answersData is String && answersData != 'None' && answersData.isNotEmpty) {
-                answers = answersData.split(',').map((e) => e.trim()).where((e) => e.isNotEmpty).take(3).toList(); // Limit to 3 answers for speed
-              } else if (answersData is List) {
-                answers = List<String>.from(answersData).take(3).toList(); // Limit to 3 answers
-              }
-              
-              if (answers.isNotEmpty) {
-                final quickReplyId = '${messageId}_replies';
-                if (!processedMessageIds.contains(quickReplyId)) {
-                  processedMessageIds.add(quickReplyId);
-                  
-                  final quickReplies = answers.map((item) => 
-                    QuickReply(text: item, value: item)
-                  ).toList();
-                  
-                  final quickReplyMessage = ChatMessage(
-                    id: quickReplyId,
-                    content: '',
-                    timestamp: DateTime.now().add(const Duration(milliseconds: 100)),
-                    isMe: false,
-                    type: MessageType.quickReply,
-                    suggestedReplies: quickReplies,
-                  );
-                  
-                  _addToCache(quickReplyMessage);
-                  messages.add(quickReplyMessage);
-                }
-              }
-            } catch (e) {
-              // Silently continue on quick reply errors
-            }
-          }
+          // Cache the message
+          _messageCache[messageId] = message;
+          
         } catch (e) {
-          // Silently continue on message processing errors
+          print('Error processing message document: $e');
+          continue;
         }
       }
       
-      // Update tracking timestamps
-      if (highestTimestamp > 0) {
-        _lastFirestoreMessageTime = highestTimestamp;
-        print('Updated _lastFirestoreMessageTime to $highestTimestamp');
+      // Add messages to stream in chronological order
+      for (var message in messages) {
+        _safeAddToStream(message);
       }
       
-      print('Processed ${messages.length} messages from Firestore (loaded ${snapshot.docs.length} docs)');
+      print('✅ Successfully loaded ${messages.length} messages to the stream');
+      _stopPerformanceTimer('Initial message loading (${messages.length} messages)');
       
-      // Ultra-fast UI updates with progressive rendering
-      if (messages.isNotEmpty) {
-        // Add first 2 messages immediately for instant UI feedback
-        final criticalMessages = messages.take(2).toList();
-        for (var message in criticalMessages) {
-          _safeAddToStream(message);
-        }
-        
-        // Add remaining messages with micro-delays for smooth rendering
-        if (messages.length > 2) {
-          final remainingMessages = messages.skip(2).toList();
-          for (int i = 0; i < remainingMessages.length; i++) {
-            await Future.delayed(const Duration(microseconds: 100));
-            _safeAddToStream(remainingMessages[i]);
-          }
-        }
-      }
-      
-      print('Added ${messages.length} messages to the stream');
-      _stopPerformanceTimer('Initial message loading');
-      
-      // Background loading: Fetch more messages after initial UI is ready
+      // Schedule background loading for any additional messages if needed
       _scheduleBackgroundMessageLoad();
+      
     } catch (e) {
-      print('Error loading messages from Firestore: $e');
+      print('Error loading existing messages: $e');
       _stopPerformanceTimer('Initial message loading (error)');
     }
+  }
+  
+  // Helper method to extract timestamp from Firestore data
+  DateTime _extractTimestamp(Map<String, dynamic> data) {
+    try {
+      final createdAt = data['createdAt'];
+      if (createdAt is Timestamp) {
+        return createdAt.toDate();
+      } else if (createdAt is int) {
+        return DateTime.fromMillisecondsSinceEpoch(createdAt);
+      } else if (createdAt is String) {
+        return DateTime.parse(createdAt);
+      }
+    } catch (e) {
+      print('Error parsing timestamp: $e');
+    }
+    return DateTime.now();
+  }
+  
+  // Helper method to determine message type
+  MessageType _determineMessageType(Map<String, dynamic> data) {
+    final isPoll = data['isPoll'] ?? false;
+    final hasQuickReplies = data['questionsAnswers'] != null;
+    
+    if (isPoll || hasQuickReplies) {
+      return MessageType.quickReply;
+    }
+    return MessageType.text;
+  }
+  
+  // Helper method to extract quick replies from message data
+  List<QuickReply>? _extractQuickReplies(Map<String, dynamic> data) {
+    try {
+      final questionsAnswers = data['questionsAnswers'] as Map<String, dynamic>?;
+      if (questionsAnswers != null && questionsAnswers.isNotEmpty) {
+        return questionsAnswers.entries
+            .map((entry) => QuickReply(
+                  text: entry.key,
+                  value: entry.value.toString(),
+                ))
+            .toList();
+      }
+    } catch (e) {
+      print('Error extracting quick replies: $e');
+    }
+    return null;
   }
 
   // Send a message to the server
@@ -515,19 +469,26 @@ class DashMessagingService {
     _startPerformanceTimer('Realtime listener setup');
     
     try {
-      // Ultra-optimized listener with minimal scope for faster updates
+      // Set a timestamp filter to only get messages created from now onwards
+      // This prevents loading historical messages when the listener first connects
+      final currentTimestamp = DateTime.now().millisecondsSinceEpoch;
+      
+      print('Setting up realtime listener to only receive messages after timestamp: $currentTimestamp');
+      
+      // Listen only for messages created after the current time
       final chatRef = FirebaseFirestore.instance
           .collection('messages')
           .doc(_userId)
           .collection('chat')
+          .where('createdAt', isGreaterThan: currentTimestamp)
           .orderBy('createdAt', descending: true)
-          .limit(15); // Reduced from 50 to 15 for faster real-time updates
+          .limit(15);
       
       _firestoreSubscription = chatRef.snapshots().listen(
         (snapshot) async {
           _startPerformanceTimer('Processing realtime update');
           
-          print('📨 Realtime update received: ${snapshot.docChanges.length} changes');
+          print('📨 Realtime update received: ${snapshot.docChanges.length} changes (new messages only)');
           
           try {
             final newMessages = <ChatMessage>[];
@@ -610,10 +571,12 @@ class DashMessagingService {
             
             // Add all new messages to stream in batch
             if (newMessages.isNotEmpty) {
-              print('✅ Added ${newMessages.length} new messages to stream');
+              print('✅ Added ${newMessages.length} truly new messages to stream');
               for (var message in newMessages) {
                 _safeAddToStream(message);
               }
+            } else {
+              print('No new messages received in this update');
             }
             
             _stopPerformanceTimer('Processing realtime update');
@@ -635,7 +598,7 @@ class DashMessagingService {
       );
       
       _stopPerformanceTimer('Realtime listener setup');
-      print('✅ Optimized realtime listener started successfully');
+      print('✅ Optimized realtime listener started successfully (new messages only)');
     } catch (e) {
       print('Error setting up realtime listener: $e');
       _stopPerformanceTimer('Realtime listener setup (error)');
@@ -803,352 +766,28 @@ class DashMessagingService {
   
   // Mock method to simulate server response (for testing without server)
   Future<void> simulateServerResponse(String userMessage) async {
-    // Skip all prebuilt responses, just log a message about server unavailability
-    print('Server unavailable, but skipping all prebuilt responses as requested');
-    print('Would normally send message to server: $userMessage');
+    // Skip all mock responses to keep chat completely clean
+    print('Mock server responses disabled - no responses will be generated');
+    print('Message received but not processed: $userMessage');
     return;
-    
-    // All code below will not execute due to the early return above
-    
-    // Add a small delay to simulate network latency
-    await Future.delayed(const Duration(milliseconds: 800));
-    
-    // Generate a unique response ID for deduplication
-    final responseId = _uuid.v4();
-    
-    // Add info message about server URL - removed to prevent duplicate messages
-    // Server info messages are now filtered out in DashChatProvider
-    
-    // Determine which mock response to send based on the user message
-    if (userMessage.toLowerCase().contains('hello') ||
-        userMessage.toLowerCase().contains('hi') ||
-        userMessage.contains('ready to quit')) {
-      // Check if this is a duplicate message (same type sent in last 5 seconds)
-      if (_lastResponseId != null && 
-          _lastResponseTime != null && 
-          DateTime.now().difference(_lastResponseTime!).inSeconds < 5 &&
-          _lastResponseId!.contains('youtube-welcome')) {
-        print('Preventing duplicate YouTube welcome message');
-        return;
-      }
-      
-      // Store this response with a recognizable ID pattern to prevent duplicates
-      _lastResponseId = 'youtube-welcome-${DateTime.now().millisecondsSinceEpoch}';
-      _lastResponseTime = DateTime.now();
-      
-      // YouTube link message
-      final youtubeMessage = ChatMessage(
-        id: _lastResponseId!,
-        content: 'Welcome to Quitxt from the UT Health Science Center! Congrats on your decision to quit smoking! See why we think you\'re awesome, Tap pic below https://youtu.be/ZWsR3G0mdJo',
-        timestamp: DateTime.now(),
-        isMe: false,
-        type: MessageType.text,
-      );
-      _safeAddToStream(youtubeMessage);
-    } 
-    else if (userMessage.toLowerCase().contains('#deactivate')) {
-      // Check if this is a duplicate message (same type sent in last 5 seconds)
-      if (_lastResponseId != null && 
-          _lastResponseTime != null && 
-          DateTime.now().difference(_lastResponseTime!).inSeconds < 5 &&
-          _lastResponseId!.contains('deactivate-message')) {
-        print('Preventing duplicate deactivate message');
-        return;
-      }
-      
-      // Store this response with a recognizable ID pattern
-      _lastResponseId = 'deactivate-message-${DateTime.now().millisecondsSinceEpoch}';
-      _lastResponseTime = DateTime.now();
-      
-      // GIF link message
-      final gifMessage = ChatMessage(
-        id: _lastResponseId!,
-        content: 'We\'re sorry to see you go. Here\'s a quick tip: Stay strong! https://quitxt.org/sites/quitxt/files/gifs/PreQ6_Hoverboard.gif',
-        timestamp: DateTime.now(),
-        isMe: false,
-        type: MessageType.text,
-      );
-      _safeAddToStream(gifMessage);
-    }
-    else if (userMessage == 'Better Health') {
-      // Check if this is a duplicate message (same type sent in last 5 seconds)
-      if (_lastResponseId != null && 
-          _lastResponseTime != null && 
-          DateTime.now().difference(_lastResponseTime!).inSeconds < 5 &&
-          _lastResponseId!.contains('poll-message')) {
-        print('Preventing duplicate poll message');
-        return;
-      }
-      
-      // Store this response with a recognizable ID pattern
-      _lastResponseId = 'poll-message-${DateTime.now().millisecondsSinceEpoch}';
-      _lastResponseTime = DateTime.now();
-      
-      // Poll message with buttons
-      final pollMessage = ChatMessage(
-        id: _lastResponseId!,
-        content: 'Which of these benefits appeals to you the most?',
-        timestamp: DateTime.now(),
-        isMe: false,
-        type: MessageType.text,
-      );
-      _safeAddToStream(pollMessage);
-      
-      // Add quick reply buttons
-      await Future.delayed(const Duration(milliseconds: 200));
-      final quickReplyMessage = ChatMessage(
-        id: '${_lastResponseId!}_replies',
-        content: '',
-        timestamp: DateTime.now(),
-        isMe: false,
-        type: MessageType.quickReply,
-        suggestedReplies: [
-          QuickReply(text: 'Better Health', value: 'Better Health'),
-          QuickReply(text: 'Save Money', value: 'Save Money'),
-          QuickReply(text: 'More Energy', value: 'More Energy'),
-        ],
-      );
-      _safeAddToStream(quickReplyMessage);
-    }
-    else if (userMessage == 'Tell me more') {
-      // Check if this is a duplicate message (same type sent in last 5 seconds)
-      if (_lastResponseId != null && 
-          _lastResponseTime != null && 
-          DateTime.now().difference(_lastResponseTime!).inSeconds < 5 &&
-          _lastResponseId!.contains('gif-message')) {
-        print('Preventing duplicate GIF message');
-        return;
-      }
-      
-      // Store this response with a recognizable ID pattern
-      _lastResponseId = 'gif-message-${DateTime.now().millisecondsSinceEpoch}';
-      _lastResponseTime = DateTime.now();
-      
-      // Another GIF link message
-      final anotherGifMessage = ChatMessage(
-        id: _lastResponseId!,
-        content: 'Reason #2 to quit smoking while you\'re young: Add a decade to your life and see the rise of fully automated smart homes; who needs to do chores when robots become a common commodity! https://quitxt.org/sites/quitxt/files/gifs/preq5_motiv2_automated_esp.gif',
-        timestamp: DateTime.now(),
-        isMe: false,
-        type: MessageType.text,
-      );
-      _safeAddToStream(anotherGifMessage);
-    }
-    else {
-      // Check if this is a duplicate default message (same ID generated in last 5 seconds)
-      if (_lastResponseId != null && 
-          _lastResponseTime != null && 
-          DateTime.now().difference(_lastResponseTime!).inSeconds < 5 &&
-          _lastResponseId!.contains('default-message')) {
-        print('Preventing duplicate default message');
-        return;
-      }
-      
-      // Store this response with a recognizable ID pattern
-      _lastResponseId = 'default-message-${DateTime.now().millisecondsSinceEpoch}';
-      _lastResponseTime = DateTime.now();
-      
-      // For any other message, show a default response asking for more specific input
-      final defaultMessage = ChatMessage(
-        id: _lastResponseId!,
-        content: 'I\'m not sure how to respond to that. Try one of these options:',
-        timestamp: DateTime.now(),
-        isMe: false,
-        type: MessageType.text,
-      );
-      _safeAddToStream(defaultMessage);
-      
-      // Add quick reply buttons for standard options
-      await Future.delayed(const Duration(milliseconds: 200));
-      final quickReplyMessage = ChatMessage(
-        id: '${_lastResponseId!}_replies',
-        content: '',
-        timestamp: DateTime.now(),
-        isMe: false,
-        type: MessageType.quickReply,
-        suggestedReplies: [
-          QuickReply(text: 'Hello, I\'m ready to quit!', value: 'Hello, I\'m ready to quit!'),
-          QuickReply(text: '#deactivate', value: '#deactivate'),
-          QuickReply(text: 'Tell me more', value: 'Tell me more'),
-        ],
-      );
-      _safeAddToStream(quickReplyMessage);
-    }
   }
   
   // Send all test messages in sequence (useful for testing)
   Future<void> sendTestMessages() async {
-    print("Sending test messages sequence...");
-    // Message 1: YouTube video
-    final youtubeMessage = ChatMessage(
-      id: '0a1b2c3d-4e5f-6a7b-8c9d-0e1f2a3b4c5d',
-      content: 'Welcome to Quitxt from the UT Health Science Center! Congrats on your decision to quit smoking! See why we think you\'re awesome, Tap pic below https://youtu.be/ZWsR3G0mdJo',
-      timestamp: DateTime.now(),
-      isMe: false,
-      type: MessageType.text,
-    );
-    _safeAddToStream(youtubeMessage);
-    await Future.delayed(const Duration(milliseconds: 1500));
-    
-    // Message 2: GIF link
-    final gifMessage = ChatMessage(
-      id: '1b2c3d4e-5f6a-7b8c-9d0e-1f2a3b4c5d6e',
-      content: 'We\'re sorry to see you go. Here\'s a quick tip: Stay strong! https://quitxt.org/sites/quitxt/files/gifs/PreQ6_Hoverboard.gif',
-      timestamp: DateTime.now(),
-      isMe: false,
-      type: MessageType.text,
-    );
-    _safeAddToStream(gifMessage);
-    await Future.delayed(const Duration(milliseconds: 1500));
-    
-    // Message 3: Poll with buttons
-    final pollMessage = ChatMessage(
-      id: '2c3d4e5f-6a7b-8c9d-0e1f-2a3b4c5d6e7f',
-      content: 'Which of these benefits appeals to you the most?',
-      timestamp: DateTime.now(),
-      isMe: false,
-      type: MessageType.text,
-    );
-    _safeAddToStream(pollMessage);
-    
-    await Future.delayed(const Duration(milliseconds: 500));
-    final quickReplyMessage = ChatMessage(
-      id: '2c3d4e5f-6a7b-8c9d-0e1f-2a3b4c5d6e7f_replies',
-      content: '',
-      timestamp: DateTime.now(),
-      isMe: false,
-      type: MessageType.quickReply,
-      suggestedReplies: [
-        QuickReply(text: 'Better Health', value: 'Better Health'),
-        QuickReply(text: 'Save Money', value: 'Save Money'),
-        QuickReply(text: 'More Energy', value: 'More Energy'),
-      ],
-    );
-    _safeAddToStream(quickReplyMessage);
-    await Future.delayed(const Duration(milliseconds: 1500));
-    
-    // Message 4: Another GIF link
-    final anotherGifMessage = ChatMessage(
-      id: '3d4e5f6a-7b8c-9d0e-1f2a-3b4c5d6e7f8a',
-      content: 'Reason #2 to quit smoking while you\'re young: Add a decade to your life and see the rise of fully automated smart homes; who needs to do chores when robots become a common commodity! https://quitxt.org/sites/quitxt/files/gifs/preq5_motiv2_automated_esp.gif',
-      timestamp: DateTime.now(),
-      isMe: false,
-      type: MessageType.text,
-    );
-    _safeAddToStream(anotherGifMessage);
+    print("Test messages disabled - no test messages will be sent");
+    return;
   }
   
   // Process sample test data
   Future<void> processSampleTestData() async {
-    print("Processing sample test data...");
-    
-    try {
-      // Just send all test messages
-      await sendTestMessages();
-      
-      print("Sample test data processing completed.");
-    } catch (e) {
-      print("Error in processSampleTestData: $e");
-      // As a fallback, try sending test messages directly
-      try {
-        await sendTestMessages();
-      } catch (e2) {
-        print("Error in fallback test messages: $e2");
-      }
-    }
+    print("Sample test data processing disabled - no sample messages will be sent");
+    return;
   }
   
   // Process server responses
   Future<void> processServerResponses() async {
-    try {
-      print("Processing predefined server responses...");
-      
-      // List of predefined example responses showing different types of messages
-      final responses = [
-        {
-          "serverMessageId": "example-1",
-          "messageBody": "Welcome to Quitxt from the UT Health Science Center! Congrats on your decision to quit smoking!",
-          "timestamp": DateTime.now().millisecondsSinceEpoch ~/ 1000,
-          "isPoll": false
-        },
-        {
-          "serverMessageId": "example-2",
-          "messageBody": "Welcome to Quitxt from the UT Health Science Center! Congrats on your decision to quit smoking! See why we think you're awesome, Tap pic below https://youtu.be/ZWsR3G0mdJo",
-          "timestamp": DateTime.now().millisecondsSinceEpoch ~/ 1000,
-          "isPoll": false
-        },
-        {
-          "serverMessageId": "example-3",
-          "messageBody": "How many cigarettes do you smoke per day?",
-          "timestamp": DateTime.now().millisecondsSinceEpoch ~/ 1000,
-          "isPoll": true,
-          "questionsAnswers": {
-            "Less than 5": "Less than 5",
-            "5-10": "5-10",
-            "11-20": "11-20",
-            "More than 20": "More than 20"
-          }
-        },
-        {
-          "serverMessageId": "example-4",
-          "messageBody": "Reason #1 to quit smoking while you're young: You'll have more time to enjoy hoverboards and flying cars. https://quitxt.org/sites/quitxt/files/gifs/PreQ6_Hoverboard.gif",
-          "timestamp": DateTime.now().millisecondsSinceEpoch ~/ 1000,
-          "isPoll": false
-        },
-        {
-          "serverMessageId": "example-5",
-          "messageBody": "¡Bienvenido a Quitxt del UT Health Science Center! ¡Felicitaciones por su decisión de dejar de fumar!",
-          "timestamp": DateTime.now().millisecondsSinceEpoch ~/ 1000,
-          "isPoll": false
-        },
-        {
-          "serverMessageId": "example-6",
-          "messageBody": "¿Cuántos cigarrillos fumas por día?",
-          "timestamp": DateTime.now().millisecondsSinceEpoch ~/ 1000,
-          "isPoll": true,
-          "questionsAnswers": {
-            "Menos de 5": "Menos de 5",
-            "5-10": "5-10",
-            "11-20": "11-20", 
-            "Más de 20": "Más de 20"
-          }
-        }
-      ];
-      
-      // Process each response with a delay between them
-      for (final response in responses) {
-        // Wait for a moment to simulate real conversation flow
-        await Future.delayed(const Duration(milliseconds: 1000));
-        
-        // Convert response to JSON and process it
-        final jsonResponse = jsonEncode(response);
-        final message = await processServerResponseJson(jsonResponse);
-        
-        // Add the message to the stream
-        _safeAddToStream(message);
-        
-        // If the message is a poll, add quick replies as a separate message
-        if (response["isPoll"] == true && message.suggestedReplies?.isNotEmpty == true) {
-          await Future.delayed(const Duration(milliseconds: 300));
-          
-          // Create a dedicated message for quick replies
-          final quickReplyMessage = ChatMessage(
-            id: "${message.id}_replies",
-            content: "",
-            timestamp: DateTime.now(),
-            isMe: false,
-            type: MessageType.quickReply,
-            suggestedReplies: message.suggestedReplies,
-          );
-          
-          _safeAddToStream(quickReplyMessage);
-        }
-      }
-      
-      print("Finished processing predefined server responses");
-    } catch (e) {
-      print("Error in processServerResponses: $e");
-    }
+    print("Predefined server responses disabled - no predefined messages will be sent");
+    return;
   }
   
   // Send a quick reply to the server
@@ -1749,19 +1388,21 @@ class DashMessagingService {
           .limit(18)  // Load 18 total, skip first 6 already loaded
           .startAfter([_lastFirestoreMessageTime]);
       
-      final snapshot = await chatRef.get().timeout(
-        const Duration(seconds: 3),
-        onTimeout: () {
-          print('Background loading timeout - continuing with current messages');
-          return null;
-        },
-      );
+      QuerySnapshot<Map<String, dynamic>>? snapshot;
+      try {
+        snapshot = await chatRef.get().timeout(
+          const Duration(seconds: 3),
+        );
+      } catch (e) {
+        print('Background loading timeout or error - continuing with current messages: $e');
+        return;
+      }
       
-      if (snapshot?.docs.isNotEmpty == true) {
+      if (snapshot.docs.isNotEmpty) {
         final additionalMessages = <ChatMessage>[];
         final processedIds = <String>{};
         
-        for (var doc in snapshot!.docs.reversed) {
+        for (var doc in snapshot.docs.reversed) {
           final message = await _processMessageDocOptimized(doc, processedIds);
           if (message != null && !_messageCache.containsKey(message.id)) {
             additionalMessages.add(message);

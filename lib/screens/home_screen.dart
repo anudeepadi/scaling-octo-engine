@@ -15,6 +15,7 @@ import '../widgets/chat_message_widget.dart';
 import '../theme/app_theme.dart';
 import '../utils/app_localizations.dart';
 import 'profile_screen.dart';
+import 'clean_chat_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -509,6 +510,9 @@ class _HomeScreenState extends State<HomeScreen> {
             onPressed: () => Scaffold.of(context).openDrawer(),
           ),
         ),
+        actions: [
+          // Removed cleaning services button to clean up the UI
+        ],
       ),
       drawer: _buildDrawer(),
       body: Column(

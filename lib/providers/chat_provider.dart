@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import '../models/chat_message.dart';
 import '../models/quick_reply.dart';
+import '../utils/debug_config.dart';
 import 'package:uuid/uuid.dart';
 import 'dart:async';
 
@@ -43,7 +44,7 @@ class ChatProvider extends ChangeNotifier {
   String? get error => _error;
 
   ChatProvider() {
-    print('ChatProvider: Initializing in demo mode');
+    DebugConfig.debugPrint('ChatProvider: Initializing in demo mode');
     _initializeDemoConversations();
   }
 
@@ -113,10 +114,8 @@ class ChatProvider extends ChangeNotifier {
     _messages.clear();
     _messages.addAll(selectedConversation.messages);
 
-    // If conversation is empty, add welcome message
-    if (_messages.isEmpty) {
-      _loadDemoMessages();
-    }
+    // Skip loading demo messages - keep conversations empty
+    print('Conversation switched - keeping empty without demo messages');
 
     notifyListeners();
   }
@@ -217,7 +216,7 @@ class ChatProvider extends ChangeNotifier {
       if (lastMessage.content == text && 
           lastMessage.isMe == isMe &&
           DateTime.now().difference(lastMessage.timestamp).inSeconds < 2) {
-        print('Preventing duplicate message: $text from ${isMe ? "user" : "server"}');
+        DebugConfig.debugPrint('Preventing duplicate message: $text from ${isMe ? "user" : "server"}');
         return; // Skip adding this duplicate message
       }
       
@@ -227,7 +226,7 @@ class ChatProvider extends ChangeNotifier {
         if (message.content == text && 
             message.isMe == isMe &&
             DateTime.now().difference(message.timestamp).inSeconds < 5) {
-          print('Preventing recent duplicate message: $text from ${isMe ? "user" : "server"}');
+          DebugConfig.debugPrint('Preventing recent duplicate message: $text from ${isMe ? "user" : "server"}');
           return; // Skip adding this duplicate message
         }
       }
@@ -321,37 +320,8 @@ class ChatProvider extends ChangeNotifier {
 
   // Load demo messages
   void _loadDemoMessages() {
-    // Add welcome message from Dr. Amelia Fuentes
-    addTextMessage('Are you ready to quit smoking tomorrow?', isMe: false);
-    
-    // Add quick reply options
-    addQuickReplyMessage([
-      QuickReply(text: 'Yes, let\'s do it!', value: 'Yes, let\'s do it!'),
-      QuickReply(text: 'No, not yet', value: 'No, not yet'),
-    ]);
-    
-    // Add user response
-    addTextMessage('Yes, let\'s do it!', isMe: true);
-    
-    // Add video message from Dr. Amelia Fuentes
-    final videoMessage = ChatMessage(
-      id: _uuid.v4(),
-      content: 'Dr. Amelia Fuentes - QuiTxt Director',
-      type: MessageType.video,
-      isMe: false,
-      timestamp: DateTime.now(),
-      mediaUrl: 'https://example.com/video.mp4', // Placeholder URL
-    );
-    _messages.add(videoMessage);
-    
-    // Add quit day message
-    addTextMessage('It\'s quit day! To start on the road to a smokefree life, get rid of cigarettes, butts, matches, lighters and ashtrays. Here is why you\'re ready:', isMe: false);
-    
-    // Add more user messages
-    addTextMessage('message 1', isMe: true);
-    addTextMessage('message 2', isMe: true);
-    addTextMessage('message 3', isMe: true);
-    
-    notifyListeners();
+    // Skip loading demo messages to start with a completely clean chat
+    print('Skipping demo message loading - starting with empty chat');
+    // No demo messages will be added, chat starts completely clean
   }
 }

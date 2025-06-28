@@ -21,7 +21,6 @@ class AppTheme {
       primary: quitxtTeal,
       secondary: quitxtPurple,
       surface: quitxtWhite,
-      surface: quitxtWhite,
       error: Colors.red,
       onPrimary: quitxtWhite,
       onSecondary: quitxtWhite,

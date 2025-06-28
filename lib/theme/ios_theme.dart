@@ -52,7 +52,7 @@ class IosTheme {
         seedColor: primaryColor,
         primary: primaryColor,
         secondary: accentColor,
-        background: backgroundColor,
+        surface: backgroundColor,
       ),
     );
   }
@@ -98,7 +98,7 @@ class IosTheme {
         seedColor: primaryColor,
         primary: primaryColor,
         secondary: accentColor,
-        background: CupertinoColors.darkBackgroundGray,
+        surface: CupertinoColors.darkBackgroundGray,
         brightness: Brightness.dark,
       ),
     );

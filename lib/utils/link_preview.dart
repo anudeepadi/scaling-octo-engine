@@ -171,7 +171,7 @@ class LinkPreview {
                       description!,
                       style: TextStyle(
                         fontSize: 12,
-                        color: textColor.withOpacity(0.8),
+                        color: textColor.withValues(alpha: 0.8),
                       ),
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
@@ -182,7 +182,7 @@ class LinkPreview {
                     url,
                     style: TextStyle(
                       fontSize: 10,
-                      color: textColor.withOpacity(0.6),
+                      color: textColor.withValues(alpha: 0.6),
                     ),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,

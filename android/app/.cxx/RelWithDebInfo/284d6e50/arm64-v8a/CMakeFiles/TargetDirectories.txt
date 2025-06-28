@@ -1,2 +1,0 @@
-/Users/vuc229/Downloads/Projects/rcs_application/android/app/.cxx/RelWithDebInfo/284d6e50/arm64-v8a/CMakeFiles/edit_cache.dir
-/Users/vuc229/Downloads/Projects/rcs_application/android/app/.cxx/RelWithDebInfo/284d6e50/arm64-v8a/CMakeFiles/rebuild_cache.dir

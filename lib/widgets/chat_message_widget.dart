@@ -1,15 +1,10 @@
 import 'package:flutter/material.dart';
 import 'dart:io' show Platform, File;
-import 'package:video_player/video_player.dart';
-import 'package:chewie/chewie.dart';
 import 'package:flutter_linkify/flutter_linkify.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:provider/provider.dart';
 import '../models/chat_message.dart';
-import '../models/quick_reply.dart';
 import '../providers/dash_chat_provider.dart';
-import 'video_player_widget.dart';
-import 'youtube_player_widget.dart';
 import '../theme/app_theme.dart';
 
 class ChatMessageWidget extends StatefulWidget {

@@ -4,6 +4,7 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
 import '../models/quitxt_dto.dart';
 import 'dash_messaging_service.dart';
+import 'notification_service.dart';
 import 'dart:developer' as developer;
 
 // Handle background messages
@@ -13,11 +14,16 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   await Firebase.initializeApp();
   developer.log('Handling a background message: ${message.messageId}', name: 'FCM');
   developer.log('Message data: ${message.data}', name: 'FCM');
+  
+  // Show notification for background messages
+  final notificationService = NotificationService();
+  await notificationService.showNotificationFromFirebaseMessage(message);
 }
 
 class FirebaseMessagingService {
   final FirebaseMessaging _firebaseMessaging = FirebaseMessaging.instance;
   final DashMessagingService _dashMessagingService = DashMessagingService();
+  final NotificationService _notificationService = NotificationService();
   
   // Singleton instance
   static final FirebaseMessagingService _instance = FirebaseMessagingService._internal();
@@ -40,6 +46,9 @@ class FirebaseMessagingService {
   
   // Setup messaging handlers
   Future<void> setupMessaging() async {
+    // Initialize notification service
+    await _notificationService.initialize();
+    
     // Request permissions for iOS
     if (Platform.isIOS) {
       NotificationSettings settings = await _firebaseMessaging.requestPermission(
@@ -65,11 +74,10 @@ class FirebaseMessagingService {
       final String? messageBody = data['messageBody'];
       
       if (messageBody != null) {
-        // Log the message body instead of showing a notification
         developer.log('Message body: $messageBody', name: 'FCM');
         
-        // NOTE: To display notifications, we would need flutter_local_notifications
-        // This will be implemented after running "flutter pub get"
+        // Show notification even when app is in foreground
+        _notificationService.showNotificationFromFirebaseMessage(message);
       }
       
       // Process message data

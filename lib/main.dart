@@ -24,6 +24,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'services/firebase_connection_service.dart';
 import 'services/firebase_messaging_service.dart';
+import 'services/notification_service.dart';
 import 'services/user_profile_service.dart';
 import 'services/analytics_service.dart';
 
@@ -79,6 +80,10 @@ void main() async {
       } else {
         developer.log('WARNING: Firebase.apps is empty after initialization!', name: 'App');
       }
+      
+      // Initialize Notification Service first
+      final notificationService = NotificationService();
+      await notificationService.initialize();
       
       // Initialize Firebase Messaging Service
       final firebaseMessagingService = FirebaseMessagingService();

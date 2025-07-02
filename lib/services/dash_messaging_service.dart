@@ -400,7 +400,7 @@ class DashMessagingService {
   }
 
   // Send a message to the server
-  Future<bool> sendMessage(String text) async {
+  Future<bool> sendMessage(String text, {int eventTypeCode = 1}) async {
     if (text.trim().isEmpty) {
       print('Cannot send empty message');
       return false;
@@ -418,7 +418,7 @@ class DashMessagingService {
     
     // Generate unique message ID and track timing
     final messageId = _uuid.v4();
-    final requestStartTime = now.millisecondsSinceEpoch;
+    final requestStartTime = now.millisecondsSinceEpoch ~/ 1000; // Convert to seconds for server
     
     // Update tracking variables
     _lastMessageText = text;
@@ -431,11 +431,12 @@ class DashMessagingService {
       timestamp: DateTime.now(),
       isMe: true,
       type: MessageType.text,
+      eventTypeCode: eventTypeCode,
     );
     _safeAddToStream(userMessage);
     _addToCache(userMessage);
     
-    print('Sending message to server: {messageId: $messageId, userId: $_userId, messageText: $text}');
+    print('Sending message to server: {messageId: $messageId, userId: $_userId, messageText: $text, eventTypeCode: $eventTypeCode}');
     
     try {
       final requestBody = jsonEncode({
@@ -444,9 +445,11 @@ class DashMessagingService {
         'messageText': text,
         'fcmToken': _fcmToken,
         'messageTime': requestStartTime,
+        'eventTypeCode': eventTypeCode,
       });
       
       print('Using endpoint: $_hostUrl');
+      print('Request body: $requestBody');
       
       // Send to server with optimized timeout
       final response = await http.post(
@@ -467,6 +470,7 @@ class DashMessagingService {
       );
       
       print('Send message response status: ${response.statusCode}');
+      print('Send message response body: ${response.body}');
       
       if (response.statusCode == 200) {
         print('Message sent successfully to server');
@@ -478,6 +482,7 @@ class DashMessagingService {
         return true;
       } else {
         print('Failed to send message. Status: ${response.statusCode}');
+        print('Response body: ${response.body}');
         // Remove the message from stream if server rejected it
         // Note: In a real app, you might want to show an error state instead
         return false;
@@ -836,7 +841,8 @@ class DashMessagingService {
   
   // Send a quick reply to the server
   Future<bool> sendQuickReply(String value, String text) async {
-    return sendMessage(text);
+    print('Sending quick reply: value="$value", text="$text"');
+    return sendMessage(text, eventTypeCode: 2);
   }
   
   // Process predefined server responses from JSON input

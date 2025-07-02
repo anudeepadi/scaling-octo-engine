@@ -1,14 +1,33 @@
 <?xml version="1.0" encoding="utf-8"?>
 <network-security-config>
+    <!-- Allow Firebase domains -->
     <domain-config cleartextTrafficPermitted="false">
+        <domain includeSubdomains="true">firebase.googleapis.com</domain>
+        <domain includeSubdomains="true">firebaseapp.com</domain>
+        <domain includeSubdomains="true">googleapis.com</domain>
+        <domain includeSubdomains="true">gstatic.com</domain>
+        <domain includeSubdomains="true">google-analytics.com</domain>
+        <domain includeSubdomains="true">googletagmanager.com</domain>
+        <domain includeSubdomains="true">accounts.google.com</domain>
         <domain includeSubdomains="true">img.youtube.com</domain>
-        <!-- You might need to add other domains if images come from elsewhere -->
-        <!-- <domain includeSubdomains="true">another.domain.com</domain> -->
+        <!-- For development servers -->
+        <domain includeSubdomains="true">10.0.2.2</domain>
+        <domain includeSubdomains="true">localhost</domain>
     </domain-config>
-    <!-- Add base-config if you need default rules for other domains -->
+    
+    <!-- Base configuration -->
     <base-config cleartextTrafficPermitted="false">
         <trust-anchors>
             <certificates src="system" />
+            <certificates src="user" />
         </trust-anchors>
     </base-config>
+    
+    <!-- Debug configuration for emulator -->
+    <debug-overrides>
+        <trust-anchors>
+            <certificates src="system" />
+            <certificates src="user" />
+        </trust-anchors>
+    </debug-overrides>
 </network-security-config> 

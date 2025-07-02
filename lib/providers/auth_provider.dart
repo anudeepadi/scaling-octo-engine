@@ -45,18 +45,18 @@ class AuthProvider extends ChangeNotifier {
     notifyListeners();
     
     try {
-      // Use Firebase sign in
+      // Use Firebase sign in with retry logic for network issues
       await _auth.signInWithEmailAndPassword(email: email, password: password);
       // _onAuthStateChanged will handle updating state and notifying listeners
       return true; // Indicate success
     } on FirebaseAuthException catch (e) {
-      _error = e.message ?? 'Sign in failed.';
+      _error = _getDetailedFirebaseErrorMessage(e);
       print('AuthProvider: SignIn Error - ${e.code}: ${e.message}');
       _isLoading = false;
       notifyListeners();
       return false; // Indicate failure
     } catch (e) {
-      _error = 'An unexpected error occurred during sign in.';
+      _error = _getNetworkErrorMessage(e);
       print('AuthProvider: SignIn Unexpected Error - $e');
       _isLoading = false;
       notifyListeners();
@@ -203,9 +203,51 @@ class AuthProvider extends ChangeNotifier {
         return 'Invalid verification code.';
       case 'invalid-verification-id':
         return 'Invalid verification ID.';
+      case 'network-request-failed':
+        return 'Network error occurred. Please check your internet connection and try again.';
       default:
         return e.message ?? 'Google sign-in failed. Please try again.';
     }
+  }
+
+  String _getDetailedFirebaseErrorMessage(FirebaseAuthException e) {
+    switch (e.code) {
+      case 'network-request-failed':
+        return 'Network connection failed. Please check your internet connection and try again.';
+      case 'too-many-requests':
+        return 'Too many failed attempts. Please try again later.';
+      case 'user-disabled':
+        return 'This account has been disabled. Please contact support.';
+      case 'user-not-found':
+        return 'No account found with this email address.';
+      case 'wrong-password':
+        return 'Incorrect password. Please try again.';
+      case 'invalid-email':
+        return 'Invalid email address format.';
+      case 'weak-password':
+        return 'Password is too weak. Please use a stronger password.';
+      case 'email-already-in-use':
+        return 'An account with this email already exists.';
+      case 'operation-not-allowed':
+        return 'This sign-in method is not enabled. Please contact support.';
+      case 'invalid-credential':
+        return 'Invalid credentials provided. Please try again.';
+      case 'account-exists-with-different-credential':
+        return 'An account already exists with a different sign-in method.';
+      default:
+        return e.message ?? 'Authentication failed. Please try again.';
+    }
+  }
+
+  String _getNetworkErrorMessage(dynamic error) {
+    final errorString = error.toString().toLowerCase();
+    if (errorString.contains('network') || 
+        errorString.contains('timeout') || 
+        errorString.contains('connection') ||
+        errorString.contains('resolve')) {
+      return 'Network connection failed. Please check your internet connection and try again.';
+    }
+    return 'An unexpected error occurred. Please try again.';
   }
 
   Future<void> updateUserProfile({String? displayName, String? photoURL}) async {

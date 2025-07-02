@@ -109,6 +109,10 @@ class DashChatProvider extends ChangeNotifier {
         _chatProvider!.addTextMessage(message.content, isMe: message.isMe);
       }
       
+      // CRITICAL FIX: Notify DashChatProvider listeners so UI updates
+      DebugConfig.debugPrint('DashChatProvider: Notifying listeners after message added');
+      notifyListeners();
+      
     }, onError: (error) {
       print('DashChatProvider: Error listening to messages: $error');
     });
@@ -243,6 +247,8 @@ class DashChatProvider extends ChangeNotifier {
       // Add the reply to the chat UI
       if (_chatProvider != null) {
         _chatProvider!.addTextMessage(reply.text, isMe: true);
+        // Notify DashChatProvider listeners so UI updates
+        notifyListeners();
       }
       
       // If in demo mode or testing, simulate response
@@ -279,6 +285,11 @@ class DashChatProvider extends ChangeNotifier {
       print('Error updating host URL: $e');
       throw Exception('Failed to update host URL: $e');
     }
+  }
+
+  // Alias method for updateHostUrl to match screen calls
+  Future<void> updateServerUrl(String newUrl) async {
+    return updateHostUrl(newUrl);
   }
 
   // Process custom JSON input
@@ -353,6 +364,9 @@ class DashChatProvider extends ChangeNotifier {
     
     // Clear current chat history
     _chatProvider?.clearChatHistory();
+    
+    // Notify listeners after clearing chat
+    notifyListeners();
     
     // Reset the last message time and reload
     _dashService.resetLastMessageTime();

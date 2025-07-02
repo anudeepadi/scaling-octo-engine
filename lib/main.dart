@@ -22,6 +22,7 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 // Import Firebase
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:firebase_app_check/firebase_app_check.dart';
 import 'services/firebase_connection_service.dart';
 import 'services/firebase_messaging_service.dart';
 import 'services/notification_service.dart';
@@ -72,6 +73,21 @@ void main() async {
     try {
       await Firebase.initializeApp();
       developer.log('Firebase initialized successfully', name: 'App');
+      
+      // Initialize Firebase App Check to fix "No AppCheckProvider installed" error
+      try {
+        await FirebaseAppCheck.instance.activate(
+          // For development, use debug provider
+          // For production, switch to device check (iOS) or play integrity (Android)
+          webProvider: ReCaptchaV3Provider('recaptcha-v3-site-key'),
+          androidProvider: AndroidProvider.debug,
+          appleProvider: AppleProvider.debug,
+        );
+        developer.log('Firebase App Check initialized successfully', name: 'App');
+      } catch (appCheckError) {
+        developer.log('Firebase App Check initialization failed: $appCheckError', name: 'App');
+        developer.log('Continuing without App Check - this may cause authentication issues', name: 'App');
+      }
       
       // Log Firebase initialization details for debugging
       if (Firebase.apps.isNotEmpty) {

@@ -1,21 +1,11 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart'; // Import Provider
-// Remove Cupertino import if not used elsewhere
-// import 'package:flutter/cupertino.dart';
-// Remove Platform import if not used elsewhere
-// import 'dart:io' show Platform;
-import 'package:cloud_firestore/cloud_firestore.dart'; // Add Firestore import
-import 'package:firebase_auth/firebase_auth.dart'; // Add Auth import
+import 'package:provider/provider.dart';
 import '../models/chat_message.dart';
-import '../models/quick_reply.dart'; // Import the QuickReply model
-import '../providers/dash_chat_provider.dart'; // Import DashChatProvider
-// Remove DashMessagingService import
-// import '../services/dash_messaging_service.dart';
-// Remove AuthProvider import if not used elsewhere after changes
-// import '../providers/auth_provider.dart';
+import '../models/quick_reply.dart';
+import '../providers/dash_chat_provider.dart';
+import '../providers/chat_provider.dart';
 import '../widgets/chat_message_widget.dart';
-// Remove Provider import if not used elsewhere after changes
-// import 'package:provider/provider.dart';
+import '../widgets/quick_reply_widget.dart';
 
 class DashMessagingScreen extends StatefulWidget {
   const DashMessagingScreen({Key? key}) : super(key: key);
@@ -27,66 +17,36 @@ class DashMessagingScreen extends StatefulWidget {
 class _DashMessagingScreenState extends State<DashMessagingScreen> {
   final TextEditingController _messageController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
-  // Add flag to prevent double message sending
-  bool _isSendingMessage = false;
-
-  // Add Firebase instances
-  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-  final FirebaseAuth _auth = FirebaseAuth.instance;
-  User? _currentUser;
-  Stream<QuerySnapshot>? _messageStream;
 
   @override
   void initState() {
     super.initState();
-    _currentUser = _auth.currentUser;
-    _setupMessageStream();
-  }
-
-  void _setupMessageStream() {
-    if (_currentUser != null) {
-      _messageStream = _firestore
-          .collection('messages')
-          .doc(_currentUser!.uid)
-          .collection('messages')
-          .orderBy('timestamp', descending: false) // Order by timestamp
-          .snapshots();
-      // Add listener to scroll down when new messages arrive
-      _messageStream?.listen((_) => _scrollToBottom(isDelayed: true));
-    } else {
-      print("DashMessagingScreen: User not logged in.");
-      // Optionally handle the case where the user is not logged in
-    }
+    
+    // Link DashChatProvider to ChatProvider when screen loads
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        final chatProvider = context.read<ChatProvider>();
+        final dashProvider = context.read<DashChatProvider>();
+        dashProvider.setChatProvider(chatProvider);
+        print('DashMessagingScreen: Linked DashChatProvider and ChatProvider.');
+      }
+    });
   }
 
   Future<void> _sendMessage() async {
-    // Guard against double message sending
-    if (_isSendingMessage) {
-      print("Already sending a message, ignoring duplicate send request");
-      return;
-    }
-    
     final messageText = _messageController.text.trim();
-    if (messageText.isEmpty || _currentUser == null) return;
-    
-    // Set flag to prevent double sending
-    _isSendingMessage = true;
+    if (messageText.isEmpty) return;
     
     try {
       _messageController.clear();
-
-      // Use DashChatProvider to send message instead of directly adding to Firestore
-      // This fixes the double message issue
+      
+      // Use DashChatProvider to send message
       final dashChatProvider = Provider.of<DashChatProvider>(context, listen: false);
       await dashChatProvider.sendMessage(messageText);
       
-      // No need to add to Firestore directly - DashChatProvider will handle that
-      // This was causing double messages
+      _scrollToBottom();
     } catch (e) {
       print("Error sending message: $e");
-    } finally {
-      // Reset flag when done
-      _isSendingMessage = false;
     }
   }
 
@@ -117,56 +77,87 @@ class _DashMessagingScreenState extends State<DashMessagingScreen> {
   void _showHelpDialog(BuildContext context) {
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Help - Demo Commands'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: const [
-            Text('Available demo commands:', style: TextStyle(fontWeight: FontWeight.bold)),
-            SizedBox(height: 8),
-            Text('• Play button: Show a complete interactive conversation demo'),
-            Text('• List button: Load all predefined server responses'),
-            Text('• Message button: Show server responses one by one'),
-            Text('• Test button: Show sample test messages'),
-            SizedBox(height: 16),
-            Text('Message keywords:', style: TextStyle(fontWeight: FontWeight.bold)),
-            SizedBox(height: 8),
-            Text('• Hello/Hi: English greeting'),
-            Text('• Hola: Spanish greeting'),
-            Text('• I want to quit smoking: Shows poll'),
-            Text('• 5-10: Responds to cigarette poll'),
-            Text('• Cool/Thanks: Trigger info messages'),
-            Text('• EXIT/SALIR: Show exit messages'),
-            Text('• #deactivate: Show deactivation message'),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Close'),
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Dash Messaging Help'),
+          content: const Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('Commands you can try:'),
+              SizedBox(height: 8),
+              Text('• #test - Load test messages'),
+              Text('• #demo_conversation - Start demo conversation'),
+              Text('• #server_responses - Load predefined responses'),
+              Text('• start - Begin smoking cessation program'),
+              Text('• exit - Exit the program'),
+              SizedBox(height: 16),
+              Text('Just type your message and press send to interact with the QuitTXT system.'),
+            ],
           ),
-        ],
-      ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('OK'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  void _showServerUrlDialog(BuildContext context, DashChatProvider dashChatProvider) {
+    final TextEditingController urlController = TextEditingController();
+    
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Update Server URL'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: urlController,
+                decoration: const InputDecoration(
+                  labelText: 'Server URL',
+                  hintText: 'https://your-server.ngrok.io/scheduler/mobile-app',
+                ),
+              ),
+              const SizedBox(height: 16),
+              const Text(
+                'Enter the ngrok URL or server endpoint for the Dash messaging system.',
+                style: TextStyle(fontSize: 12, color: Colors.grey),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () {
+                final url = urlController.text.trim();
+                if (url.isNotEmpty) {
+                  // Update server URL in DashMessagingService
+                  dashChatProvider.updateServerUrl(url);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Server URL updated to: $url')),
+                  );
+                }
+                Navigator.of(context).pop();
+              },
+              child: const Text('Update'),
+            ),
+          ],
+        );
+      },
     );
   }
 
   @override
   Widget build(BuildContext context) {
-    // Get the DashChatProvider instance
-    final dashChatProvider = Provider.of<DashChatProvider>(context, listen: false);
-
-    // Potentially get user again if Auth state changes? Or rely on initial state.
-    _currentUser = _auth.currentUser;
-    if (_currentUser == null) {
-      // Handle user not logged in UI
-      return Scaffold(
-        appBar: AppBar(title: const Text('Dash Messaging')),
-        body: const Center(child: Text('Please log in to view messages.')),
-      );
-    }
-
-
     return Scaffold(
       appBar: AppBar(
         title: const Text('Dash Messaging'),
@@ -178,11 +169,15 @@ class _DashMessagingScreenState extends State<DashMessagingScreen> {
             onPressed: () => _showHelpDialog(context),
           ),
           // Add action to trigger the interactive demo conversation
-          IconButton(
-            icon: const Icon(Icons.play_arrow),
-            tooltip: 'Start demo conversation',
-            onPressed: () {
-              dashChatProvider.sendMessage('#demo_conversation');
+          Consumer<DashChatProvider>(
+            builder: (context, dashChatProvider, child) {
+              return IconButton(
+                icon: const Icon(Icons.play_arrow),
+                tooltip: 'Start demo conversation',
+                onPressed: () {
+                  dashChatProvider.sendMessage('#demo_conversation');
+                },
+              );
             },
           ),
           // Add action to trigger custom JSON responses
@@ -192,27 +187,39 @@ class _DashMessagingScreenState extends State<DashMessagingScreen> {
             onPressed: _processCustomJson,
           ),
           // Add action to trigger predefined server responses
-          IconButton(
-            icon: const Icon(Icons.message),
-            tooltip: 'Load predefined server responses',
-            onPressed: () {
-              dashChatProvider.sendMessage('#server_responses');
+          Consumer<DashChatProvider>(
+            builder: (context, dashChatProvider, child) {
+              return IconButton(
+                icon: const Icon(Icons.message),
+                tooltip: 'Load predefined server responses',
+                onPressed: () {
+                  dashChatProvider.sendMessage('#server_responses');
+                },
+              );
             },
           ),
           // Add action to trigger test messages
-          IconButton(
-            icon: const Icon(Icons.science),
-            tooltip: 'Load test messages',
-            onPressed: () {
-              dashChatProvider.sendMessage('#test');
+          Consumer<DashChatProvider>(
+            builder: (context, dashChatProvider, child) {
+              return IconButton(
+                icon: const Icon(Icons.science),
+                tooltip: 'Load test messages',
+                onPressed: () {
+                  dashChatProvider.sendMessage('#test');
+                },
+              );
             },
           ),
           // Add action to update server URL
-          IconButton(
-            icon: const Icon(Icons.cloud_sync),
-            tooltip: 'Update server URL',
-            onPressed: () {
-              _showServerUrlDialog(context, dashChatProvider);
+          Consumer<DashChatProvider>(
+            builder: (context, dashChatProvider, child) {
+              return IconButton(
+                icon: const Icon(Icons.cloud_sync),
+                tooltip: 'Update server URL',
+                onPressed: () {
+                  _showServerUrlDialog(context, dashChatProvider);
+                },
+              );
             },
           ),
         ],
@@ -220,64 +227,51 @@ class _DashMessagingScreenState extends State<DashMessagingScreen> {
       body: Column(
         children: [
           Expanded(
-            // Use StreamBuilder to listen to Firestore
-            child: StreamBuilder<QuerySnapshot>(
-              stream: _messageStream,
-              builder: (context, snapshot) {
-                if (snapshot.connectionState == ConnectionState.waiting) {
+            // Use Consumer to listen to ChatProvider messages via DashChatProvider
+            child: Consumer<DashChatProvider>(
+              builder: (context, dashChatProvider, child) {
+                WidgetsBinding.instance.addPostFrameCallback((_) {
+                  if (dashChatProvider.messages.isNotEmpty) {
+                    _scrollToBottom();
+                  }
+                });
+
+                if (dashChatProvider.isLoading) {
                   return const Center(child: CircularProgressIndicator());
                 }
-                if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-                  return const Center(child: Text('No messages yet. Try sending "#test" to see sample messages.'));
-                }
-                if (snapshot.hasError) {
-                  print("Firestore Stream Error: ${snapshot.error}");
-                  return const Center(child: Text('Error loading messages.'));
-                }
 
-                // Map Firestore documents to ChatMessage objects
-                final messages = snapshot.data!.docs.map((doc) {
-                  final data = doc.data() as Map<String, dynamic>;
-                  final timestamp = data['timestamp'] as Timestamp?;
-
-                  // Determine content based on sender
-                  final isServerMessage = data['source'] == 'server';
-                  final content = data[isServerMessage ? 'messageBody' : 'content'] ?? '';
-
-                  // Extract quick replies (answers)
-                  List<QuickReply>? suggestedReplies;
-                  if (data.containsKey('answers') && data['answers'] is List) {
-                    final answers = List<String>.from(data['answers']);
-                    suggestedReplies = answers.map((text) => QuickReply(text: text, value: text)).toList();
-                  }
-
-                  return ChatMessage(
-                    id: doc.id,
-                    content: content, // Use the determined content
-                    isMe: data['senderId'] == _currentUser?.uid, // Check if message is from current user
-                    timestamp: timestamp?.toDate() ?? DateTime.now(), // Handle null timestamp
-                    suggestedReplies: suggestedReplies, // Assign extracted replies
-                    type: data.containsKey('type') && data['type'] is int
-                          ? MessageType.values[data['type']]
-                          : MessageType.text, // Default or handle error
-                    status: data.containsKey('status') && data['status'] is int
-                          ? MessageStatus.values[data['status']]
-                          : MessageStatus.sent, // Default or handle error
-                    // Add other fields as necessary from your data model
-                    // e.g., senderName, senderPhotoUrl etc. if stored
+                if (dashChatProvider.messages.isEmpty) {
+                  return const Center(
+                    child: Text('No messages yet. Try sending "start" to begin or "#test" for sample messages.'),
                   );
-                }).toList();
+                }
 
-                // Use ListView.builder with the mapped messages
                 return ListView.builder(
                   controller: _scrollController,
                   padding: const EdgeInsets.all(16),
-                  itemCount: messages.length,
+                  itemCount: dashChatProvider.messages.length,
                   itemBuilder: (context, index) {
-                    final message = messages[index];
-                    return ChatMessageWidget(
-                      message: message,
-                    );
+                    final message = dashChatProvider.messages[index];
+                    
+                    if (message.type == MessageType.quickReply && 
+                        message.suggestedReplies != null && 
+                        message.suggestedReplies!.isNotEmpty) {
+                      return Column(
+                        children: [
+                          if (message.content.isNotEmpty)
+                            ChatMessageWidget(message: message),
+                          QuickReplyWidget(
+                            quickReplies: message.suggestedReplies!,
+                            onReplySelected: (reply) {
+                              dashChatProvider.handleQuickReply(reply);
+                              _scrollToBottom();
+                            },
+                          ),
+                        ],
+                      );
+                    } else {
+                      return ChatMessageWidget(message: message);
+                    }
                   },
                 );
               },
@@ -286,24 +280,37 @@ class _DashMessagingScreenState extends State<DashMessagingScreen> {
           // Keep the message input field
           Padding(
             padding: const EdgeInsets.all(8.0),
-            child: Row(
-              children: [
-                Expanded(
-                  child: TextField(
-                    controller: _messageController,
-                    decoration: const InputDecoration(
-                      hintText: 'Type a message... (try "#test" for sample messages)',
-                      border: OutlineInputBorder(),
+            child: Consumer<DashChatProvider>(
+              builder: (context, dashChatProvider, child) {
+                return Row(
+                  children: [
+                    Expanded(
+                      child: TextField(
+                        controller: _messageController,
+                        decoration: const InputDecoration(
+                          hintText: 'Type a message... (try "start" or "#test")',
+                          border: OutlineInputBorder(),
+                        ),
+                        onSubmitted: (_) => _sendMessage(),
+                        enabled: !dashChatProvider.isSendingMessage,
+                      ),
                     ),
-                    onSubmitted: (_) => _sendMessage(),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                IconButton(
-                  icon: const Icon(Icons.send),
-                  onPressed: _sendMessage,
-                ),
-              ],
+                    const SizedBox(width: 8),
+                    IconButton(
+                      icon: dashChatProvider.isSendingMessage
+                          ? const SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : const Icon(Icons.send),
+                      onPressed: dashChatProvider.isSendingMessage
+                          ? null
+                          : _sendMessage,
+                    ),
+                  ],
+                );
+              },
             ),
           ),
         ],
@@ -316,63 +323,5 @@ class _DashMessagingScreenState extends State<DashMessagingScreen> {
     _messageController.dispose();
     _scrollController.dispose();
     super.dispose();
-  }
-
-  // Method to show dialog for updating server URL
-  void _showServerUrlDialog(BuildContext context, DashChatProvider provider) {
-    final TextEditingController urlController = TextEditingController();
-    urlController.text = "https://f2f4-3-17-141-5.ngrok-free.app";
-    
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Update Server URL'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: urlController,
-              decoration: const InputDecoration(
-                labelText: 'Server URL',
-                hintText: 'Enter server URL',
-              ),
-            ),
-            const SizedBox(height: 16),
-            const Text('Current server: ngrok endpoint'),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () async {
-              final newUrl = urlController.text.trim();
-              if (newUrl.isNotEmpty) {
-                try {
-                  Navigator.pop(context);
-                  // Show loading indicator
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Updating server URL...')),
-                  );
-                  
-                  await provider.updateHostUrl(newUrl);
-                  
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Server URL updated successfully')),
-                  );
-                } catch (e) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Error updating server URL: $e')),
-                  );
-                }
-              }
-            },
-            child: const Text('Update'),
-          ),
-        ],
-      ),
-    );
   }
 } 

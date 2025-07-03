@@ -86,6 +86,9 @@ class DashMessagingService {
   // Add performance monitoring
   final Stopwatch _performanceStopwatch = Stopwatch();
   
+  // Debug flag for message alignment logging
+  static const bool _debugMessageAlignment = true; // Set to false in production
+  
   void _startPerformanceTimer(String operation) {
     _performanceStopwatch.reset();
     _performanceStopwatch.start();
@@ -236,13 +239,13 @@ class DashMessagingService {
     try {
       print('⚡ INSTANT loading messages for user: $_userId');
       
-      // INSTANT OPTIMIZATION: Parallel loading from cache and server
+      // CHRONOLOGICAL LOADING: Load messages in chronological order  
       final chatRef = FirebaseFirestore.instance
           .collection('messages')
           .doc(_userId)
           .collection('chat')
-          .orderBy('createdAt', descending: true)
-          .limit(30); // Load more for better UX
+          .orderBy('createdAt', descending: false)
+          .limitToLast(30); // Load last 30 messages in chronological order
       
       // Try cache first for INSTANT display
       Future<QuerySnapshot>? cacheQuery;
@@ -293,15 +296,16 @@ class DashMessagingService {
     }
   }
   
-  // Ultra-fast snapshot processing
+  // Process snapshot with proper chronological ordering
   void _processSnapshotInstant(QuerySnapshot snapshot) {
     if (snapshot.docs.isEmpty) return;
     
     final processedIds = <String>{};
+    final messages = <ChatMessage>[];
     int lowestTimestamp = DateTime.now().millisecondsSinceEpoch;
     
-    // Process in reverse for chronological order
-    for (var doc in snapshot.docs.reversed) {
+    // Process documents (already in chronological order due to limitToLast)
+    for (var doc in snapshot.docs) {
       try {
         final data = doc.data() as Map<String, dynamic>?;
         if (data == null) continue;
@@ -324,33 +328,169 @@ class DashMessagingService {
             ? timestamp.millisecondsSinceEpoch 
             : lowestTimestamp;
         
-        // Quick user check
-        final senderId = data['senderId'] ?? data['userId'] ?? '';
+        // Quick user check - prioritize source field for reliability
         final source = data['source']?.toString() ?? '';
-        final isMe = senderId == _userId || source == 'client';
+        final senderId = data['senderId'] ?? data['userId'] ?? '';
+        // FIXED: Prioritize source field since it's more reliable than senderId comparison
+        final isMe = source == 'client' || (source.isEmpty && senderId == _userId);
         
-        // Create and add message instantly
-        final message = ChatMessage(
-          id: messageId,
-          content: content,
-          timestamp: timestamp,
-          isMe: isMe,
-          type: MessageType.text,
-        );
+        // DEBUG: Log message alignment for troubleshooting
+        if (_debugMessageAlignment && content.isNotEmpty) {
+          print('📍 INITIAL Message alignment check: "${content.substring(0, content.length > 30 ? 30 : content.length)}..." -> isMe: $isMe (source: "$source", senderId: "$senderId", _userId: "$_userId")');
+        }
         
-        _messageCache[messageId] = message;
-        _safeAddToStream(message);
+        // Debug: Print full message data for messages that might have quick replies
+        if (content.toLowerCase().contains('cigarette') || content.toLowerCase().contains('ready') || content.toLowerCase().contains('quiz')) {
+          print('🔍 POTENTIAL QUICK REPLY MESSAGE:');
+          print('🔍 Content: $content');
+          print('🔍 Full data keys: ${data.keys.toList()}');
+          print('🔍 Full data: $data');
+        }
+
+        // Enhanced poll detection - check ALL possible quick reply fields (same as unified logic)
+        final isPoll = data['isPoll'];
+        final questionsAnswers = data['questionsAnswers'] as Map<String, dynamic>?;
+        final answers = data['answers'];
+        final buttons = data['buttons'] as List<dynamic>?;
+        final suggestedReplies = data['suggestedReplies'] as List<dynamic>?;
         
-        // Process quick replies instantly
-        _processQuickRepliesInstant(data, messageId, timestamp);
+        // Comprehensive logging for debugging (same as unified logic)
+        if (content.toLowerCase().contains('cigarette') || content.toLowerCase().contains('ready') || 
+            content.toLowerCase().contains('quiz') || content.toLowerCase().contains('smoke')) {
+          print('🔍 INITIAL: Analyzing potential poll message:');
+          print('🔍 Content: $content');
+          print('🔍 isPoll: $isPoll');
+          print('🔍 questionsAnswers: $questionsAnswers');
+          print('🔍 answers: $answers');
+          print('🔍 buttons: $buttons');
+          print('🔍 suggestedReplies: $suggestedReplies');
+          print('🔍 All keys: ${data.keys.toList()}');
+        }
+        
+        final hasQuickReplyData = isMessagePoll(isPoll) || 
+                                 questionsAnswers != null || 
+                                 answers != null || 
+                                 buttons != null || 
+                                 suggestedReplies != null;
+        
+        if (hasQuickReplyData) {
+          // Create a single message with content AND quick replies
+          List<QuickReply> quickReplies = [];
+          
+          // Process quick replies from ALL possible sources (same as unified logic)
+          
+          // 1. questionsAnswers (Map format)
+          if (questionsAnswers != null && questionsAnswers.isNotEmpty) {
+            questionsAnswers.forEach((k, v) => quickReplies.add(QuickReply(text: k, value: v.toString())));
+            print('🔧 INITIAL: Added ${questionsAnswers.length} quick replies from questionsAnswers');
+          }
+          
+          // 2. answers (List or String format)
+          else if (answers is List && answers.isNotEmpty) {
+            for (var a in answers.take(4)) {
+              quickReplies.add(QuickReply(text: a.toString(), value: a.toString()));
+            }
+            print('🔧 INITIAL: Added ${(answers as List).length} quick replies from answers (List)');
+          } 
+          else if (answers is String && answers != 'None' && answers.isNotEmpty) {
+            final answerList = answers.split(',').map((e) => e.trim()).where((e) => e.isNotEmpty).take(4).toList();
+            answerList.forEach((a) {
+              quickReplies.add(QuickReply(text: a, value: a));
+            });
+            print('🔧 INITIAL: Added ${answerList.length} quick replies from answers (String)');
+          }
+          
+          // 3. buttons (from push notifications)
+          else if (buttons != null && buttons.isNotEmpty) {
+            for (var button in buttons.take(4)) {
+              final title = button['title']?.toString() ?? button.toString();
+              if (title.isNotEmpty) {
+                quickReplies.add(QuickReply(text: title, value: title));
+              }
+            }
+            print('🔧 INITIAL: Added ${buttons.length} quick replies from buttons');
+          }
+          
+          // 4. suggestedReplies (already processed)
+          else if (suggestedReplies != null && suggestedReplies.isNotEmpty) {
+            for (var reply in suggestedReplies.take(4)) {
+              final text = reply['text']?.toString() ?? reply.toString();
+              final value = reply['value']?.toString() ?? text;
+              if (text.isNotEmpty) {
+                quickReplies.add(QuickReply(text: text, value: value));
+              }
+            }
+            print('🔧 INITIAL: Added ${suggestedReplies.length} quick replies from suggestedReplies');
+          }
+          
+          // 5. Check for legacy field names that might exist
+          final oldAnswers = data['options'] ?? data['choices'] ?? data['replies'];
+          if (quickReplies.isEmpty && oldAnswers != null) {
+            if (oldAnswers is List) {
+              for (var option in oldAnswers.take(4)) {
+                quickReplies.add(QuickReply(text: option.toString(), value: option.toString()));
+              }
+              print('🔧 INITIAL: Added ${(oldAnswers as List).length} quick replies from legacy options/choices/replies');
+            }
+          }
+          
+          if (quickReplies.isNotEmpty) {
+            // Create a single message with both content and quick replies
+            final message = ChatMessage(
+              id: messageId,
+              content: content, // Include the poll question content
+              timestamp: timestamp,
+              isMe: isMe,
+              type: MessageType.quickReply, // Mark as quick reply type
+              suggestedReplies: quickReplies,
+            );
+            
+            _messageCache[messageId] = message;
+            messages.add(message);
+            print('🔧 ✅ INITIAL: Created single poll message with content and ${quickReplies.length} options: ${quickReplies.map((r) => r.text).join(", ")}');
+          } else {
+            print('🔧 ⚠️ INITIAL: Poll detected but no valid quick replies created for: $content');
+            // Fallback to regular text message if no quick replies could be created
+            final message = ChatMessage(
+              id: messageId,
+              content: content,
+              timestamp: timestamp,
+              isMe: isMe,
+              type: MessageType.text,
+            );
+            
+            _messageCache[messageId] = message;
+            messages.add(message);
+          }
+        } else {
+          // Create regular text message
+          final message = ChatMessage(
+            id: messageId,
+            content: content,
+            timestamp: timestamp,
+            isMe: isMe,
+            type: MessageType.text,
+          );
+          
+          _messageCache[messageId] = message;
+          messages.add(message);
+        }
         
       } catch (e) {
         print('Error processing doc: $e');
       }
     }
     
+    // Sort messages by timestamp to ensure perfect chronological order
+    messages.sort((a, b) => a.timestamp.compareTo(b.timestamp));
+    
+    // Add messages to stream in chronological order
+    for (var message in messages) {
+      _safeAddToStream(message);
+    }
+    
     _lowestLoadedTimestamp = lowestTimestamp;
-    print('⚡ Processed ${processedIds.length} messages instantly');
+    print('⚡ Processed ${processedIds.length} messages in chronological order');
   }
   
   // Helper method to extract timestamp from Firestore data
@@ -424,17 +564,14 @@ class DashMessagingService {
     _lastMessageText = text;
     _lastResponseTime = now;
     
-    // OPTIMIZATION: Add user message to stream immediately for instant UI feedback
-    final userMessage = ChatMessage(
-      id: messageId,
-      content: text,
-      timestamp: DateTime.now(),
-      isMe: true,
-      type: MessageType.text,
-      eventTypeCode: eventTypeCode,
-    );
-    _safeAddToStream(userMessage);
-    _addToCache(userMessage);
+    // REMOVED: Don't add user message to stream immediately to prevent timestamp conflicts
+    // User messages will appear when they come back through Firebase real-time listener
+    // with proper server timestamps ensuring correct chronological ordering
+    
+    // CONVERSATION HISTORY: Store user message in Firebase for complete conversation history
+    await _storeUserMessageInFirebase(messageId, text, now, eventTypeCode);
+    
+    print('🕐 User message stored in Firebase, will appear through real-time listener with correct server timestamp');
     
     print('Sending message to server: {messageId: $messageId, userId: $_userId, messageText: $text, eventTypeCode: $eventTypeCode}');
     
@@ -509,14 +646,13 @@ class DashMessagingService {
     try {
       print('Setting up INSTANT realtime listener for user: $_userId');
       
-      // INSTANT OPTIMIZATION: Use snapshot listeners with metadata changes
-      // This gives us the fastest possible updates
+      // CHRONOLOGICAL ORDERING: Get messages in ascending order for proper chronological display
       final chatRef = FirebaseFirestore.instance
           .collection('messages')
           .doc(_userId)
           .collection('chat')
-          .orderBy('createdAt', descending: true)
-          .limitToLast(100); // Use limitToLast for better performance
+          .orderBy('createdAt', descending: false)
+          .limitToLast(100); // Get last 100 messages in chronological order
       
       // Enable network synchronization for instant updates
       FirebaseFirestore.instance.enableNetwork();
@@ -525,13 +661,15 @@ class DashMessagingService {
         includeMetadataChanges: true  // Include metadata for instant local writes
       ).listen(
         (snapshot) {
-          // Process immediately without performance timer for speed
+          // Process changes and ensure chronological ordering
           final docChanges = snapshot.docChanges;
           if (docChanges.isEmpty) return;
           
           print('⚡ INSTANT update: ${docChanges.length} changes');
           
-          // Process in micro-batches for instant UI updates
+          // Collect new messages and sort them chronologically
+          final newMessages = <ChatMessage>[];
+          
           for (var change in docChanges) {
             // Process all change types for instant updates
             if (change.type == DocumentChangeType.added || 
@@ -550,30 +688,165 @@ class DashMessagingService {
               final messageBody = data['messageBody']?.toString() ?? '';
               if (messageBody.isEmpty) continue;
               
+              // Debug: Print full message data for messages that might have quick replies
+              if (messageBody.toLowerCase().contains('cigarette') || messageBody.toLowerCase().contains('ready') || messageBody.toLowerCase().contains('quiz')) {
+                print('🔍 REALTIME POTENTIAL QUICK REPLY MESSAGE:');
+                print('🔍 Content: $messageBody');
+                print('🔍 Full data keys: ${data.keys.toList()}');
+                print('🔍 Full data: $data');
+              }
+              
               // Instant timestamp - use now if not available
               final messageTimestamp = _extractTimestampFast(data);
               
-              // Quick user check
-              final senderId = data['senderId'] ?? data['userId'] ?? '';
-              final source = data['source']?.toString() ?? '';
-              final isMe = senderId == _userId || source == 'client';
+                      // Quick user check - prioritize source field for reliability
+        final source = data['source']?.toString() ?? '';
+        final senderId = data['senderId'] ?? data['userId'] ?? '';
+        // FIXED: Prioritize source field since it's more reliable than senderId comparison
+        final isMe = source == 'client' || (source.isEmpty && senderId == _userId);
+        
+        // DEBUG: Log message alignment for troubleshooting
+        if (_debugMessageAlignment && messageBody.isNotEmpty) {
+          print('📍 REALTIME Message alignment check: "${messageBody.substring(0, messageBody.length > 30 ? 30 : messageBody.length)}..." -> isMe: $isMe (source: "$source", senderId: "$senderId", _userId: "$_userId")');
+        }
               
-              // Create and add message instantly
-              final message = ChatMessage(
-                id: messageId,
-                content: messageBody,
-                timestamp: messageTimestamp,
-                isMe: isMe,
-                type: MessageType.text,
-              );
+              // Enhanced poll detection - check ALL possible quick reply fields (same as unified logic)
+              final isPoll = data['isPoll'];
+              final questionsAnswers = data['questionsAnswers'] as Map<String, dynamic>?;
+              final answers = data['answers'];
+              final buttons = data['buttons'] as List<dynamic>?;
+              final suggestedReplies = data['suggestedReplies'] as List<dynamic>?;
               
-              // Instant cache and stream
-              _messageCache[messageId] = message;
-              _safeAddToStream(message);
+              // Comprehensive logging for debugging (same as unified logic)
+              if (messageBody.toLowerCase().contains('cigarette') || messageBody.toLowerCase().contains('ready') || 
+                  messageBody.toLowerCase().contains('quiz') || messageBody.toLowerCase().contains('smoke')) {
+                print('🔍 REALTIME: Analyzing potential poll message:');
+                print('🔍 Content: $messageBody');
+                print('🔍 isPoll: $isPoll');
+                print('🔍 questionsAnswers: $questionsAnswers');
+                print('🔍 answers: $answers');
+                print('🔍 buttons: $buttons');
+                print('🔍 suggestedReplies: $suggestedReplies');
+                print('🔍 All keys: ${data.keys.toList()}');
+              }
               
-              // Process quick replies in parallel
-              _processQuickRepliesInstant(data, messageId, messageTimestamp);
+              final hasQuickReplyData = isMessagePoll(isPoll) || 
+                                       questionsAnswers != null || 
+                                       answers != null || 
+                                       buttons != null || 
+                                       suggestedReplies != null;
+              
+              if (hasQuickReplyData) {
+                // Create a single message with content AND quick replies
+                List<QuickReply> quickReplies = [];
+                
+                // Process quick replies from ALL possible sources (same as unified logic)
+                
+                // 1. questionsAnswers (Map format)
+                if (questionsAnswers != null && questionsAnswers.isNotEmpty) {
+                  questionsAnswers.forEach((k, v) => quickReplies.add(QuickReply(text: k, value: v.toString())));
+                  print('🔧 REALTIME: Added ${questionsAnswers.length} quick replies from questionsAnswers');
+                }
+                
+                // 2. answers (List or String format)
+                else if (answers is List && answers.isNotEmpty) {
+                  for (var a in answers.take(4)) {
+                    quickReplies.add(QuickReply(text: a.toString(), value: a.toString()));
+                  }
+                  print('🔧 REALTIME: Added ${(answers as List).length} quick replies from answers (List)');
+                } 
+                else if (answers is String && answers != 'None' && answers.isNotEmpty) {
+                  final answerList = answers.split(',').map((e) => e.trim()).where((e) => e.isNotEmpty).take(4).toList();
+                  answerList.forEach((a) {
+                    quickReplies.add(QuickReply(text: a, value: a));
+                  });
+                  print('🔧 REALTIME: Added ${answerList.length} quick replies from answers (String)');
+                }
+                
+                // 3. buttons (from push notifications)
+                else if (buttons != null && buttons.isNotEmpty) {
+                  for (var button in buttons.take(4)) {
+                    final title = button['title']?.toString() ?? button.toString();
+                    if (title.isNotEmpty) {
+                      quickReplies.add(QuickReply(text: title, value: title));
+                    }
+                  }
+                  print('🔧 REALTIME: Added ${buttons.length} quick replies from buttons');
+                }
+                
+                // 4. suggestedReplies (already processed)
+                else if (suggestedReplies != null && suggestedReplies.isNotEmpty) {
+                  for (var reply in suggestedReplies.take(4)) {
+                    final text = reply['text']?.toString() ?? reply.toString();
+                    final value = reply['value']?.toString() ?? text;
+                    if (text.isNotEmpty) {
+                      quickReplies.add(QuickReply(text: text, value: value));
+                    }
+                  }
+                  print('🔧 REALTIME: Added ${suggestedReplies.length} quick replies from suggestedReplies');
+                }
+                
+                // 5. Check for legacy field names that might exist
+                final oldAnswers = data['options'] ?? data['choices'] ?? data['replies'];
+                if (quickReplies.isEmpty && oldAnswers != null) {
+                  if (oldAnswers is List) {
+                    for (var option in oldAnswers.take(4)) {
+                      quickReplies.add(QuickReply(text: option.toString(), value: option.toString()));
+                    }
+                    print('🔧 REALTIME: Added ${(oldAnswers as List).length} quick replies from legacy options/choices/replies');
+                  }
+                }
+                
+                if (quickReplies.isNotEmpty) {
+                  // Create a single message with both content and quick replies
+                  final message = ChatMessage(
+                    id: messageId,
+                    content: messageBody, // Include the poll question content
+                    timestamp: messageTimestamp,
+                    isMe: isMe,
+                    type: MessageType.quickReply, // Mark as quick reply type
+                    suggestedReplies: quickReplies,
+                  );
+                  
+                  _messageCache[messageId] = message;
+                  newMessages.add(message);
+                  print('🔧 ✅ REALTIME: Created single poll message with content and ${quickReplies.length} options: ${quickReplies.map((r) => r.text).join(", ")}');
+                } else {
+                  print('🔧 ⚠️ REALTIME: Poll detected but no valid quick replies created for: $messageBody');
+                  // Fallback to regular text message if no quick replies could be created
+                  final message = ChatMessage(
+                    id: messageId,
+                    content: messageBody,
+                    timestamp: messageTimestamp,
+                    isMe: isMe,
+                    type: MessageType.text,
+                  );
+                  
+                  _messageCache[messageId] = message;
+                  newMessages.add(message);
+                }
+              } else {
+                // Create regular text message
+                final message = ChatMessage(
+                  id: messageId,
+                  content: messageBody,
+                  timestamp: messageTimestamp,
+                  isMe: isMe,
+                  type: MessageType.text,
+                );
+                
+                _messageCache[messageId] = message;
+                newMessages.add(message);
+              }
             }
+          }
+          
+          // Sort messages by timestamp (chronological order)
+          newMessages.sort((a, b) => a.timestamp.compareTo(b.timestamp));
+          
+          // Add messages to stream in chronological order
+          for (var message in newMessages) {
+            _safeAddToStream(message);
           }
         },
         onError: (error) {
@@ -596,48 +869,76 @@ class DashMessagingService {
   // Ultra-fast timestamp extraction
   DateTime _extractTimestampFast(Map<String, dynamic> data) {
     try {
+      // Try primary timestamp field (server timestamp)
       final createdAt = data['createdAt'];
       if (createdAt is Timestamp) {
         return createdAt.toDate();
-      } else if (createdAt is int) {
-        return DateTime.fromMillisecondsSinceEpoch(createdAt);
       }
+      
+      // Try backup fields for older messages
+      if (createdAt is int) {
+        // Handle both seconds and milliseconds
+        if (createdAt > 9999999999) {
+          return DateTime.fromMillisecondsSinceEpoch(createdAt);
+        } else {
+          return DateTime.fromMillisecondsSinceEpoch(createdAt * 1000);
+        }
+      }
+      
+      // Try client timestamp as fallback
+      final clientTimestamp = data['clientTimestamp'];
+      if (clientTimestamp is int) {
+        return DateTime.fromMillisecondsSinceEpoch(clientTimestamp);
+      }
+      
     } catch (_) {}
     return DateTime.now(); // Instant fallback
   }
   
-  // Process quick replies without blocking
-  void _processQuickRepliesInstant(Map<String, dynamic> data, String messageId, DateTime messageTimestamp) {
+  // Create quick reply message without directly adding to stream
+  ChatMessage? _createQuickReplyMessage(Map<String, dynamic> data, String messageId, DateTime messageTimestamp) {
     try {
       final isPoll = data['isPoll'];
       final questionsAnswers = data['questionsAnswers'] as Map<String, dynamic>?;
       final answers = data['answers'];
       
-      if (!isMessagePoll(isPoll) && questionsAnswers == null && answers == null) return;
+      print('🔧 Creating quick reply for message $messageId: isPoll=$isPoll, questionsAnswers=$questionsAnswers, answers=$answers');
+      print('🔧 All fields in message data: ${data.keys.toList()}');
+      
+      // Check if this message has quick reply data
+      final hasQuickReplyData = isMessagePoll(isPoll) || questionsAnswers != null || answers != null;
+      if (!hasQuickReplyData) {
+        print('🔧 No quick reply data found for message $messageId');
+        return null;
+      }
       
       final quickReplyId = '${messageId}_qr';
-      if (_messageCache.containsKey(quickReplyId)) return;
+      if (_messageCache.containsKey(quickReplyId)) return null;
       
       List<QuickReply> quickReplies = [];
       
-      // Fast processing
+      // Fast processing - handle both questionsAnswers and answers formats
       if (questionsAnswers != null && questionsAnswers.isNotEmpty) {
         questionsAnswers.forEach((k, v) => quickReplies.add(QuickReply(text: k, value: v.toString())));
+        print('🔧 Added ${questionsAnswers.length} quick replies from questionsAnswers');
       } else if (answers != null) {
         if (answers is List) {
           for (var a in answers.take(4)) {
             quickReplies.add(QuickReply(text: a.toString(), value: a.toString()));
           }
-        } else if (answers is String && answers != 'None') {
-          answers.split(',').take(4).forEach((a) {
-            final trimmed = a.trim();
-            if (trimmed.isNotEmpty) quickReplies.add(QuickReply(text: trimmed, value: trimmed));
+          print('🔧 Added ${(answers as List).length} quick replies from answers (List)');
+        } else if (answers is String && answers != 'None' && answers.isNotEmpty) {
+          final answerList = answers.split(',').map((e) => e.trim()).where((e) => e.isNotEmpty).take(4).toList();
+          answerList.forEach((a) {
+            quickReplies.add(QuickReply(text: a, value: a));
           });
+          print('🔧 Added ${answerList.length} quick replies from answers (String)');
         }
       }
       
       if (quickReplies.isNotEmpty) {
-        final qrMessage = ChatMessage(
+        print('🔧 ✅ Created quick reply message with ${quickReplies.length} options: ${quickReplies.map((r) => r.text).join(", ")}');
+        return ChatMessage(
           id: quickReplyId,
           content: '',
           timestamp: messageTimestamp.add(const Duration(milliseconds: 1)),
@@ -645,12 +946,13 @@ class DashMessagingService {
           type: MessageType.quickReply,
           suggestedReplies: quickReplies,
         );
-        
-        _messageCache[quickReplyId] = qrMessage;
-        _safeAddToStream(qrMessage);
       }
+      
+      print('🔧 ❌ No quick replies created for message $messageId');
+      return null;
     } catch (e) {
       print('Quick reply processing error: $e');
+      return null;
     }
   }
 
@@ -1130,55 +1432,14 @@ class DashMessagingService {
             print('Error updating pagination timestamp: $e');
           }
           
-          final message = ChatMessage(
-            id: messageId,
-            content: data['messageBody']?.toString() ?? '',
-            timestamp: DateTime.now(),
-            isMe: (data['source']?.toString() ?? '') == 'client',
-            type: MessageType.text,
-          );
+          // Use unified processing logic for historical messages
+          final timestamp = _extractTimestampFast(data);
+          final isMe = (data['source']?.toString() ?? '') == 'client';
           
-          _addToCache(message);
-          messages.add(message);
-          
-          // Handle quick replies
-          final isPoll = data['isPoll'];
-          if (isMessagePoll(isPoll) && data['answers'] != null) {
-            try {
-              List<String> answers = [];
-              final answersData = data['answers'];
-              
-              if (answersData is String && answersData != 'None' && answersData.isNotEmpty) {
-                answers = answersData.split(',').map((e) => e.trim()).where((e) => e.isNotEmpty).toList();
-              } else if (answersData is List) {
-                answers = List<String>.from(answersData);
-              }
-              
-              if (answers.isNotEmpty) {
-                final quickReplyId = '${messageId}_replies';
-                if (!processedMessageIds.contains(quickReplyId) && !_messageCache.containsKey(quickReplyId)) {
-                  processedMessageIds.add(quickReplyId);
-                  
-                  final quickReplies = answers.map((item) => 
-                    QuickReply(text: item, value: item)
-                  ).toList();
-                  
-                  final quickReplyMessage = ChatMessage(
-                    id: quickReplyId,
-                    content: '',
-                    timestamp: DateTime.now().add(const Duration(milliseconds: 100)),
-                    isMe: false,
-                    type: MessageType.quickReply,
-                    suggestedReplies: quickReplies,
-                  );
-                  
-                  _addToCache(quickReplyMessage);
-                  messages.add(quickReplyMessage);
-                }
-              }
-            } catch (e) {
-              print('Error processing quick replies for older message: $e');
-            }
+          final message = _processUnifiedMessage(data, messageId, timestamp, isMe);
+          if (message != null) {
+            _addToCache(message);
+            messages.add(message);
           }
         } catch (e) {
           print('Error processing older message: $e');
@@ -1275,53 +1536,14 @@ class DashMessagingService {
             // Continue silently
           }
           
-          final message = ChatMessage(
-            id: messageId,
-            content: messageBody,
-            timestamp: DateTime.now(),
-            isMe: (data['source']?.toString() ?? '') == 'client',
-            type: MessageType.text,
-          );
+          // Use unified processing logic for additional messages
+          final timestamp = _extractTimestampFast(data);
+          final isMe = (data['source']?.toString() ?? '') == 'client';
           
-          _addToCache(message);
-          messages.add(message);
-          
-          // Handle quick replies if present
-          final isPoll = data['isPoll'];
-          if (isMessagePoll(isPoll) && data['answers'] != null) {
-            try {
-              List<String> answers = [];
-              final answersData = data['answers'];
-              
-              if (answersData is String && answersData != 'None' && answersData.isNotEmpty) {
-                answers = answersData.split(',').map((e) => e.trim()).where((e) => e.isNotEmpty).take(3).toList();
-              } else if (answersData is List) {
-                answers = List<String>.from(answersData).take(3).toList();
-              }
-              
-              if (answers.isNotEmpty) {
-                final quickReplyId = '${messageId}_replies';
-                if (!_messageCache.containsKey(quickReplyId)) {
-                  final quickReplies = answers.map((item) => 
-                    QuickReply(text: item, value: item)
-                  ).toList();
-                  
-                  final quickReplyMessage = ChatMessage(
-                    id: quickReplyId,
-                    content: '',
-                    timestamp: DateTime.now().add(const Duration(milliseconds: 100)),
-                    isMe: false,
-                    type: MessageType.quickReply,
-                    suggestedReplies: quickReplies,
-                  );
-                  
-                  _addToCache(quickReplyMessage);
-                  messages.add(quickReplyMessage);
-                }
-              }
-            } catch (e) {
-              // Continue silently
-            }
+          final message = _processUnifiedMessage(data, messageId, timestamp, isMe);
+          if (message != null) {
+            _addToCache(message);
+            messages.add(message);
           }
         } catch (e) {
           // Continue silently
@@ -1400,10 +1622,11 @@ class DashMessagingService {
       }
       
       // Create minimal ChatMessage for ultra-fast processing
+      final messageTimestamp = _extractTimestampFast(data);
       return ChatMessage(
         id: messageId,
         content: messageBody,
-        timestamp: DateTime.now(),
+        timestamp: messageTimestamp,
         isMe: (data['source']?.toString() ?? '') == 'client',
         type: MessageType.text,
       );
@@ -1429,13 +1652,13 @@ class DashMessagingService {
     try {
       print('Loading additional messages in background...');
       
-      // Load next 12 messages (total 18 with initial 6)
+      // Load additional messages in chronological order
       final chatRef = FirebaseFirestore.instance
           .collection('messages')
           .doc(_userId!)
           .collection('chat')
-          .orderBy('createdAt', descending: true)
-          .limit(18)  // Load 18 total, skip first 6 already loaded
+          .orderBy('createdAt', descending: false)
+          .limit(18)  // Load 18 additional messages
           .startAfter([_lastFirestoreMessageTime]);
       
       QuerySnapshot<Map<String, dynamic>>? snapshot;
@@ -1452,7 +1675,8 @@ class DashMessagingService {
         final additionalMessages = <ChatMessage>[];
         final processedIds = <String>{};
         
-        for (var doc in snapshot.docs.reversed) {
+        // Process in chronological order (already sorted)
+        for (var doc in snapshot.docs) {
           final message = await _processMessageDocOptimized(doc, processedIds);
           if (message != null && !_messageCache.containsKey(message.id)) {
             additionalMessages.add(message);
@@ -1460,16 +1684,350 @@ class DashMessagingService {
           }
         }
         
-        // Add background messages with subtle delays
+        // Sort by timestamp to ensure perfect chronological order
+        additionalMessages.sort((a, b) => a.timestamp.compareTo(b.timestamp));
+        
+        // Add background messages in chronological order with subtle delays
         for (int i = 0; i < additionalMessages.length; i++) {
           await Future.delayed(const Duration(milliseconds: 50));
           _safeAddToStream(additionalMessages[i]);
         }
         
-        print('Background loaded ${additionalMessages.length} additional messages');
+        print('Background loaded ${additionalMessages.length} additional messages in chronological order');
       }
     } catch (e) {
       print('Background message loading failed: $e');
     }
   }
-}
+
+  // Store user message in Firebase for conversation history
+  Future<void> _storeUserMessageInFirebase(String messageId, String messageText, DateTime timestamp, int eventTypeCode) async {
+    if (_userId == null) {
+      print('Cannot store user message: user ID is null');
+      return;
+    }
+
+    try {
+      // Get reference to user's chat collection
+      final userMessagesRef = FirebaseFirestore.instance
+          .collection('messages')
+          .doc(_userId!)
+          .collection('chat');
+      
+      // Create user message document with same structure as server messages
+      // Use server timestamp as the primary ordering field for consistency
+      final userMessageData = {
+        'messageBody': messageText,
+        'source': 'client', // Indicates this is from the user
+        'senderId': _userId,
+        'serverMessageId': messageId,
+        'createdAt': FieldValue.serverTimestamp(), // Use server timestamp for consistent ordering
+        'clientTimestamp': timestamp.millisecondsSinceEpoch, // Keep client time for reference
+        'isPoll': 'n',
+        'eventTypeCode': eventTypeCode,
+      };
+      
+      // Store the user message in Firebase
+      await userMessagesRef.doc(messageId).set(userMessageData);
+      
+             print('✓ User message stored in Firebase: $messageId');
+     } catch (e) {
+       print('Error storing user message in Firebase: $e');
+       // Don't throw the error - this shouldn't prevent sending the message
+     }
+   }
+
+  // Get conversation history from Firebase (for debugging/verification)
+  Future<List<Map<String, dynamic>>> getConversationHistory({int limit = 20}) async {
+    if (_userId == null) {
+      print('Cannot get conversation history: user ID is null');
+      return [];
+    }
+
+    try {
+      final userMessagesRef = FirebaseFirestore.instance
+          .collection('messages')
+          .doc(_userId!)
+          .collection('chat')
+          .orderBy('createdAt', descending: false)
+          .limitToLast(limit);
+      
+      final snapshot = await userMessagesRef.get();
+      
+      final history = <Map<String, dynamic>>[];
+      for (var doc in snapshot.docs) { // Already in chronological order
+        final data = doc.data();
+        
+        // Extract timestamp properly using the same logic as the app
+        final timestamp = _extractTimestampFast(data);
+        final timeString = timestamp.toString();
+        
+        history.add({
+          'id': data['serverMessageId'] ?? doc.id,
+          'message': data['messageBody'] ?? '',
+          'source': data['source'] ?? 'unknown',
+          'timestamp': timeString,
+          'isUserMessage': (data['source'] ?? '') == 'client',
+        });
+      }
+      
+             print('📜 Conversation History ($_userId):');
+      for (var i = 0; i < history.length; i++) {
+        final msg = history[i];
+        final prefix = msg['isUserMessage'] ? '👤 User:' : '🤖 Server:';
+        print('  ${i + 1}. $prefix ${msg['message']} [${msg['timestamp']}]');
+      }
+      
+      return history;
+    } catch (e) {
+      print('Error getting conversation history: $e');
+      return [];
+    }
+  }
+
+  // Verify message ordering and fix if needed
+  Future<void> verifyMessageOrdering() async {
+    if (_userId == null) {
+      print('Cannot verify message ordering: user ID is null');
+      return;
+    }
+
+    try {
+      print('🔍 Verifying message ordering for user: $_userId');
+      
+      final userMessagesRef = FirebaseFirestore.instance
+          .collection('messages')
+          .doc(_userId!)
+          .collection('chat')
+          .orderBy('createdAt', descending: false) // Get in chronological order
+          .limit(20);
+      
+      final snapshot = await userMessagesRef.get();
+      
+      if (snapshot.docs.isEmpty) {
+        print('✅ No messages to verify ordering');
+        return;
+      }
+      
+      print('📋 Message ordering verification (chronological):');
+      DateTime? lastTimestamp;
+      bool orderingIssues = false;
+      
+      for (int i = 0; i < snapshot.docs.length; i++) {
+        final doc = snapshot.docs[i];
+        final data = doc.data();
+        final timestamp = _extractTimestampFast(data);
+        final source = data['source'] ?? 'unknown';
+        final messageBody = data['messageBody'] ?? '';
+        
+        if (lastTimestamp != null && timestamp.isBefore(lastTimestamp)) {
+          print('⚠️  Ordering issue at message ${i + 1}');
+          orderingIssues = true;
+        }
+        
+        final timeStr = timestamp.toString().substring(11, 19); // HH:MM:SS
+        final prefix = source == 'client' ? '👤' : '🤖';
+        print('  ${i + 1}. $prefix [$timeStr] ${messageBody.substring(0, messageBody.length > 30 ? 30 : messageBody.length)}${messageBody.length > 30 ? '...' : ''}');
+        
+        lastTimestamp = timestamp;
+      }
+      
+      if (orderingIssues) {
+        print('⚠️  Ordering issues detected. Consider clearing and resyncing messages.');
+      } else {
+        print('✅ Message ordering is correct');
+      }
+      
+    } catch (e) {
+      print('Error verifying message ordering: $e');
+    }
+  }
+
+  // Force reload all messages (clear cache and reload)
+  Future<void> forceReloadMessages() async {
+    print('🔄 Force reloading all messages...');
+    
+    // Clear the cache to remove old format messages
+    clearCache();
+    
+    // Reset timestamps
+    _lastFirestoreMessageTime = 0;
+    _lowestLoadedTimestamp = 0;
+    
+    // Stop existing listener
+    stopRealtimeMessageListener();
+    
+    // Reload messages with new logic
+    await loadExistingMessages();
+    
+    // Restart listener
+    startRealtimeMessageListener();
+    
+    print('🔄 ✅ Force reload completed');
+  }
+
+  // Debug method to test message alignment fix
+  Future<void> debugMessageAlignment() async {
+    if (_userId == null) {
+      print('❌ Cannot debug message alignment: user ID is null');
+      return;
+    }
+
+    try {
+      print('🔍 DEBUG: Testing message alignment fix for user: $_userId');
+      
+      final userMessagesRef = FirebaseFirestore.instance
+          .collection('messages')
+          .doc(_userId!)
+          .collection('chat')
+          .orderBy('createdAt', descending: false)
+          .limit(10);
+      
+      final snapshot = await userMessagesRef.get();
+      
+      if (snapshot.docs.isEmpty) {
+        print('✅ No messages found to test alignment');
+        return;
+      }
+      
+      print('📋 Message alignment test results:');
+      
+      for (int i = 0; i < snapshot.docs.length; i++) {
+        final doc = snapshot.docs[i];
+        final data = doc.data();
+        
+        // Use the same logic as the fixed code
+        final source = data['source']?.toString() ?? '';
+        final senderId = data['senderId'] ?? data['userId'] ?? '';
+        final isMe = source == 'client' || (source.isEmpty && senderId == _userId);
+        final messageBody = data['messageBody'] ?? '';
+        
+        final alignmentStatus = isMe ? '👤 USER (RIGHT)' : '🤖 SERVER (LEFT)';
+        final sourceInfo = source.isNotEmpty ? source : 'no source';
+        
+        print('  ${i + 1}. $alignmentStatus - "$messageBody" (source: $sourceInfo)');
+      }
+      
+      print('✅ Message alignment test completed');
+    } catch (e) {
+      print('❌ Error testing message alignment: $e');
+    }
+  }
+
+  // Helper method to process any message with unified logic
+  ChatMessage? _processUnifiedMessage(Map<String, dynamic> data, String messageId, DateTime timestamp, bool isMe) {
+    final content = data['messageBody']?.toString() ?? '';
+    if (content.isEmpty) return null;
+    
+    // Enhanced poll detection - check ALL possible quick reply fields
+    final isPoll = data['isPoll'];
+    final questionsAnswers = data['questionsAnswers'] as Map<String, dynamic>?;
+    final answers = data['answers'];
+    final buttons = data['buttons'] as List<dynamic>?;
+    final suggestedReplies = data['suggestedReplies'] as List<dynamic>?;
+    
+    // Comprehensive logging for debugging
+    if (content.toLowerCase().contains('cigarette') || content.toLowerCase().contains('ready') || 
+        content.toLowerCase().contains('quiz') || content.toLowerCase().contains('smoke')) {
+      print('🔍 UNIFIED: Analyzing potential poll message:');
+      print('🔍 Content: $content');
+      print('🔍 isPoll: $isPoll');
+      print('🔍 questionsAnswers: $questionsAnswers');
+      print('🔍 answers: $answers');
+      print('🔍 buttons: $buttons');
+      print('🔍 suggestedReplies: $suggestedReplies');
+      print('🔍 All keys: ${data.keys.toList()}');
+    }
+    
+    // Enhanced quick reply detection - check ALL possible sources
+    final hasQuickReplyData = isMessagePoll(isPoll) || 
+                             questionsAnswers != null || 
+                             answers != null || 
+                             buttons != null || 
+                             suggestedReplies != null;
+    
+    if (hasQuickReplyData) {
+      List<QuickReply> quickReplies = [];
+      
+      // Process quick replies from ALL possible sources
+      
+      // 1. questionsAnswers (Map format)
+      if (questionsAnswers != null && questionsAnswers.isNotEmpty) {
+        questionsAnswers.forEach((k, v) => quickReplies.add(QuickReply(text: k, value: v.toString())));
+        print('🔧 UNIFIED: Added ${questionsAnswers.length} quick replies from questionsAnswers');
+      }
+      
+      // 2. answers (List or String format)
+      else if (answers is List && answers.isNotEmpty) {
+        for (var a in answers.take(4)) {
+          quickReplies.add(QuickReply(text: a.toString(), value: a.toString()));
+        }
+        print('🔧 UNIFIED: Added ${(answers as List).length} quick replies from answers (List)');
+      } 
+      else if (answers is String && answers != 'None' && answers.isNotEmpty) {
+        final answerList = answers.split(',').map((e) => e.trim()).where((e) => e.isNotEmpty).take(4).toList();
+        answerList.forEach((a) {
+          quickReplies.add(QuickReply(text: a, value: a));
+        });
+        print('🔧 UNIFIED: Added ${answerList.length} quick replies from answers (String)');
+      }
+      
+      // 3. buttons (from push notifications)
+      else if (buttons != null && buttons.isNotEmpty) {
+        for (var button in buttons.take(4)) {
+          final title = button['title']?.toString() ?? button.toString();
+          if (title.isNotEmpty) {
+            quickReplies.add(QuickReply(text: title, value: title));
+          }
+        }
+        print('🔧 UNIFIED: Added ${buttons.length} quick replies from buttons');
+      }
+      
+      // 4. suggestedReplies (already processed)
+      else if (suggestedReplies != null && suggestedReplies.isNotEmpty) {
+        for (var reply in suggestedReplies.take(4)) {
+          final text = reply['text']?.toString() ?? reply.toString();
+          final value = reply['value']?.toString() ?? text;
+          if (text.isNotEmpty) {
+            quickReplies.add(QuickReply(text: text, value: value));
+          }
+        }
+        print('🔧 UNIFIED: Added ${suggestedReplies.length} quick replies from suggestedReplies');
+      }
+      
+      // 5. Check for legacy field names that might exist
+      final oldAnswers = data['options'] ?? data['choices'] ?? data['replies'];
+      if (quickReplies.isEmpty && oldAnswers != null) {
+        if (oldAnswers is List) {
+          for (var option in oldAnswers.take(4)) {
+            quickReplies.add(QuickReply(text: option.toString(), value: option.toString()));
+          }
+          print('🔧 UNIFIED: Added ${(oldAnswers as List).length} quick replies from legacy options/choices/replies');
+        }
+      }
+      
+      if (quickReplies.isNotEmpty) {
+        print('🔧 ✅ UNIFIED: Created single poll message with content and ${quickReplies.length} options: ${quickReplies.map((r) => r.text).join(", ")}');
+        return ChatMessage(
+          id: messageId,
+          content: content, // Include the poll question content
+          timestamp: timestamp,
+          isMe: isMe,
+          type: MessageType.quickReply, // Mark as quick reply type
+          suggestedReplies: quickReplies,
+        );
+      } else {
+        print('🔧 ⚠️ UNIFIED: Poll detected but no valid quick replies created for: $content');
+      }
+    }
+    
+    // Create regular text message
+    return ChatMessage(
+      id: messageId,
+      content: content,
+      timestamp: timestamp,
+      isMe: isMe,
+      type: MessageType.text,
+    );
+      }
+  }

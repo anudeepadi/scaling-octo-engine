@@ -12,6 +12,7 @@ import '../services/media_picker_service.dart';
 import '../services/gif_service.dart';
 import '../services/dash_messaging_service.dart';
 import '../widgets/chat_message_widget.dart';
+import '../widgets/quick_reply_widget.dart';
 import '../theme/app_theme.dart';
 import '../utils/app_localizations.dart';
 import 'profile_screen.dart';
@@ -29,6 +30,7 @@ class _HomeScreenState extends State<HomeScreen> {
   final ScrollController _scrollController = ScrollController();
   bool _isDrawerOpen = false;
   bool _isComposing = false;
+  final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
 
   @override
   void initState() {
@@ -489,29 +491,32 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final localizations = AppLocalizations.of(context);
-    
     return Scaffold(
+      key: _scaffoldKey,
       appBar: AppBar(
-        title: const Text(
-          'QuiTXT Mobile',
-          style: TextStyle(
-            color: Colors.white,
-            fontSize: 18,
-            fontWeight: FontWeight.w500,
-          ),
-        ),
+        title: Text(AppLocalizations.of(context).translate('app_title')),
         backgroundColor: AppTheme.quitxtTeal,
         foregroundColor: Colors.white,
         elevation: 0,
-        leading: Builder(
-          builder: (context) => IconButton(
-            icon: const Icon(Icons.menu, color: Colors.white),
-            onPressed: () => Scaffold.of(context).openDrawer(),
-          ),
+        leading: IconButton(
+          icon: const Icon(Icons.menu),
+          onPressed: () {
+            setState(() {
+              _isDrawerOpen = true;
+            });
+            _scaffoldKey.currentState?.openDrawer();
+          },
         ),
         actions: [
-          // Removed cleaning services button to clean up the UI
+          IconButton(
+            icon: const Icon(Icons.person),
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const ProfileScreen()),
+              );
+            },
+          ),
         ],
       ),
       drawer: _buildDrawer(),
@@ -520,33 +525,102 @@ class _HomeScreenState extends State<HomeScreen> {
           Expanded(
             child: Container(
               color: Colors.grey[100],
-              child: Consumer<ChatProvider>(
-                builder: (context, chatProvider, child) {
+              child: Consumer<DashChatProvider>(
+                builder: (context, dashChatProvider, child) {
                   WidgetsBinding.instance.addPostFrameCallback((_) {
-                    if (chatProvider.messages.isNotEmpty) {
+                    if (dashChatProvider.messages.isNotEmpty) {
                       _scrollToBottom();
                     }
                   });
 
+                  if (dashChatProvider.messages.isEmpty) {
+                    return Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            Icons.chat_bubble_outline,
+                            size: 64,
+                            color: Colors.grey[400],
+                          ),
+                          const SizedBox(height: 16),
+                          Text(
+                            'Welcome to QuitTXT',
+                            style: TextStyle(
+                              fontSize: 18,
+                              color: Colors.grey[600],
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            'Your conversation will appear here',
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: Colors.grey[500],
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  }
+
+                  // Show quick reply buttons for ALL poll messages, not just the most recent one
+                  print('🔍 HomeScreen: Analyzing ${dashChatProvider.messages.length} messages for quick replies');
+                  
                   return ListView.builder(
                     controller: _scrollController,
                     padding: const EdgeInsets.all(16),
-                    itemCount: chatProvider.messages.length,
+                    itemCount: dashChatProvider.messages.length,
                     itemBuilder: (context, index) {
-                      return ChatMessageWidget(
-                        message: chatProvider.messages[index],
-                        onReplyTap: () => _scrollToBottom(),
-                        onReactionAdd: (value) {
-                          if (value.isNotEmpty) {
-                            // Use the Dash messaging service for quick replies
-                            final dashChatProvider = context.read<DashChatProvider>();
-                            dashChatProvider.handleQuickReply(
-                              QuickReply(text: value, value: value)
-                            );
-                          }
-                          _scrollToBottom();
-                        },
-                      );
+                      final message = dashChatProvider.messages[index];
+                      
+                      // Check if this message has quick replies - show for ALL poll messages
+                      final shouldShowQuickReplies = message.type == MessageType.quickReply && 
+                          message.suggestedReplies != null && 
+                          message.suggestedReplies!.isNotEmpty;
+                      
+                      print('🔍 HomeScreen: Message ${index}: type=${message.type}, hasReplies=${message.suggestedReplies?.isNotEmpty}, shouldShow=$shouldShowQuickReplies');
+                      
+                      if (shouldShowQuickReplies) {
+                        // For poll messages with quick replies, show both content and buttons
+                        return Column(
+                          children: [
+                            ChatMessageWidget(
+                              message: message,
+                              onReplyTap: () => _scrollToBottom(),
+                              onReactionAdd: (value) {
+                                if (value.isNotEmpty) {
+                                  dashChatProvider.handleQuickReply(
+                                    QuickReply(text: value, value: value)
+                                  );
+                                }
+                                _scrollToBottom();
+                              },
+                            ),
+                            QuickReplyWidget(
+                              quickReplies: message.suggestedReplies!,
+                              onReplySelected: (reply) {
+                                dashChatProvider.handleQuickReply(reply);
+                                _scrollToBottom();
+                              },
+                            ),
+                          ],
+                        );
+                      } else {
+                        // For regular messages, just show the content
+                        return ChatMessageWidget(
+                          message: message,
+                          onReplyTap: () => _scrollToBottom(),
+                          onReactionAdd: (value) {
+                            if (value.isNotEmpty) {
+                              dashChatProvider.handleQuickReply(
+                                QuickReply(text: value, value: value)
+                              );
+                            }
+                            _scrollToBottom();
+                          },
+                        );
+                      }
                     },
                   );
                 },

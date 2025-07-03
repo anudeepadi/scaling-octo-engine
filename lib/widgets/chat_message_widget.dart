@@ -401,47 +401,8 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
 
   @override
   Widget build(BuildContext context) {
-    // Render quick reply buttons if this is a quick reply message
-    final replies = (widget.message.suggestedReplies != null && widget.message.suggestedReplies!.isNotEmpty)
-        ? widget.message.suggestedReplies
-        : (widget.message.quickReplies != null && widget.message.quickReplies!.isNotEmpty)
-            ? widget.message.quickReplies
-            : null;
-    if (widget.message.type == MessageType.quickReply && replies != null && replies.isNotEmpty) {
-      return Padding(
-        padding: const EdgeInsets.symmetric(vertical: 2.0, horizontal: 8.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: replies.map((reply) {
-            return Container(
-              margin: const EdgeInsets.only(bottom: 4),
-              child: ElevatedButton(
-                onPressed: () {
-                  final dashChatProvider = Provider.of<DashChatProvider>(context, listen: false);
-                  dashChatProvider.handleQuickReply(reply);
-                },
-                style: ElevatedButton.styleFrom(
-                  foregroundColor: Colors.white,
-                  backgroundColor: AppTheme.quitxtTeal,
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(6),
-                  ),
-                  elevation: 1,
-                  minimumSize: const Size(0, 24),
-                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                ),
-                child: Text(
-                  reply.text,
-                  style: const TextStyle(fontSize: 10),
-                  textAlign: TextAlign.center,
-                ),
-              ),
-            );
-          }).toList(),
-        ),
-      );
-    }
+    // NOTE: Quick reply buttons are now handled by the screen's ListView logic
+    // ChatMessageWidget only renders the message content bubble
 
     // Build content bubble
     Widget contentBubble = Container(

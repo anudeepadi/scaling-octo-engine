@@ -5,7 +5,7 @@ import '../models/quick_reply.dart';
 
 class QuickReplyWidget extends StatelessWidget {
   final List<QuickReply> quickReplies;
-  final Function(String) onReplySelected;
+  final Function(QuickReply) onReplySelected;
 
   const QuickReplyWidget({
     Key? key,
@@ -20,14 +20,18 @@ class QuickReplyWidget extends StatelessWidget {
     }
 
     return Container(
-      margin: const EdgeInsets.only(bottom: 2),
-      child: Wrap(
-        spacing: 4.0,
-        runSpacing: 4.0,
+      width: double.infinity,
+      margin: const EdgeInsets.only(top: 4, bottom: 8, left: 16, right: 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: quickReplies.map((reply) {
-          return Platform.isIOS 
-            ? _buildIOSQuickReply(reply, context)
-            : _buildAndroidQuickReply(reply, context);
+          return Container(
+            margin: const EdgeInsets.only(bottom: 4),
+            alignment: Alignment.centerLeft,
+            child: Platform.isIOS 
+              ? _buildIOSQuickReply(reply, context)
+              : _buildAndroidQuickReply(reply, context),
+          );
         }).toList(),
       ),
     );
@@ -35,16 +39,17 @@ class QuickReplyWidget extends StatelessWidget {
 
   Widget _buildIOSQuickReply(QuickReply reply, BuildContext context) {
     return CupertinoButton(
-      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-      color: CupertinoColors.systemBlue.withValues(alpha: 0.1),
-      borderRadius: BorderRadius.circular(6),
-      minSize: 20,
-      onPressed: () => onReplySelected(reply.value),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      color: const Color(0xFF009688), // Teal color to match app theme
+      borderRadius: BorderRadius.circular(16),
+      minSize: 0,
+      onPressed: () => onReplySelected(reply),
       child: Text(
         reply.text,
         style: const TextStyle(
-          color: CupertinoColors.systemBlue,
-          fontSize: 10,
+          color: CupertinoColors.white,
+          fontSize: 13,
+          fontWeight: FontWeight.w500,
         ),
         textAlign: TextAlign.center,
       ),
@@ -52,22 +57,24 @@ class QuickReplyWidget extends StatelessWidget {
   }
 
   Widget _buildAndroidQuickReply(QuickReply reply, BuildContext context) {
-    return TextButton(
-      style: TextButton.styleFrom(
-        backgroundColor: Theme.of(context).primaryColor.withValues(alpha: 0.1),
-        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+    return ElevatedButton(
+      style: ElevatedButton.styleFrom(
+        backgroundColor: const Color(0xFF009688), // Teal color to match app theme
+        foregroundColor: Colors.white,
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(6),
+          borderRadius: BorderRadius.circular(16),
         ),
-        minimumSize: const Size(30, 20),
+        elevation: 1,
         tapTargetSize: MaterialTapTargetSize.shrinkWrap,
       ),
-      onPressed: () => onReplySelected(reply.value),
+      onPressed: () => onReplySelected(reply),
       child: Text(
         reply.text,
-        style: TextStyle(
-          color: Theme.of(context).primaryColor,
-          fontSize: 10,
+        style: const TextStyle(
+          color: Colors.white,
+          fontSize: 13,
+          fontWeight: FontWeight.w500,
         ),
         textAlign: TextAlign.center,
       ),

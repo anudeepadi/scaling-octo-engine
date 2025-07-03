@@ -142,17 +142,23 @@ class _CleanChatScreenState extends State<CleanChatScreen> {
                         itemBuilder: (context, index) {
                           final message = chatProvider.messages[index];
                           
-                          if (message.type == MessageType.quickReply && 
+                          // Find the most recent quick reply message (should be the active one)
+                          final mostRecentQuickReplyIndex = _findMostRecentQuickReplyIndex(chatProvider.messages);
+                          final shouldShowQuickReplies = message.type == MessageType.quickReply && 
                               message.suggestedReplies != null && 
-                              message.suggestedReplies!.isNotEmpty) {
+                              message.suggestedReplies!.isNotEmpty &&
+                              mostRecentQuickReplyIndex != null &&
+                              index == mostRecentQuickReplyIndex; // Only show for most recent
+                          
+                          if (shouldShowQuickReplies) {
                             return Column(
                               children: [
                                 if (message.content.isNotEmpty)
                                   ChatMessageWidget(message: message),
                                 QuickReplyWidget(
                                   quickReplies: message.suggestedReplies!,
-                                  onReplySelected: (replyValue) {
-                                    chatProvider.sendMessage(replyValue);
+                                  onReplySelected: (reply) {
+                                    chatProvider.sendMessage(reply.value);
                                     _scrollToBottom();
                                   },
                                 ),
@@ -172,6 +178,20 @@ class _CleanChatScreenState extends State<CleanChatScreen> {
         },
       ),
     );
+  }
+
+  // Find the index of the most recent quick reply message
+  int? _findMostRecentQuickReplyIndex(List<ChatMessage> messages) {
+    // Search from the end (most recent) to find the last quick reply message
+    for (int i = messages.length - 1; i >= 0; i--) {
+      final message = messages[i];
+      if (message.type == MessageType.quickReply && 
+          message.suggestedReplies != null && 
+          message.suggestedReplies!.isNotEmpty) {
+        return i;
+      }
+    }
+    return null; // No quick reply messages found
   }
 
   @override

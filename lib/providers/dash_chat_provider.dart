@@ -431,44 +431,19 @@ class DashChatProvider extends ChangeNotifier {
     }
   }
 
-  // Test message shifting functionality (DISABLED by default to preserve chronological order)
-  void testMessageShifting() {
+  // Debug chronological message ordering
+  void debugMessageOrdering() {
     if (_chatProvider == null) {
-      print('[DashChatProvider] ChatProvider not available, cannot test message shifting');
+      print('[DashChatProvider] ChatProvider not available, cannot debug message ordering');
       return;
     }
     
-    print('[DashChatProvider] 🔄 Testing message shifting functionality...');
-    print('[DashChatProvider] NOTE: Message shifting is DISABLED by default to preserve natural chronological order');
-    print('[DashChatProvider] Current message shifting enabled: ${_chatProvider!.isMessageShiftingEnabled}');
-    print('[DashChatProvider] Current message count: ${_chatProvider!.messages.length}');
+    print('[DashChatProvider] 🔍 Debugging message ordering (chronological by timestamp)...');
+    print('[DashChatProvider] Total messages: ${_chatProvider!.messages.length}');
     
-    // Apply message shifting manually only if enabled
-    if (_chatProvider!.isMessageShiftingEnabled) {
-      _chatProvider!.applyMessageShifting();
-      print('[DashChatProvider] ✅ Message shifting applied');
-    } else {
-      print('[DashChatProvider] ℹ️ Message shifting is disabled - preserving chronological order as requested');
-    }
-    
-    print('[DashChatProvider] ✅ Message shifting test completed');
-  }
-
-  // Toggle message shifting on/off (NOTE: Disabled by default to preserve order)
-  void toggleMessageShifting() {
-    if (_chatProvider == null) {
-      print('[DashChatProvider] ChatProvider not available, cannot toggle message shifting');
-      return;
-    }
-    
-    final newState = !_chatProvider!.isMessageShiftingEnabled;
-    _chatProvider!.setMessageShifting(newState);
-    
-    if (newState) {
-      print('[DashChatProvider] ⚠️ Message shifting enabled - this will change chronological order');
-    } else {
-      print('[DashChatProvider] ✅ Message shifting disabled - preserving natural chronological order');
-    }
+    // Verify chronological order is maintained
+    _chatProvider!.verifyMessageOrder();
+    print('[DashChatProvider] ✅ Message ordering debug completed');
   }
 
   // Test chronological ordering by clearing and reloading

@@ -131,7 +131,7 @@ class GeminiChatProvider extends ChangeNotifier {
         type: MessageType.quickReply,
         isMe: false,
         timestamp: DateTime.now(),
-        quickReplies: replies,
+        suggestedReplies: replies,
       ),
     );
   }

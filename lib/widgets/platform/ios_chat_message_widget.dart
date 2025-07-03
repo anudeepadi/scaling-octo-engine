@@ -117,9 +117,9 @@ class _IosChatMessageWidgetState extends State<IosChatMessageWidget> {
         return widget.message.suggestedReplies != null ?
           QuickReplyWidget(
             quickReplies: widget.message.suggestedReplies!,
-            onReplySelected: (value) {
+            onReplySelected: (reply) {
               if (widget.onReactionAdd != null) {
-                widget.onReactionAdd!(value);
+                widget.onReactionAdd!(reply.value);
               }
             },
           ) : const SizedBox.shrink();

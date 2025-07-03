@@ -222,6 +222,90 @@ class _DashMessagingScreenState extends State<DashMessagingScreen> {
               );
             },
           ),
+          // Add debug button to show conversation history
+          Consumer<DashChatProvider>(
+            builder: (context, dashChatProvider, child) {
+              return IconButton(
+                icon: const Icon(Icons.history),
+                tooltip: 'Show conversation history',
+                onPressed: () {
+                  _showConversationHistoryDialog(context, dashChatProvider);
+                },
+              );
+            },
+          ),
+          // Add test button for chronological ordering
+          Consumer<DashChatProvider>(
+            builder: (context, dashChatProvider, child) {
+              return IconButton(
+                icon: const Icon(Icons.refresh),
+                tooltip: 'Test chronological ordering',
+                onPressed: () {
+                  dashChatProvider.testChronologicalOrdering();
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Testing chronological ordering... Check console for results.'),
+                      duration: Duration(seconds: 2),
+                    ),
+                  );
+                },
+              );
+            },
+          ),
+          // Add test button for message alignment
+          Consumer<DashChatProvider>(
+            builder: (context, dashChatProvider, child) {
+              return IconButton(
+                icon: const Icon(Icons.align_horizontal_left),
+                tooltip: 'Test message alignment fix',
+                onPressed: () {
+                  dashChatProvider.debugMessageAlignment();
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Testing message alignment... Check console for results.'),
+                      duration: Duration(seconds: 2),
+                    ),
+                  );
+                },
+              );
+            },
+          ),
+          // Add test button for message shifting
+          Consumer<DashChatProvider>(
+            builder: (context, dashChatProvider, child) {
+              return IconButton(
+                icon: const Icon(Icons.swap_vert),
+                tooltip: 'Test message shifting',
+                onPressed: () {
+                  dashChatProvider.testMessageShifting();
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Testing message shifting... Check console for results.'),
+                      duration: Duration(seconds: 2),
+                    ),
+                  );
+                },
+              );
+            },
+          ),
+          // Add toggle button for message shifting
+          Consumer<DashChatProvider>(
+            builder: (context, dashChatProvider, child) {
+              return IconButton(
+                icon: const Icon(Icons.toggle_on),
+                tooltip: 'Toggle message shifting on/off',
+                onPressed: () {
+                  dashChatProvider.toggleMessageShifting();
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Toggled message shifting... Check console for status.'),
+                      duration: Duration(seconds: 2),
+                    ),
+                  );
+                },
+              );
+            },
+          ),
         ],
       ),
       body: Column(
@@ -246,6 +330,10 @@ class _DashMessagingScreenState extends State<DashMessagingScreen> {
                   );
                 }
 
+                // Calculate the most recent quick reply index once for efficiency
+                print('🔍 Analyzing ${dashChatProvider.messages.length} messages for quick replies');
+                final mostRecentQuickReplyIndex = _findMostRecentQuickReplyIndex(dashChatProvider.messages);
+                
                 return ListView.builder(
                   controller: _scrollController,
                   padding: const EdgeInsets.all(16),
@@ -253,13 +341,17 @@ class _DashMessagingScreenState extends State<DashMessagingScreen> {
                   itemBuilder: (context, index) {
                     final message = dashChatProvider.messages[index];
                     
-                    if (message.type == MessageType.quickReply && 
+                    // Only show quick reply buttons for the most recent quick reply message
+                    final shouldShowQuickReplies = message.type == MessageType.quickReply && 
                         message.suggestedReplies != null && 
-                        message.suggestedReplies!.isNotEmpty) {
+                        message.suggestedReplies!.isNotEmpty &&
+                        mostRecentQuickReplyIndex != null &&
+                        index == mostRecentQuickReplyIndex;
+                    
+                    if (shouldShowQuickReplies) {
                       return Column(
                         children: [
-                          if (message.content.isNotEmpty)
-                            ChatMessageWidget(message: message),
+                          ChatMessageWidget(message: message),
                           QuickReplyWidget(
                             quickReplies: message.suggestedReplies!,
                             onReplySelected: (reply) {
@@ -270,6 +362,7 @@ class _DashMessagingScreenState extends State<DashMessagingScreen> {
                         ],
                       );
                     } else {
+                      // For all other messages (including older quick reply messages), just show the content
                       return ChatMessageWidget(message: message);
                     }
                   },
@@ -313,9 +406,139 @@ class _DashMessagingScreenState extends State<DashMessagingScreen> {
               },
             ),
           ),
+          // Add debug button to verify message ordering
+          Consumer<DashChatProvider>(
+            builder: (context, dashChatProvider, child) {
+              return IconButton(
+                icon: const Icon(Icons.sort),
+                tooltip: 'Verify message ordering',
+                onPressed: () {
+                  dashChatProvider.verifyMessageOrdering();
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Message ordering verification started. Check console for results.'),
+                      duration: Duration(seconds: 2),
+                    ),
+                  );
+                },
+              );
+            },
+          ),
         ],
       ),
     );
+  }
+
+  void _showConversationHistoryDialog(BuildContext context, DashChatProvider dashChatProvider) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Conversation History'),
+          content: Container(
+            width: double.maxFinite,
+            child: FutureBuilder<List<Map<String, dynamic>>>(
+              future: dashChatProvider.getConversationHistory(limit: 30),
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+                
+                if (snapshot.hasError) {
+                  return Text('Error: ${snapshot.error}');
+                }
+                
+                final history = snapshot.data ?? [];
+                
+                if (history.isEmpty) {
+                  return const Text('No conversation history found.');
+                }
+                
+                return Container(
+                  height: 400,
+                  child: ListView.builder(
+                    itemCount: history.length,
+                    itemBuilder: (context, index) {
+                      final message = history[index];
+                      final isUser = message['isUserMessage'] ?? false;
+                      final messageText = message['message'] ?? '';
+                      final timestamp = message['timestamp'] ?? '';
+                      
+                      return Card(
+                        margin: const EdgeInsets.symmetric(vertical: 4),
+                        color: isUser ? Colors.blue[50] : Colors.green[50],
+                        child: Padding(
+                          padding: const EdgeInsets.all(8.0),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  Icon(
+                                    isUser ? Icons.person : Icons.smart_toy,
+                                    size: 16,
+                                    color: isUser ? Colors.blue : Colors.green,
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Text(
+                                    isUser ? 'You' : 'Server',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      color: isUser ? Colors.blue : Colors.green,
+                                    ),
+                                  ),
+                                  const Spacer(),
+                                  Text(
+                                    timestamp.contains(' ') 
+                                        ? timestamp.split(' ')[1].substring(0, 8)
+                                        : 'Unknown',
+                                    style: const TextStyle(
+                                      fontSize: 12,
+                                      color: Colors.grey,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                messageText,
+                                style: const TextStyle(fontSize: 14),
+                              ),
+                            ],
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                );
+              },
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Close'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  // Find the index of the most recent quick reply message
+  int? _findMostRecentQuickReplyIndex(List<ChatMessage> messages) {
+    // Search from the end (most recent) to find the last quick reply message
+    for (int i = messages.length - 1; i >= 0; i--) {
+      final message = messages[i];
+      if (message.type == MessageType.quickReply && 
+          message.suggestedReplies != null && 
+          message.suggestedReplies!.isNotEmpty) {
+        print('🎯 Most recent quick reply at index $i: "${message.content.isEmpty ? "[Quick Reply]" : message.content.substring(0, message.content.length > 30 ? 30 : message.content.length)}"');
+        return i;
+      }
+    }
+    print('🎯 No quick reply messages found in ${messages.length} messages');
+    return null; // No quick reply messages found
   }
 
   @override

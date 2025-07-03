@@ -122,25 +122,26 @@ class ChatProvider extends ChangeNotifier {
 
   // Get message preview text for sidebar
   String _getMessagePreview(ChatMessage message) {
-    switch (message.type) {
-      case MessageType.text:
-        return message.content.length > 30
-          ? '${message.content.substring(0, 27)}...'
+    if (message.content.isNotEmpty) {
+      return message.content.length > 50 
+          ? '${message.content.substring(0, 50)}...'
           : message.content;
+    }
+    
+    // Handle special message types
+    switch (message.type) {
       case MessageType.image:
         return '📷 Image';
+      case MessageType.gif:
+        return '🎬 GIF';
       case MessageType.video:
         return '🎥 Video';
-      case MessageType.gif:
-        return '🎭 GIF';
       case MessageType.file:
-        return '📄 File';
-      case MessageType.youtube:
-        return '📺 YouTube';
+        return '📎 File';
+      case MessageType.voice:
+        return '🎤 Voice message';
       case MessageType.quickReply:
-        return '💬 Quick Replies';
-      case MessageType.linkPreview:
-        return '🔗 Link';
+        return '💬 Quick reply options';
       default:
         return 'Message';
     }
@@ -148,21 +149,18 @@ class ChatProvider extends ChangeNotifier {
 
   // Delete a conversation
   void deleteConversation(String conversationId) {
-    // Remove the conversation
     _conversations.removeWhere((conv) => conv.id == conversationId);
-
-    // If we deleted the current conversation, switch to another one
+    
+    // If the deleted conversation was current, switch to another one
     if (_currentConversationId == conversationId) {
       if (_conversations.isNotEmpty) {
-        _currentConversationId = _conversations.first.id;
-        _messages.clear();
-        _messages.addAll(_conversations.first.messages);
+        switchConversation(_conversations.first.id);
       } else {
-        // If no conversations left, create a new one
-        createNewConversation('New Chat');
+        // Create a new default conversation
+        _initializeDemoConversations();
       }
     }
-
+    
     notifyListeners();
   }
 
@@ -181,10 +179,38 @@ class ChatProvider extends ChangeNotifier {
     }
   }
 
-  // Add a method to set the entire list of messages
+  // Get current conversation
+  ChatConversation? getCurrentConversation() {
+    if (_currentConversationId == null) return null;
+    
+    try {
+      return _conversations.firstWhere((conv) => conv.id == _currentConversationId);
+    } catch (e) {
+      return null;
+    }
+  }
+
+  // Update current conversation's last message time
+  void _updateCurrentConversationTime() {
+    if (_currentConversationId != null && _messages.isNotEmpty) {
+      final currentIndex = _conversations.indexWhere((conv) => conv.id == _currentConversationId);
+      if (currentIndex >= 0) {
+        _conversations[currentIndex] = ChatConversation(
+          id: _conversations[currentIndex].id,
+          name: _conversations[currentIndex].name,
+          lastMessageTime: _messages.last.timestamp,
+          messages: _conversations[currentIndex].messages,
+          lastMessagePreview: _getMessagePreview(_messages.last),
+        );
+      }
+    }
+  }
+
+  // Set messages directly (called by DashChatProvider)
   void setMessages(List<ChatMessage> messages) {
     _messages.clear();
     _messages.addAll(messages);
+    
     // Ensure the last message preview is updated if needed
     if (_currentConversationId != null) {
       final currentIndex = _conversations.indexWhere((conv) => conv.id == _currentConversationId);
@@ -201,13 +227,94 @@ class ChatProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  // Add a complete message directly (preserves all original data)
+  void addMessage(ChatMessage message) {
+    // Check for duplicate messages to prevent displaying multiple instances of the same message
+    if (_messages.isNotEmpty) {
+      final lastMessage = _messages.last;
+      // If the last message has the same ID, skip it
+      if (lastMessage.id == message.id) {
+        DebugConfig.debugPrint('Preventing duplicate message with same ID: ${message.id}');
+        return;
+      }
+      
+      // If the last message has the same content, is from the same user, and was sent within 2 seconds
+      if (lastMessage.content == message.content && 
+          lastMessage.isMe == message.isMe &&
+          DateTime.now().difference(lastMessage.timestamp).inSeconds < 2) {
+        DebugConfig.debugPrint('Preventing duplicate message: ${message.content} from ${message.isMe ? "user" : "server"}');
+        return; // Skip adding this duplicate message
+      }
+    }
+    
+    _messages.add(message);
+    notifyListeners();
+  }
+
+  // Message shifting feature - DISABLED by default as per user request
+  bool _messageShiftingEnabled = false; // CHANGED: Disabled by default
+  bool get isMessageShiftingEnabled => _messageShiftingEnabled;
+  
+  void setMessageShifting(bool enabled) {
+    _messageShiftingEnabled = enabled;
+    if (enabled) {
+      _applyMessageShifting();
+      notifyListeners();
+    } else {
+      // When disabled, we don't need to do anything - messages remain in natural order
+      notifyListeners();
+    }
+  }
+
+  // Dynamic message shifting: Move user messages one position up relative to server messages
+  // NOTE: This feature is now disabled by default to preserve natural message order
+  void _applyMessageShifting() {
+    if (!_messageShiftingEnabled || _messages.length < 2) return; // Need at least 2 messages to shift
+    
+    final originalMessages = List<ChatMessage>.from(_messages);
+    final reorderedMessages = <ChatMessage>[];
+    
+    // Group messages into conversation pairs (server message + potential user response)
+    for (int i = 0; i < originalMessages.length; i++) {
+      final currentMessage = originalMessages[i];
+      
+      // If this is a server message, check if there's a user response after it
+      if (!currentMessage.isMe && i + 1 < originalMessages.length) {
+        final nextMessage = originalMessages[i + 1];
+        
+        // If the next message is from user, shift it to appear first
+        if (nextMessage.isMe) {
+          reorderedMessages.add(nextMessage); // Add user message first
+          reorderedMessages.add(currentMessage); // Then add server message
+          i++; // Skip the next message since we already processed it
+          continue;
+        }
+      }
+      
+      // For all other cases, add the message as-is
+      reorderedMessages.add(currentMessage);
+    }
+    
+    // Update the messages list with reordered messages
+    _messages.clear();
+    _messages.addAll(reorderedMessages);
+    
+    DebugConfig.debugPrint('Applied message shifting: ${originalMessages.length} -> ${reorderedMessages.length} messages');
+  }
+
+  // Manual method to apply message shifting (useful for testing/debugging)
+  void applyMessageShifting() {
+    _applyMessageShifting();
+    notifyListeners();
+  }
+
   // Clear chat history
   void clearChatHistory() {
     _messages.clear();
     notifyListeners();
   }
 
-  // Add a text message
+  // Add a text message - FIXED: Preserve chronological order
   void addTextMessage(String text, {bool isMe = false}) {
     // Check for duplicate messages to prevent displaying multiple instances of the same message
     if (_messages.isNotEmpty) {
@@ -241,10 +348,12 @@ class ChatProvider extends ChangeNotifier {
         timestamp: DateTime.now(),
       ),
     );
+    
+    // REMOVED: Message shifting to preserve natural order as requested
     notifyListeners();
   }
 
-  // Add a quick reply message
+  // Add a quick reply message - FIXED: Preserve chronological order
   void addQuickReplyMessage(List<QuickReply> replies) {
     _messages.add(
       ChatMessage(
@@ -253,9 +362,11 @@ class ChatProvider extends ChangeNotifier {
         type: MessageType.quickReply,
         isMe: false,
         timestamp: DateTime.now(),
-        quickReplies: replies,
+        suggestedReplies: replies,
       ),
     );
+    
+    // REMOVED: Message shifting to preserve natural order as requested
     notifyListeners();
   }
 
@@ -268,6 +379,7 @@ class ChatProvider extends ChangeNotifier {
         type: type,
         isMe: true,
         timestamp: DateTime.now(),
+        mediaUrl: path,
       ),
     );
     notifyListeners();

@@ -11,14 +11,16 @@ import 'chat_provider.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:uuid/uuid.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 
 class DashChatProvider extends ChangeNotifier {
   final DashMessagingService _dashService = DashMessagingService();
   final FirebaseAuth _auth = FirebaseAuth.instance;
   
   ChatProvider? _chatProvider;
-  StreamSubscription? _authSubscription;
-  StreamSubscription? _messageSubscription;
+  StreamSubscription<User?>? _authSubscription;
+  StreamSubscription<ChatMessage>? _messageSubscription;
   User? _currentUser;
   String? _fcmToken;
   
@@ -41,11 +43,6 @@ class DashChatProvider extends ChangeNotifier {
   // Constructor
   DashChatProvider() {
     DebugConfig.debugPrint('DashChatProvider: Initializing...');
-    if (_auth == null) {
-      DebugConfig.errorPrint('DashChatProvider._auth is NULL immediately after assignment!');
-    } else {
-      DebugConfig.debugPrint('DashChatProvider: _auth initialized successfully.');
-    }
     _listenToAuthChanges();
   }
 
@@ -70,9 +67,9 @@ class DashChatProvider extends ChangeNotifier {
         // User logged in
         _currentUser = user;
         if (_chatProvider != null) {
-           _setupMessageListener();
+          _setupMessageListener();
         } else {
-           DebugConfig.debugPrint('DashChatProvider: User logged in, but ChatProvider not linked yet.');
+          DebugConfig.debugPrint('DashChatProvider: User logged in, but ChatProvider not linked yet.');
         }
         notifyListeners();
       }
@@ -123,9 +120,10 @@ class DashChatProvider extends ChangeNotifier {
   }
 
   // Initialize the server message service
-  void initializeServerService(String userId, String fcmToken) {
+  Future<void> initializeServerService(String userId, String fcmToken) async {
     print('[DashChatProvider] Initializing DashMessagingService for user $userId');
-    _dashService.initialize(userId).then((_) {
+    try {
+      await _dashService.initialize(userId);
       print('[DashChatProvider] DashMessagingService initialized successfully');
       
       // Setup message listener after successful initialization
@@ -141,9 +139,10 @@ class DashChatProvider extends ChangeNotifier {
         print('[DashChatProvider] Warning: ChatProvider is null, cannot set up message listener');
       }
       notifyListeners();
-    }).catchError((error) {
+    } catch (error) {
       print('[DashChatProvider] Error initializing DashMessagingService: $error');
-    });
+      rethrow; // Re-throw to let the caller handle the error
+    }
   }
 
   // Clear state on logout
@@ -474,4 +473,22 @@ class DashChatProvider extends ChangeNotifier {
       print('[DashChatProvider] Error testing chronological ordering: $e');
     }
   }
+  
+  // Refresh messages from server (called when app resumes)
+  Future<void> refreshMessages() async {
+    if (!_dashService.isInitialized) {
+      print('[DashChatProvider] Service not initialized, cannot refresh messages');
+      return;
+    }
+    
+    try {
+      print('[DashChatProvider] 🔄 Refreshing messages from server...');
+      await _dashService.loadExistingMessages();
+      print('[DashChatProvider] ✅ Messages refreshed successfully');
+    } catch (e) {
+      print('[DashChatProvider] ❌ Error refreshing messages: $e');
+    }
+  }
+
+
 }

@@ -5,7 +5,6 @@ import '../widgets/chat_message_widget.dart';
 import '../widgets/quick_reply_widget.dart';
 import '../models/chat_message.dart';
 import '../utils/app_localizations.dart';
-import 'dart:io';
 
 class DashChatScreen extends StatefulWidget {
   const DashChatScreen({super.key});
@@ -17,7 +16,6 @@ class DashChatScreen extends StatefulWidget {
 class _DashChatScreenState extends State<DashChatScreen> {
   final ScrollController _scrollController = ScrollController();
   final TextEditingController _messageController = TextEditingController();
-  bool _showDebugInfo = false; // Keep debug panel hidden by default
 
   @override
   void initState() {
@@ -114,115 +112,13 @@ class _DashChatScreenState extends State<DashChatScreen> {
         title: Text(AppLocalizations.of(context).translate('dash_chat')),
         backgroundColor: Theme.of(context).primaryColor,
         foregroundColor: Colors.white,
-        actions: [
-          // Android debug button
-          if (Platform.isAndroid)
-            PopupMenuButton<String>(
-              icon: const Icon(Icons.bug_report, color: Colors.orange),
-              onSelected: (value) {
-                switch (value) {
-                  case 'reload':
-                    context.read<DashChatProvider>().forceMessageReload();
-                    break;
-                  case 'debug_info':
-                    setState(() {
-                      _showDebugInfo = !_showDebugInfo;
-                    });
-                    break;
-                  case 'force_sync':
-                    context.read<DashChatProvider>().forceMessageSync();
-                    break;
-                }
-              },
-              itemBuilder: (context) => [
-                const PopupMenuItem(
-                  value: 'reload',
-                  child: Row(
-                    children: [
-                      Icon(Icons.refresh, color: Colors.blue),
-                      SizedBox(width: 8),
-                      Text('Force Reload Messages'),
-                    ],
-                  ),
-                ),
-                const PopupMenuItem(
-                  value: 'debug_info',
-                  child: Row(
-                    children: [
-                      Icon(Icons.info, color: Colors.green),
-                      SizedBox(width: 8),
-                      Text('Toggle Debug Info'),
-                    ],
-                  ),
-                ),
-                const PopupMenuItem(
-                  value: 'force_sync',
-                  child: Row(
-                    children: [
-                      Icon(Icons.sync, color: Colors.purple),
-                      SizedBox(width: 8),
-                      Text('Force Message Sync'),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-        ],
+        actions: [],
       ),
       body: Consumer<DashChatProvider>(
         builder: (context, chatProvider, child) {
           return Column(
             children: [
-              // Android Debug Info Panel
-              if (Platform.isAndroid && _showDebugInfo)
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(8.0),
-                  margin: const EdgeInsets.all(8.0),
-                  decoration: BoxDecoration(
-                    color: Colors.orange.shade50,
-                    border: Border.all(color: Colors.orange),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Row(
-                        children: [
-                          Icon(Icons.android, color: Colors.green),
-                          SizedBox(width: 8),
-                          Text(
-                            'Android Debug Info',
-                            style: TextStyle(
-                              fontWeight: FontWeight.bold,
-                              color: Colors.orange,
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        'Messages: ${chatProvider.messages.length}',
-                        style: const TextStyle(fontSize: 12),
-                      ),
-                      Text(
-                        'Loading: ${chatProvider.isLoading}',
-                        style: const TextStyle(fontSize: 12),
-                      ),
-                      Text(
-                        'Sending: ${chatProvider.isSendingMessage}',
-                        style: const TextStyle(fontSize: 12),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        chatProvider.getAndroidDebugInfo(),
-                        style: const TextStyle(fontSize: 10, fontFamily: 'monospace'),
-                        maxLines: 5,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ],
-                  ),
-                ),
+
               
               // Loading indicator
               if (chatProvider.isLoading)
@@ -266,35 +162,7 @@ class _DashChatScreenState extends State<DashChatScreen> {
                                 color: Colors.grey[500],
                               ),
                             ),
-                            // Android-specific empty state message
-                            if (Platform.isAndroid) ...[
-                              const SizedBox(height: 16),
-                              Container(
-                                padding: const EdgeInsets.all(12),
-                                decoration: BoxDecoration(
-                                  color: Colors.orange.shade50,
-                                  borderRadius: BorderRadius.circular(8),
-                                  border: Border.all(color: Colors.orange.shade200),
-                                ),
-                                child: const Column(
-                                  children: [
-                                    Icon(Icons.android, color: Colors.green),
-                                    SizedBox(height: 8),
-                                    Text(
-                                      'Android Debug Mode',
-                                      style: TextStyle(
-                                        fontWeight: FontWeight.bold,
-                                        color: Colors.orange,
-                                      ),
-                                    ),
-                                    Text(
-                                      'Tap the bug icon to access debug tools',
-                                      style: TextStyle(fontSize: 12),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ],
+
                           ],
                         ),
                       )

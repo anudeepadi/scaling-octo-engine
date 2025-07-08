@@ -181,10 +181,15 @@ class MyApp extends StatelessWidget {
             if (authProvider.isAuthenticated && !dashChatProvider.isServerServiceInitialized) {
               final userId = authProvider.currentUser?.uid;
               if (userId != null) {
-                FirebaseMessaging.instance.getToken().then((token) {
+                FirebaseMessaging.instance.getToken().then((token) async {
                   if (token != null) {
-                    developer.log('Initializing Server Service for user: $userId with token: $token', name: 'App');
-                    dashChatProvider.initializeServerService(userId, token);
+                    developer.log('Initializing Server Service for user: $userId with token: ${token.substring(0, 20)}...', name: 'App');
+                    try {
+                      await dashChatProvider.initializeServerService(userId, token);
+                      developer.log('Server Service initialized successfully for user: $userId', name: 'App');
+                    } catch (initError) {
+                      developer.log('Error initializing server service for user $userId: $initError', name: 'App');
+                    }
                     
                     // Print token in a format easy to copy for testing
                     developer.log('==================== FCM TOKEN ====================', name: 'FCM');

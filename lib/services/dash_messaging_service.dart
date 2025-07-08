@@ -78,7 +78,7 @@ class DashMessagingService {
   int _lowestLoadedTimestamp = 0; // Track lowest timestamp for pagination
 
   // Add this field to manage the Firestore subscription
-  StreamSubscription<QuerySnapshot>? _firestoreSubscription;
+  StreamSubscription? _firestoreSubscription;
 
   // Add cache management
   final Map<String, ChatMessage> _messageCache = {};
@@ -199,9 +199,20 @@ class DashMessagingService {
       print('Server connection test response: ${response.statusCode}');
       if (response.statusCode == 200) {
         print('Successfully connected to server');
+      } else {
+        print('Server responded with status: ${response.statusCode}');
+        print('Response body: ${response.body}');
       }
     } catch (e) {
       print('Background server connection test failed: $e');
+      // Check if it's a network connectivity issue
+      if (e.toString().contains('Failed host lookup') || e.toString().contains('Network is unreachable')) {
+        print('❌ Network connectivity issue detected. Please check internet connection.');
+      } else if (e.toString().contains('timeout')) {
+        print('❌ Server timeout - the server may be down or slow to respond.');
+      } else {
+        print('❌ Unexpected connection error: $e');
+      }
       // Don't throw - this is just a background test
     }
   }
@@ -2030,4 +2041,6 @@ class DashMessagingService {
       type: MessageType.text,
     );
       }
-  }
+
+
+}

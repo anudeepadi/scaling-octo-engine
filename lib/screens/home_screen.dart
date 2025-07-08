@@ -25,7 +25,7 @@ class HomeScreen extends StatefulWidget {
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> {
+class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   final TextEditingController _messageController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   bool _isDrawerOpen = false;
@@ -35,6 +35,7 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _messageController.addListener(_handleTextChange);
 
     // Link DashChatProvider to ChatProvider
@@ -50,10 +51,39 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _messageController.removeListener(_handleTextChange);
     _messageController.dispose();
     _scrollController.dispose();
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    super.didChangeAppLifecycleState(state);
+    
+    switch (state) {
+      case AppLifecycleState.resumed:
+        print('App resumed - checking for new messages');
+        // Refresh messages when app comes back to foreground
+        if (mounted) {
+          final dashProvider = context.read<DashChatProvider>();
+          dashProvider.refreshMessages();
+        }
+        break;
+      case AppLifecycleState.paused:
+        print('App paused');
+        break;
+      case AppLifecycleState.inactive:
+        print('App inactive');
+        break;
+      case AppLifecycleState.detached:
+        print('App detached');
+        break;
+      case AppLifecycleState.hidden:
+        print('App hidden');
+        break;
+    }
   }
 
   void _handleTextChange() {
@@ -75,13 +105,15 @@ class _HomeScreenState extends State<HomeScreen> {
   void _handleSubmitted(String text) {
     if (text.isEmpty) return;
 
-    final chatProvider = context.read<ChatProvider>();
+    print('[SendMessage] Sending message with ID: ${DateTime.now().millisecondsSinceEpoch}');
+    
     final dashChatProvider = context.read<DashChatProvider>();
     
-    // Add the user's message to the UI immediately
-    chatProvider.addTextMessage(text, isMe: true);
-
-    // Send message to the Dash backend
+    // FIXED: Don't add message to ChatProvider immediately
+    // Let DashMessagingService handle adding the message with proper timestamp ordering
+    // This prevents duplicate messages and ensures chronological order
+    
+    // Send message to the Dash backend - this will handle adding to UI via Firebase
     dashChatProvider.sendMessage(text);
 
     _messageController.clear();

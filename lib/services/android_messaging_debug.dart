@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:io';
-import 'package:flutter/foundation.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/chat_message.dart';
 import 'dash_messaging_service.dart';
@@ -113,7 +112,7 @@ class AndroidMessagingDebug {
           _messagesReceived++;
           DebugConfig.debugPrint('  📨 Message received (#$_messagesReceived):');
           DebugConfig.debugPrint('    - ID: ${message.id}');
-          DebugConfig.debugPrint('    - Content: ${message.content.length > 50 ? message.content.substring(0, 50) + "..." : message.content}');
+          DebugConfig.debugPrint('    - Content: ${message.content.length > 50 ? "${message.content.substring(0, 50)}..." : message.content}');
           DebugConfig.debugPrint('    - Is Me: ${message.isMe}');
           DebugConfig.debugPrint('    - Type: ${message.type}');
           DebugConfig.debugPrint('    - Timestamp: ${message.timestamp}');
@@ -178,7 +177,7 @@ class AndroidMessagingDebug {
           DebugConfig.debugPrint('    - Doc ${i + 1}:');
           DebugConfig.debugPrint('      ID: ${doc.id}');
           DebugConfig.debugPrint('      ServerMessageId: ${data['serverMessageId'] ?? 'N/A'}');
-          DebugConfig.debugPrint('      MessageBody: ${(data['messageBody'] ?? '').toString().length > 30 ? (data['messageBody'] ?? '').toString().substring(0, 30) + "..." : data['messageBody'] ?? 'N/A'}');
+          DebugConfig.debugPrint('      MessageBody: ${(data['messageBody'] ?? '').toString().length > 30 ? "${(data['messageBody'] ?? '').toString().substring(0, 30)}..." : data['messageBody'] ?? 'N/A'}');
           DebugConfig.debugPrint('      Source: ${data['source'] ?? 'N/A'}');
           DebugConfig.debugPrint('      CreatedAt: ${data['createdAt'] ?? 'N/A'}');
         }

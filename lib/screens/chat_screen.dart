@@ -73,7 +73,7 @@ class _ChatScreenState extends State<ChatScreen> {
       allowMultiple: false,
     );
 
-    if (result != null && result.files.isNotEmpty) {
+    if (result != null && result.files.isNotEmpty && mounted) {
       final file = result.files.first;
       final path = file.path;
       

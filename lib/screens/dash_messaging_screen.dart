@@ -12,10 +12,10 @@ class DashMessagingScreen extends StatefulWidget {
   const DashMessagingScreen({super.key});
 
   @override
-  _DashMessagingScreenState createState() => _DashMessagingScreenState();
+  DashMessagingScreenState createState() => DashMessagingScreenState();
 }
 
-class _DashMessagingScreenState extends State<DashMessagingScreen> {
+class DashMessagingScreenState extends State<DashMessagingScreen> {
   final TextEditingController _messageController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
 
@@ -53,13 +53,13 @@ class _DashMessagingScreenState extends State<DashMessagingScreen> {
 
   void _scrollToBottom({bool isDelayed = false}) {
     if (_scrollController.hasClients) {
-      final scrollToTask = () {
+      void scrollToTask() {
         _scrollController.animateTo(
           _scrollController.position.maxScrollExtent,
           duration: const Duration(milliseconds: 300),
           curve: Curves.easeOut,
         );
-      };
+      }
       
       if (isDelayed) {
         Future.delayed(const Duration(milliseconds: 100), scrollToTask);

@@ -11,6 +11,7 @@ import '../services/gif_service.dart';
 import '../widgets/chat_message_widget.dart';
 import '../widgets/quick_reply_widget.dart';
 import '../utils/app_localizations.dart';
+import '../theme/app_theme.dart';
 import 'profile_screen.dart';
 import '../utils/debug_config.dart';
 
@@ -24,7 +25,6 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   final TextEditingController _messageController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
-  bool _isDrawerOpen = false;
   bool _isComposing = false;
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
 
@@ -116,6 +116,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     _scrollToBottom();
   }
 
+  // ignore: unused_element
   Future<void> _pickGif() async {
     // Show a grid of local GIFs in a bottom sheet
     showModalBottomSheet(
@@ -205,6 +206,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     chatProvider.addGifMessage(gifPath);
   }
 
+  // ignore: unused_element
   Future<void> _pickMedia() async {
     // Show Android-style bottom sheet
     showModalBottomSheet(
@@ -242,13 +244,14 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     );
   }
 
+  // ignore: unused_element
   Future<void> _pickMediaFromSource(MediaSource source) async {
     final result = await MediaPickerService.pickMedia(
       allowedExtensions: ['jpg', 'jpeg', 'png', 'gif', 'mp4'],
       source: source,
     );
 
-    if (result != null && result.files.isNotEmpty) {
+    if (result != null && result.files.isNotEmpty && mounted) {
       final file = result.files.first;
       final path = file.path;
 
@@ -365,9 +368,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                         ),
                       ),
                       onTap: () {
-                        setState(() {
-                          _isDrawerOpen = false;
-                        });
                         Navigator.pop(context);
                         
                         Navigator.push(
@@ -393,9 +393,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                         ),
                       ),
                       onTap: () {
-                        setState(() {
-                          _isDrawerOpen = false;
-                        });
                         Navigator.pop(context);
                         // Already on chat screen, so just close drawer
                       },
@@ -417,9 +414,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                         ),
                       ),
                       onTap: () async {
-                        setState(() {
-                          _isDrawerOpen = false;
-                        });
                         Navigator.pop(context);
                         
                         
@@ -527,9 +521,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         leading: IconButton(
           icon: const Icon(Icons.menu),
           onPressed: () {
-            setState(() {
-              _isDrawerOpen = true;
-            });
             _scaffoldKey.currentState?.openDrawer();
           },
         ),

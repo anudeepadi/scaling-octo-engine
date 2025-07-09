@@ -99,6 +99,7 @@ class DashMessagingService {
     _messageCache[message.id] = message;
   }
   
+  // ignore: unused_element
   bool _isMessageCached(String messageId) {
     return _messageCache.containsKey(messageId);
   }
@@ -212,6 +213,7 @@ class DashMessagingService {
   }
 
   // Load host URL - use the exact server URL from main.py
+  // ignore: unused_element
   Future<void> _loadHostUrl() async {
     try {
       // Always use the correct ngrok URL from main.py with full path
@@ -499,6 +501,7 @@ class DashMessagingService {
   }
   
   // Helper method to extract timestamp from Firestore data
+  // ignore: unused_element
   DateTime _extractTimestamp(Map<String, dynamic> data) {
     try {
       final createdAt = data['createdAt'];
@@ -872,6 +875,7 @@ class DashMessagingService {
   }
   
   // Ultra-fast timestamp extraction
+  // ignore: unused_element
   DateTime _extractTimestampFast(Map<String, dynamic> data) {
     try {
       // Try primary timestamp field (server timestamp)

@@ -39,16 +39,17 @@ class IosMessageInput extends StatelessWidget {
               CupertinoButton(
                 padding: EdgeInsets.zero,
                 minSize: 30,
+                onPressed: onPickMedia,
                 child: const Icon(
                   CupertinoIcons.photo_on_rectangle,
                   color: CupertinoColors.activeBlue,
                   size: 20,
                 ),
-                onPressed: onPickMedia,
               ),
               CupertinoButton(
                 padding: EdgeInsets.zero,
                 minSize: 30,
+                onPressed: onPickGif,
                 child: const Text(
                   'GIF',
                   style: TextStyle(
@@ -57,7 +58,6 @@ class IosMessageInput extends StatelessWidget {
                     fontSize: 14,
                   ),
                 ),
-                onPressed: onPickGif,
               ),
             ],
           ),

@@ -9,10 +9,10 @@ class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
 
   @override
-  _SettingsScreenState createState() => _SettingsScreenState();
+  SettingsScreenState createState() => SettingsScreenState();
 }
 
-class _SettingsScreenState extends State<SettingsScreen> {
+class SettingsScreenState extends State<SettingsScreen> {
   Environment _currentEnv = Environment.development;
   final TextEditingController _serverUrlController = TextEditingController();
   bool _isLoading = false;
@@ -35,9 +35,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
       // Set the server URL textfield
       _serverUrlController.text = dotenv.env['SERVER_URL'] ?? '';
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error loading settings: $e')),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error loading settings: $e')),
+        );
+      }
     } finally {
       setState(() {
         _isLoading = false;
@@ -59,13 +61,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
       // Update the server URL text field
       _serverUrlController.text = dotenv.env['SERVER_URL'] ?? '';
       
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Switched to ${env.toString()} environment')),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Switched to ${env.toString()} environment')),
+        );
+      }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error switching environment: $e')),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error switching environment: $e')),
+        );
+      }
     } finally {
       setState(() {
         _isLoading = false;
@@ -92,13 +98,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
       await prefs.setString('hostUrl', newUrl);
       
       // Show confirmation
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Server URL saved: $newUrl')),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Server URL saved: $newUrl')),
+        );
+      }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error saving server URL: $e')),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error saving server URL: $e')),
+        );
+      }
     } finally {
       setState(() {
         _isLoading = false;

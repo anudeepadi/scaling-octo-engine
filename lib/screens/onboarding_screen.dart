@@ -3,7 +3,6 @@ import 'package:provider/provider.dart';
 import 'dart:ui';
 import '../providers/user_profile_provider.dart';
 import '../providers/language_provider.dart';
-import '../theme/app_theme.dart';
 import '../utils/app_localizations.dart';
 import 'intake_questionnaire_screen.dart';
 

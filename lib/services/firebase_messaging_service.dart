@@ -120,9 +120,6 @@ class FirebaseMessagingService {
       
       // Check if this is a QuitTXT message (compatible with expected format)
       if (data.containsKey('serverMessageId') && data.containsKey('messageBody')) {
-        // Parse into DTO
-        final quitxtMessage = QuitxtServerIncomingDto.fromJson(data);
-        
         // Forward to DashMessagingService
         _dashMessagingService.handlePushNotification(data);
       } else {

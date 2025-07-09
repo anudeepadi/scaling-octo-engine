@@ -65,6 +65,7 @@ class _IosChatMessageWidgetState extends State<IosChatMessageWidget> {
     widget.onQuickReplyTap?.call(value);
   }
 
+  // ignore: unused_element
   Widget _buildContent() {
     switch (widget.message.type) {
       case MessageType.text:
@@ -260,6 +261,7 @@ class _IosChatMessageWidgetState extends State<IosChatMessageWidget> {
     );
   }
   
+  // ignore: unused_element
   IconData _getStatusIcon() {
     switch (widget.message.status) {
       case MessageStatus.sending:

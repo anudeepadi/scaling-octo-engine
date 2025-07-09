@@ -13,11 +13,11 @@ class SimpleGeminiTesterScreen extends StatefulWidget {
   const SimpleGeminiTesterScreen({super.key});
 
   @override
-  _SimpleGeminiTesterScreenState createState() =>
-      _SimpleGeminiTesterScreenState();
+  SimpleGeminiTesterScreenState createState() =>
+      SimpleGeminiTesterScreenState();
 }
 
-class _SimpleGeminiTesterScreenState extends State<SimpleGeminiTesterScreen> {
+class SimpleGeminiTesterScreenState extends State<SimpleGeminiTesterScreen> {
   final TextEditingController _textController = TextEditingController();
   String _responseText = 'Response will appear here...';
   bool _isLoading = false;

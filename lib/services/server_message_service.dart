@@ -119,6 +119,7 @@ class ServerMessageService {
   }
 
   // Local fallback response generator
+  // ignore: unused_element
   Map<String, dynamic> _generateServerResponse(String messageText, int eventTypeCode) {
     String responseText = "I don't understand the command: '$messageText'. Can you please clarify?"; // Default for commands
     List<String> options = [];

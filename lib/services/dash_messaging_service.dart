@@ -34,7 +34,7 @@ class DashMessagingService {
       await firestore.enableNetwork();
       
       // Warm up the connection
-      firestore.collection('messages').doc('_warmup').get().catchError((_) {});
+      firestore.collection('messages').doc('_warmup').get().catchError((_) => null);
       
       DebugConfig.debugPrint('⚡ Firestore optimized for instant performance');
     } catch (e) {
@@ -63,7 +63,6 @@ class DashMessagingService {
   bool _isStreamClosed = false;
   
   // Track last response message to prevent duplicates
-  String? _lastResponseId;
   DateTime? _lastResponseTime;
   String? _lastMessageText;
 
@@ -388,7 +387,9 @@ class DashMessagingService {
           
           // 1. questionsAnswers (Map format)
           if (questionsAnswers != null && questionsAnswers.isNotEmpty) {
-            questionsAnswers.forEach((k, v) => quickReplies.add(QuickReply(text: k, value: v.toString())));
+            for (final entry in questionsAnswers.entries) {
+              quickReplies.add(QuickReply(text: entry.key, value: entry.value.toString()));
+            }
             DebugConfig.debugPrint('🔧 INITIAL: Added ${questionsAnswers.length} quick replies from questionsAnswers');
           }
           
@@ -397,13 +398,13 @@ class DashMessagingService {
             for (var a in answers.take(4)) {
               quickReplies.add(QuickReply(text: a.toString(), value: a.toString()));
             }
-            DebugConfig.debugPrint('🔧 INITIAL: Added ${(answers as List).length} quick replies from answers (List)');
+            DebugConfig.debugPrint('🔧 INITIAL: Added ${answers.length} quick replies from answers (List)');
           } 
           else if (answers is String && answers != 'None' && answers.isNotEmpty) {
             final answerList = answers.split(',').map((e) => e.trim()).where((e) => e.isNotEmpty).take(4).toList();
-            answerList.forEach((a) {
+            for (final a in answerList) {
               quickReplies.add(QuickReply(text: a, value: a));
-            });
+            }
             DebugConfig.debugPrint('🔧 INITIAL: Added ${answerList.length} quick replies from answers (String)');
           }
           
@@ -434,10 +435,10 @@ class DashMessagingService {
           final oldAnswers = data['options'] ?? data['choices'] ?? data['replies'];
           if (quickReplies.isEmpty && oldAnswers != null) {
             if (oldAnswers is List) {
-              for (var option in oldAnswers.take(4)) {
-                quickReplies.add(QuickReply(text: option.toString(), value: option.toString()));
-              }
-              DebugConfig.debugPrint('🔧 INITIAL: Added ${(oldAnswers as List).length} quick replies from legacy options/choices/replies');
+                          for (var option in oldAnswers.take(4)) {
+              quickReplies.add(QuickReply(text: option.toString(), value: option.toString()));
+            }
+            DebugConfig.debugPrint('🔧 INITIAL: Added ${oldAnswers.length} quick replies from legacy options/choices/replies');
             }
           }
           
@@ -519,6 +520,7 @@ class DashMessagingService {
   }
   
   // Helper method to determine message type
+  // ignore: unused_element
   MessageType _determineMessageType(Map<String, dynamic> data) {
     final isPoll = data['isPoll'] ?? false;
     final hasQuickReplies = data['questionsAnswers'] != null;
@@ -530,6 +532,7 @@ class DashMessagingService {
   }
   
   // Helper method to extract quick replies from message data
+  // ignore: unused_element
   List<QuickReply>? _extractQuickReplies(Map<String, dynamic> data) {
     try {
       final questionsAnswers = data['questionsAnswers'] as Map<String, dynamic>?;
@@ -752,7 +755,9 @@ class DashMessagingService {
                 
                 // 1. questionsAnswers (Map format)
                 if (questionsAnswers != null && questionsAnswers.isNotEmpty) {
-                  questionsAnswers.forEach((k, v) => quickReplies.add(QuickReply(text: k, value: v.toString())));
+                  for (final entry in questionsAnswers.entries) {
+                    quickReplies.add(QuickReply(text: entry.key, value: entry.value.toString()));
+                  }
                   DebugConfig.debugPrint('🔧 REALTIME: Added ${questionsAnswers.length} quick replies from questionsAnswers');
                 }
                 
@@ -761,13 +766,13 @@ class DashMessagingService {
                   for (var a in answers.take(4)) {
                     quickReplies.add(QuickReply(text: a.toString(), value: a.toString()));
                   }
-                  DebugConfig.debugPrint('🔧 REALTIME: Added ${(answers as List).length} quick replies from answers (List)');
+                  DebugConfig.debugPrint('🔧 REALTIME: Added ${answers.length} quick replies from answers (List)');
                 } 
                 else if (answers is String && answers != 'None' && answers.isNotEmpty) {
                   final answerList = answers.split(',').map((e) => e.trim()).where((e) => e.isNotEmpty).take(4).toList();
-                  answerList.forEach((a) {
+                  for (final a in answerList) {
                     quickReplies.add(QuickReply(text: a, value: a));
-                  });
+                  }
                   DebugConfig.debugPrint('🔧 REALTIME: Added ${answerList.length} quick replies from answers (String)');
                 }
                 
@@ -801,7 +806,7 @@ class DashMessagingService {
                     for (var option in oldAnswers.take(4)) {
                       quickReplies.add(QuickReply(text: option.toString(), value: option.toString()));
                     }
-                    DebugConfig.debugPrint('🔧 REALTIME: Added ${(oldAnswers as List).length} quick replies from legacy options/choices/replies');
+                    DebugConfig.debugPrint('🔧 REALTIME: Added ${oldAnswers.length} quick replies from legacy options/choices/replies');
                   }
                 }
                 
@@ -905,6 +910,7 @@ class DashMessagingService {
   }
   
   // Create quick reply message without directly adding to stream
+  // ignore: unused_element
   ChatMessage? _createQuickReplyMessage(Map<String, dynamic> data, String messageId, DateTime messageTimestamp) {
     try {
       final isPoll = data['isPoll'];
@@ -928,19 +934,21 @@ class DashMessagingService {
       
       // Fast processing - handle both questionsAnswers and answers formats
       if (questionsAnswers != null && questionsAnswers.isNotEmpty) {
-        questionsAnswers.forEach((k, v) => quickReplies.add(QuickReply(text: k, value: v.toString())));
+        for (final entry in questionsAnswers.entries) {
+          quickReplies.add(QuickReply(text: entry.key, value: entry.value.toString()));
+        }
         DebugConfig.debugPrint('🔧 Added ${questionsAnswers.length} quick replies from questionsAnswers');
       } else if (answers != null) {
         if (answers is List) {
           for (var a in answers.take(4)) {
             quickReplies.add(QuickReply(text: a.toString(), value: a.toString()));
           }
-          DebugConfig.debugPrint('🔧 Added ${(answers as List).length} quick replies from answers (List)');
+          DebugConfig.debugPrint('🔧 Added ${answers.length} quick replies from answers (List)');
         } else if (answers is String && answers != 'None' && answers.isNotEmpty) {
           final answerList = answers.split(',').map((e) => e.trim()).where((e) => e.isNotEmpty).take(4).toList();
-          answerList.forEach((a) {
+          for (final a in answerList) {
             quickReplies.add(QuickReply(text: a, value: a));
-          });
+          }
           DebugConfig.debugPrint('🔧 Added ${answerList.length} quick replies from answers (String)');
         }
       }
@@ -1048,7 +1056,6 @@ class DashMessagingService {
       final messageBody = data['messageBody'] as String?;
       final timestamp = data['timestamp'] as int?;
       final isPoll = data['isPoll'] as bool? ?? false;
-      final pollId = data['pollId'] as String?;
       final buttons = data['buttons'] as List<dynamic>?;
       
       // Handle missing required fields
@@ -1101,9 +1108,9 @@ class DashMessagingService {
         final questionsAnswers = data['questionsAnswers'] as Map<String, dynamic>?;
         if (questionsAnswers != null) {
           final quickReplies = <QuickReply>[];
-          questionsAnswers.forEach((key, value) {
-            quickReplies.add(QuickReply(text: value.toString(), value: key));
-          });
+          for (final entry in questionsAnswers.entries) {
+            quickReplies.add(QuickReply(text: entry.value.toString(), value: entry.key));
+          }
           
           if (quickReplies.isNotEmpty) {
             // Add a separate message with quick replies
@@ -1178,9 +1185,9 @@ class DashMessagingService {
         if (isPoll && questionsAnswers != null) {
           // Create quick replies for poll questions
           final List<QuickReply> quickReplies = [];
-          questionsAnswers.forEach((text, value) {
-            quickReplies.add(QuickReply(text: text, value: value));
-          });
+          for (final entry in questionsAnswers.entries) {
+            quickReplies.add(QuickReply(text: entry.key, value: entry.value));
+          }
           
           // Add poll message with quick replies
           final message = ChatMessage(
@@ -1290,9 +1297,9 @@ class DashMessagingService {
         final questionsAnswers = responseData['questionsAnswers'] as Map<String, dynamic>?;
         if (questionsAnswers != null && questionsAnswers.isNotEmpty) {
           final List<QuickReply> quickReplies = [];
-          questionsAnswers.forEach((key, value) {
-            quickReplies.add(QuickReply(text: key, value: value.toString()));
-          });
+          for (final entry in questionsAnswers.entries) {
+            quickReplies.add(QuickReply(text: entry.key, value: entry.value.toString()));
+          }
           
           // Create a new message with quick replies using copyWith
           message = message.copyWith(
@@ -1645,6 +1652,7 @@ class DashMessagingService {
   }
 
   // Background loading of additional messages for better UX
+  // ignore: unused_element
   void _scheduleBackgroundMessageLoad() {
     if (_userId == null) return;
     
@@ -1962,7 +1970,9 @@ class DashMessagingService {
       
       // 1. questionsAnswers (Map format)
       if (questionsAnswers != null && questionsAnswers.isNotEmpty) {
-        questionsAnswers.forEach((k, v) => quickReplies.add(QuickReply(text: k, value: v.toString())));
+        for (final entry in questionsAnswers.entries) {
+          quickReplies.add(QuickReply(text: entry.key, value: entry.value.toString()));
+        }
         DebugConfig.debugPrint('🔧 UNIFIED: Added ${questionsAnswers.length} quick replies from questionsAnswers');
       }
       
@@ -1971,13 +1981,13 @@ class DashMessagingService {
         for (var a in answers.take(4)) {
           quickReplies.add(QuickReply(text: a.toString(), value: a.toString()));
         }
-        DebugConfig.debugPrint('🔧 UNIFIED: Added ${(answers as List).length} quick replies from answers (List)');
+        DebugConfig.debugPrint('🔧 UNIFIED: Added ${answers.length} quick replies from answers (List)');
       } 
       else if (answers is String && answers != 'None' && answers.isNotEmpty) {
         final answerList = answers.split(',').map((e) => e.trim()).where((e) => e.isNotEmpty).take(4).toList();
-        answerList.forEach((a) {
+        for (final a in answerList) {
           quickReplies.add(QuickReply(text: a, value: a));
-        });
+        }
         DebugConfig.debugPrint('🔧 UNIFIED: Added ${answerList.length} quick replies from answers (String)');
       }
       
@@ -2011,7 +2021,7 @@ class DashMessagingService {
           for (var option in oldAnswers.take(4)) {
             quickReplies.add(QuickReply(text: option.toString(), value: option.toString()));
           }
-          DebugConfig.debugPrint('🔧 UNIFIED: Added ${(oldAnswers as List).length} quick replies from legacy options/choices/replies');
+          DebugConfig.debugPrint('🔧 UNIFIED: Added ${oldAnswers.length} quick replies from legacy options/choices/replies');
         }
       }
       

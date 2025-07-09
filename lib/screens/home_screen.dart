@@ -596,7 +596,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                           message.suggestedReplies != null && 
                           message.suggestedReplies!.isNotEmpty;
                       
-                      DebugConfig.debugPrint('🔍 HomeScreen: Message ${index}: type=${message.type}, hasReplies=${message.suggestedReplies?.isNotEmpty}, shouldShow=$shouldShowQuickReplies');
+                      DebugConfig.debugPrint('🔍 HomeScreen: Message $index: type=${message.type}, hasReplies=${message.suggestedReplies?.isNotEmpty}, shouldShow=$shouldShowQuickReplies');
                       
                       if (shouldShowQuickReplies) {
                         // For poll messages with quick replies, show both content and buttons

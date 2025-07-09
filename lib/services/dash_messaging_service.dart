@@ -34,7 +34,10 @@ class DashMessagingService {
       await firestore.enableNetwork();
       
       // Warm up the connection
-      firestore.collection('messages').doc('_warmup').get().catchError((_) => null);
+      firestore.collection('messages').doc('_warmup').get().catchError((_) {
+        // Return a valid DocumentSnapshot or rethrow the error
+        return firestore.collection('messages').doc('_warmup').get();
+      });
       
       DebugConfig.debugPrint('⚡ Firestore optimized for instant performance');
     } catch (e) {
@@ -687,7 +690,7 @@ class DashMessagingService {
                 (change.type == DocumentChangeType.modified && !change.doc.metadata.hasPendingWrites)) {
               
               final doc = change.doc;
-              final data = doc.data() as Map<String, dynamic>?;
+              final data = doc.data();
               if (data == null) continue;
               
               final messageId = data['serverMessageId'] ?? doc.id;

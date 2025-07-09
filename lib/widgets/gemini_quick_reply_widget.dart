@@ -291,6 +291,7 @@ class _AnimatedQuickReply extends StatefulWidget {
   final bool animated;
 
   const _AnimatedQuickReply({
+    // ignore: unused_element_parameter
     super.key,
     required this.child,
     required this.index,

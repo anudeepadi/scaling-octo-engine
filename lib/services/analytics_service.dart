@@ -6,7 +6,6 @@ class AnalyticsService {
   final FirebaseAnalytics _analytics;
   final FirebaseFirestore _firestore;
   static const String _eventsCollection = 'analytics_events';
-  static const String _errorsCollection = 'error_logs';
 
   AnalyticsService({
     FirebaseAnalytics? analytics,

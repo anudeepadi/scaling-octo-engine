@@ -57,7 +57,7 @@ class FirebaseConnectionService {
   Future<bool> _testFirestore() async {
     try {
       // Try to access a simple collection
-      final testQuery = await _firestore.collection('_connection_test').limit(1).get();
+      await _firestore.collection('_connection_test').limit(1).get();
       return true;
     } catch (e) {
       DebugConfig.debugPrint('Firestore test error: $e');

@@ -137,15 +137,6 @@ class AndroidMessagingDebug {
     DebugConfig.debugPrint('🔍 Test 4: Stream Controller Test');
     
     try {
-      // Test if we can add a message to the stream
-      final testMessage = ChatMessage(
-        id: 'debug_test_${DateTime.now().millisecondsSinceEpoch}',
-        content: 'Android Debug Test Message',
-        timestamp: DateTime.now(),
-        isMe: false,
-        type: MessageType.text,
-      );
-      
       // Use the service's test method
       _dashService.testStreamController();
       

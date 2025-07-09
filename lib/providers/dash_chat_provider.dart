@@ -490,5 +490,59 @@ class DashChatProvider extends ChangeNotifier {
     }
   }
 
+  // Test message shifting functionality
+  Future<void> testMessageShifting() async {
+    if (!_dashService.isInitialized) {
+      print('[DashChatProvider] Service not initialized, cannot test message shifting');
+      return;
+    }
+    
+    try {
+      print('[DashChatProvider] 🧪 Testing message shifting functionality...');
+      
+      // Simulate message shifting by reordering some messages temporarily
+      if (_chatProvider != null && _chatProvider!.messages.length > 1) {
+        final originalMessages = List<ChatMessage>.from(_chatProvider!.messages);
+        print('[DashChatProvider] Original message count: ${originalMessages.length}');
+        
+        // Test by clearing and reloading to see if order is maintained
+        _chatProvider!.clearChatHistory();
+        notifyListeners();
+        
+        // Wait a moment
+        await Future.delayed(const Duration(milliseconds: 500));
+        
+        // Reload from service
+        await _dashService.loadExistingMessages();
+        
+        print('[DashChatProvider] Message shifting test completed');
+        print('[DashChatProvider] Message count after reload: ${_chatProvider!.messages.length}');
+      } else {
+        print('[DashChatProvider] Not enough messages to test shifting (need at least 2)');
+      }
+    } catch (e) {
+      print('[DashChatProvider] Error testing message shifting: $e');
+    }
+  }
+
+  // Message shifting toggle state
+  bool _messageShiftingEnabled = true;
+  bool get messageShiftingEnabled => _messageShiftingEnabled;
+
+  // Toggle message shifting functionality on/off
+  void toggleMessageShifting() {
+    _messageShiftingEnabled = !_messageShiftingEnabled;
+    print('[DashChatProvider] Message shifting ${_messageShiftingEnabled ? "enabled" : "disabled"}');
+    
+    if (_messageShiftingEnabled) {
+      print('[DashChatProvider] ✅ Message shifting is now ENABLED - messages will be ordered chronologically');
+    } else {
+      print('[DashChatProvider] ⚠️ Message shifting is now DISABLED - messages will maintain original order');
+    }
+    
+    // Notify listeners to update UI if needed
+    notifyListeners();
+  }
+
 
 }

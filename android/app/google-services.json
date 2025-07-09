@@ -8,9 +8,53 @@
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:560333483278:android:ba5521aba8dd18d0b8fb5f",
+        "mobilesdk_app_id": "1:560333483278:android:477162cb0e780131b8fb5f",
         "android_client_info": {
           "package_name": "com.utsascns.quitTxTapp"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "560333483278-3eoj1soqumseb14gruh670q37grns7en.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.utsascns.quitTxTapp",
+            "certificate_hash": "4856f5a6b8ef496d8fc2d0e9458bcde4ef030a97"
+          }
+        },
+        {
+          "client_id": "560333483278-shfouvf0c8gc6pqlq9ovtk2586aa16te.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDFelQtntQg2O7T9humJXbepnqu-jCpprY"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "560333483278-shfouvf0c8gc6pqlq9ovtk2586aa16te.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "560333483278-1dihc2h1inbto21q0uddqttt3600fsrm.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "edu.utsa.quitxtmobile"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:560333483278:android:ba5521aba8dd18d0b8fb5f",
+        "android_client_info": {
+          "package_name": "edu.utsa.quitxtmobile"
         }
       },
       "oauth_client": [
@@ -18,7 +62,7 @@
           "client_id": "560333483278-ofcn6hvm6nieh9vljgt6hqmbiq1ert0f.apps.googleusercontent.com",
           "client_type": 1,
           "android_info": {
-            "package_name": "com.utsascns.quitTxTapp",
+            "package_name": "edu.utsa.quitxtmobile",
             "certificate_hash": "eb98f13a9b92eb52d6f783ee14c857b0c0fa9a8e"
           }
         },
@@ -43,7 +87,43 @@
               "client_id": "560333483278-1dihc2h1inbto21q0uddqttt3600fsrm.apps.googleusercontent.com",
               "client_type": 2,
               "ios_info": {
-                "bundle_id": "com.utsascns.quitTxTapp"
+                "bundle_id": "edu.utsa.quitxtmobile"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:560333483278:android:fd6b1e59c6e538efb8fb5f",
+        "android_client_info": {
+          "package_name": "edu.utsa.rcsapp"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "560333483278-shfouvf0c8gc6pqlq9ovtk2586aa16te.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDFelQtntQg2O7T9humJXbepnqu-jCpprY"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "560333483278-shfouvf0c8gc6pqlq9ovtk2586aa16te.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "560333483278-1dihc2h1inbto21q0uddqttt3600fsrm.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "edu.utsa.quitxtmobile"
               }
             }
           ]

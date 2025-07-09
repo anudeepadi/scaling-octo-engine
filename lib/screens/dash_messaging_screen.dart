@@ -1,14 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../models/chat_message.dart';
-import '../models/quick_reply.dart';
+
 import '../providers/dash_chat_provider.dart';
 import '../providers/chat_provider.dart';
 import '../widgets/chat_message_widget.dart';
 import '../widgets/quick_reply_widget.dart';
+import '../utils/debug_config.dart';
 
 class DashMessagingScreen extends StatefulWidget {
-  const DashMessagingScreen({Key? key}) : super(key: key);
+  const DashMessagingScreen({super.key});
 
   @override
   _DashMessagingScreenState createState() => _DashMessagingScreenState();
@@ -28,7 +29,7 @@ class _DashMessagingScreenState extends State<DashMessagingScreen> {
         final chatProvider = context.read<ChatProvider>();
         final dashProvider = context.read<DashChatProvider>();
         dashProvider.setChatProvider(chatProvider);
-        print('DashMessagingScreen: Linked DashChatProvider and ChatProvider.');
+        DebugConfig.debugPrint('DashMessagingScreen: Linked DashChatProvider and ChatProvider.');
       }
     });
   }
@@ -46,7 +47,7 @@ class _DashMessagingScreenState extends State<DashMessagingScreen> {
       
       _scrollToBottom();
     } catch (e) {
-      print("Error sending message: $e");
+      DebugConfig.debugPrint("Error sending message: $e");
     }
   }
 
@@ -70,7 +71,7 @@ class _DashMessagingScreenState extends State<DashMessagingScreen> {
 
   void _processCustomJson() {
     // Skip loading demo JSON messages to keep chat completely clean
-    print('Demo JSON message loading disabled - no hardcoded messages will be loaded');
+    DebugConfig.debugPrint('Demo JSON message loading disabled - no hardcoded messages will be loaded');
     return;
   }
 
@@ -331,7 +332,7 @@ class _DashMessagingScreenState extends State<DashMessagingScreen> {
                 }
 
                 // Calculate the most recent quick reply index once for efficiency
-                print('🔍 Analyzing ${dashChatProvider.messages.length} messages for quick replies');
+                DebugConfig.debugPrint('🔍 Analyzing ${dashChatProvider.messages.length} messages for quick replies');
                 final mostRecentQuickReplyIndex = _findMostRecentQuickReplyIndex(dashChatProvider.messages);
                 
                 return ListView.builder(
@@ -533,11 +534,11 @@ class _DashMessagingScreenState extends State<DashMessagingScreen> {
       if (message.type == MessageType.quickReply && 
           message.suggestedReplies != null && 
           message.suggestedReplies!.isNotEmpty) {
-        print('🎯 Most recent quick reply at index $i: "${message.content.isEmpty ? "[Quick Reply]" : message.content.substring(0, message.content.length > 30 ? 30 : message.content.length)}"');
+        DebugConfig.debugPrint('🎯 Most recent quick reply at index $i: "${message.content.isEmpty ? "[Quick Reply]" : message.content.substring(0, message.content.length > 30 ? 30 : message.content.length)}"');
         return i;
       }
     }
-    print('🎯 No quick reply messages found in ${messages.length} messages');
+    DebugConfig.debugPrint('🎯 No quick reply messages found in ${messages.length} messages');
     return null; // No quick reply messages found
   }
 

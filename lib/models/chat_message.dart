@@ -1,5 +1,6 @@
 import 'quick_reply.dart';
 import 'link_preview.dart';
+import '../utils/debug_config.dart';
 
 enum MessageType {
   text,
@@ -112,7 +113,7 @@ class ChatMessage {
         timestamp = DateTime.now();
       }
     } catch (e) {
-      print('Error parsing timestamp: $e');
+      DebugConfig.debugPrint('Error parsing timestamp: $e');
       timestamp = DateTime.now();
     }
     

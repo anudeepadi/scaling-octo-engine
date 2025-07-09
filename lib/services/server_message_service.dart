@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:uuid/uuid.dart';
+import '../utils/debug_config.dart';
 
 class ServerMessageService {
   final FirebaseFirestore _firestore;
@@ -37,7 +38,7 @@ class ServerMessageService {
       // Then send to server for processing
       await _sendToJavaServer(messageText, messageId, eventTypeCode);
     } catch (e) {
-      print('Error processing message: $e');
+      DebugConfig.debugPrint('Error processing message: $e');
       // If server fails, fall back to local mock response
       await _generateLocalResponse(messageText, eventTypeCode);
       rethrow;
@@ -59,7 +60,7 @@ class ServerMessageService {
         'fcmToken': _fcmToken,
       };
       
-      print('Sending message to server: $payload');
+      DebugConfig.debugPrint('Sending message to server: $payload');
       
       final response = await http.post(
         Uri.parse(endpoint),
@@ -68,7 +69,7 @@ class ServerMessageService {
       ).timeout(const Duration(seconds: 10));
       
       if (response.statusCode == 200 || response.statusCode == 202) {
-        print('Message sent successfully to Java server');
+        DebugConfig.debugPrint('Message sent successfully to Java server');
         
         // If response has content, process it
         if (response.body.isNotEmpty) {
@@ -92,19 +93,19 @@ class ServerMessageService {
               await _firestore.collection('messages').doc(_userId).collection('chat')
                   .doc(serverMessageId).set(serverMessagePayload);
                   
-              print('Server response stored with ID: $serverMessageId');
+              DebugConfig.debugPrint('Server response stored with ID: $serverMessageId');
             }
           } catch (e) {
-            print('Error processing server response: $e');
+            DebugConfig.debugPrint('Error processing server response: $e');
           }
         }
       } else {
-        print('Failed to send message to server. Status: ${response.statusCode}, Body: ${response.body}');
+        DebugConfig.debugPrint('Failed to send message to server. Status: ${response.statusCode}, Body: ${response.body}');
         // Fall back to local mock response
         await _generateLocalResponse(messageText, eventTypeCode);
       }
     } catch (e) {
-      print('Error sending message to Java server: $e');
+      DebugConfig.debugPrint('Error sending message to Java server: $e');
       // Fall back to local mock response
       await _generateLocalResponse(messageText, eventTypeCode);
     }
@@ -112,8 +113,8 @@ class ServerMessageService {
 
   // Generate and store local response when server unavailable
   Future<void> _generateLocalResponse(String messageText, int eventTypeCode) async {
-    print('Local fallback responses disabled - no local responses will be generated');
-    print('Message received but not processed: $messageText');
+    DebugConfig.debugPrint('Local fallback responses disabled - no local responses will be generated');
+    DebugConfig.debugPrint('Message received but not processed: $messageText');
     return;
   }
 

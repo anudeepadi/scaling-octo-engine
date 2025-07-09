@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/chat_message.dart';
 import 'dash_messaging_service.dart';
+import '../utils/debug_config.dart';
 
 class AndroidMessagingDebug {
   static final AndroidMessagingDebug _instance = AndroidMessagingDebug._internal();
@@ -20,12 +21,12 @@ class AndroidMessagingDebug {
   
   void startDebugging(String userId) {
     if (!Platform.isAndroid) {
-      print('AndroidMessagingDebug: Not running on Android, skipping debug');
+      DebugConfig.debugPrint('AndroidMessagingDebug: Not running on Android, skipping debug');
       return;
     }
     
     if (_isDebugging) {
-      print('AndroidMessagingDebug: Already debugging, stopping previous session');
+      DebugConfig.debugPrint('AndroidMessagingDebug: Already debugging, stopping previous session');
       stopDebugging();
     }
     
@@ -33,8 +34,8 @@ class AndroidMessagingDebug {
     _messagesReceived = 0;
     _messagesProcessed = 0;
     
-    print('🔍 AndroidMessagingDebug: Starting debug session for user: $userId');
-    print('🔍 Platform: ${Platform.operatingSystem} ${Platform.operatingSystemVersion}');
+    DebugConfig.debugPrint('🔍 AndroidMessagingDebug: Starting debug session for user: $userId');
+    DebugConfig.debugPrint('🔍 Platform: ${Platform.operatingSystem} ${Platform.operatingSystemVersion}');
     
     // Test 1: Check if DashMessagingService is initialized
     _testServiceInitialization(userId);
@@ -50,8 +51,8 @@ class AndroidMessagingDebug {
   }
   
   void stopDebugging() {
-    print('🔍 AndroidMessagingDebug: Stopping debug session');
-    print('🔍 Final stats - Received: $_messagesReceived, Processed: $_messagesProcessed');
+    DebugConfig.debugPrint('🔍 AndroidMessagingDebug: Stopping debug session');
+    DebugConfig.debugPrint('🔍 Final stats - Received: $_messagesReceived, Processed: $_messagesProcessed');
     
     _debugSubscription?.cancel();
     _debugSubscription = null;
@@ -59,24 +60,24 @@ class AndroidMessagingDebug {
   }
   
   void _testServiceInitialization(String userId) {
-    print('🔍 Test 1: Service Initialization');
-    print('  - Service initialized: ${_dashService.isInitialized}');
-    print('  - Host URL: ${_dashService.hostUrl}');
+    DebugConfig.debugPrint('🔍 Test 1: Service Initialization');
+    DebugConfig.debugPrint('  - Service initialized: ${_dashService.isInitialized}');
+    DebugConfig.debugPrint('  - Host URL: ${_dashService.hostUrl}');
     
     if (!_dashService.isInitialized) {
-      print('  ⚠️ Service not initialized, attempting to initialize...');
+      DebugConfig.debugPrint('  ⚠️ Service not initialized, attempting to initialize...');
       _dashService.initialize(userId).then((_) {
-        print('  ✅ Service initialization completed');
+        DebugConfig.debugPrint('  ✅ Service initialization completed');
       }).catchError((e) {
-        print('  ❌ Service initialization failed: $e');
+        DebugConfig.debugPrint('  ❌ Service initialization failed: $e');
       });
     } else {
-      print('  ✅ Service already initialized');
+      DebugConfig.debugPrint('  ✅ Service already initialized');
     }
   }
   
   void _testFirestoreConnection(String userId) {
-    print('🔍 Test 2: Firestore Connection');
+    DebugConfig.debugPrint('🔍 Test 2: Firestore Connection');
     
     try {
       final chatRef = FirebaseFirestore.instance
@@ -86,55 +87,55 @@ class AndroidMessagingDebug {
           .limit(1);
       
       chatRef.get().then((snapshot) {
-        print('  ✅ Firestore connection successful');
-        print('  - Collection path: messages/$userId/chat');
-        print('  - Documents found: ${snapshot.docs.length}');
+        DebugConfig.debugPrint('  ✅ Firestore connection successful');
+        DebugConfig.debugPrint('  - Collection path: messages/$userId/chat');
+        DebugConfig.debugPrint('  - Documents found: ${snapshot.docs.length}');
         
         if (snapshot.docs.isNotEmpty) {
           final doc = snapshot.docs.first;
-          print('  - Sample document ID: ${doc.id}');
-          print('  - Sample document data keys: ${doc.data().keys.toList()}');
+          DebugConfig.debugPrint('  - Sample document ID: ${doc.id}');
+          DebugConfig.debugPrint('  - Sample document data keys: ${doc.data().keys.toList()}');
         }
       }).catchError((e) {
-        print('  ❌ Firestore connection failed: $e');
+        DebugConfig.debugPrint('  ❌ Firestore connection failed: $e');
       });
     } catch (e) {
-      print('  ❌ Firestore test setup failed: $e');
+      DebugConfig.debugPrint('  ❌ Firestore test setup failed: $e');
     }
   }
   
   void _monitorMessageStream() {
-    print('🔍 Test 3: Message Stream Monitoring');
+    DebugConfig.debugPrint('🔍 Test 3: Message Stream Monitoring');
     
     try {
       _debugSubscription = _dashService.messageStream.listen(
         (message) {
           _messagesReceived++;
-          print('  📨 Message received (#$_messagesReceived):');
-          print('    - ID: ${message.id}');
-          print('    - Content: ${message.content.length > 50 ? message.content.substring(0, 50) + "..." : message.content}');
-          print('    - Is Me: ${message.isMe}');
-          print('    - Type: ${message.type}');
-          print('    - Timestamp: ${message.timestamp}');
+          DebugConfig.debugPrint('  📨 Message received (#$_messagesReceived):');
+          DebugConfig.debugPrint('    - ID: ${message.id}');
+          DebugConfig.debugPrint('    - Content: ${message.content.length > 50 ? message.content.substring(0, 50) + "..." : message.content}');
+          DebugConfig.debugPrint('    - Is Me: ${message.isMe}');
+          DebugConfig.debugPrint('    - Type: ${message.type}');
+          DebugConfig.debugPrint('    - Timestamp: ${message.timestamp}');
           
           _messagesProcessed++;
         },
         onError: (error) {
-          print('  ❌ Message stream error: $error');
+          DebugConfig.debugPrint('  ❌ Message stream error: $error');
         },
         onDone: () {
-          print('  ⚠️ Message stream closed');
+          DebugConfig.debugPrint('  ⚠️ Message stream closed');
         },
       );
       
-      print('  ✅ Message stream listener attached');
+      DebugConfig.debugPrint('  ✅ Message stream listener attached');
     } catch (e) {
-      print('  ❌ Failed to attach message stream listener: $e');
+      DebugConfig.debugPrint('  ❌ Failed to attach message stream listener: $e');
     }
   }
   
   void _testStreamController() {
-    print('🔍 Test 4: Stream Controller Test');
+    DebugConfig.debugPrint('🔍 Test 4: Stream Controller Test');
     
     try {
       // Test if we can add a message to the stream
@@ -149,15 +150,15 @@ class AndroidMessagingDebug {
       // Use the service's test method
       _dashService.testStreamController();
       
-      print('  ✅ Stream controller test completed');
+      DebugConfig.debugPrint('  ✅ Stream controller test completed');
     } catch (e) {
-      print('  ❌ Stream controller test failed: $e');
+      DebugConfig.debugPrint('  ❌ Stream controller test failed: $e');
     }
   }
   
   // Force a message sync to test if messages are in Firestore but not loading
   void forceMessageSync(String userId) {
-    print('🔍 Force Message Sync Test');
+    DebugConfig.debugPrint('🔍 Force Message Sync Test');
     
     try {
       FirebaseFirestore.instance
@@ -168,34 +169,34 @@ class AndroidMessagingDebug {
           .limit(10)
           .get()
           .then((snapshot) {
-        print('  📊 Firestore Query Results:');
-        print('    - Total documents: ${snapshot.docs.length}');
+        DebugConfig.debugPrint('  📊 Firestore Query Results:');
+        DebugConfig.debugPrint('    - Total documents: ${snapshot.docs.length}');
         
         for (int i = 0; i < snapshot.docs.length; i++) {
           final doc = snapshot.docs[i];
           final data = doc.data();
-          print('    - Doc ${i + 1}:');
-          print('      ID: ${doc.id}');
-          print('      ServerMessageId: ${data['serverMessageId'] ?? 'N/A'}');
-          print('      MessageBody: ${(data['messageBody'] ?? '').toString().length > 30 ? (data['messageBody'] ?? '').toString().substring(0, 30) + "..." : data['messageBody'] ?? 'N/A'}');
-          print('      Source: ${data['source'] ?? 'N/A'}');
-          print('      CreatedAt: ${data['createdAt'] ?? 'N/A'}');
+          DebugConfig.debugPrint('    - Doc ${i + 1}:');
+          DebugConfig.debugPrint('      ID: ${doc.id}');
+          DebugConfig.debugPrint('      ServerMessageId: ${data['serverMessageId'] ?? 'N/A'}');
+          DebugConfig.debugPrint('      MessageBody: ${(data['messageBody'] ?? '').toString().length > 30 ? (data['messageBody'] ?? '').toString().substring(0, 30) + "..." : data['messageBody'] ?? 'N/A'}');
+          DebugConfig.debugPrint('      Source: ${data['source'] ?? 'N/A'}');
+          DebugConfig.debugPrint('      CreatedAt: ${data['createdAt'] ?? 'N/A'}');
         }
         
         if (snapshot.docs.isEmpty) {
-          print('    ⚠️ No messages found in Firestore for user: $userId');
+          DebugConfig.debugPrint('    ⚠️ No messages found in Firestore for user: $userId');
         }
       }).catchError((e) {
-        print('    ❌ Firestore query failed: $e');
+        DebugConfig.debugPrint('    ❌ Firestore query failed: $e');
       });
     } catch (e) {
-      print('  ❌ Force sync setup failed: $e');
+      DebugConfig.debugPrint('  ❌ Force sync setup failed: $e');
     }
   }
   
   // Test if the issue is with the message processing logic
   void testMessageProcessing(String userId) {
-    print('🔍 Message Processing Test');
+    DebugConfig.debugPrint('🔍 Message Processing Test');
     
     // Create a mock Firestore document data
     final mockData = {
@@ -216,17 +217,17 @@ class AndroidMessagingDebug {
         type: MessageType.text,
       );
       
-      print('  ✅ Mock message created successfully:');
-      print('    - ID: ${message.id}');
-      print('    - Content: ${message.content}');
-      print('    - Is Me: ${message.isMe}');
+      DebugConfig.debugPrint('  ✅ Mock message created successfully:');
+      DebugConfig.debugPrint('    - ID: ${message.id}');
+      DebugConfig.debugPrint('    - Content: ${message.content}');
+      DebugConfig.debugPrint('    - Is Me: ${message.isMe}');
       
       // Test adding to stream (this should trigger the message listener)
-      print('  🔄 Testing message addition to stream...');
+      DebugConfig.debugPrint('  🔄 Testing message addition to stream...');
       // Note: We can't directly access _safeAddToStream, but we can test the public interface
       
     } catch (e) {
-      print('  ❌ Message processing test failed: $e');
+      DebugConfig.debugPrint('  ❌ Message processing test failed: $e');
     }
   }
   

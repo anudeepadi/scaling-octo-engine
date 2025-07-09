@@ -1,18 +1,11 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
 import '../models/chat_message.dart';
 import '../models/quick_reply.dart';
 import '../services/dash_messaging_service.dart';
-import '../utils/app_localizations.dart';
-import '../utils/context_holder.dart';
 import '../utils/debug_config.dart';
 import 'chat_provider.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:flutter/foundation.dart';
-import 'package:uuid/uuid.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_messaging/firebase_messaging.dart';
 
 class DashChatProvider extends ChangeNotifier {
   final DashMessagingService _dashService = DashMessagingService();
@@ -24,7 +17,7 @@ class DashChatProvider extends ChangeNotifier {
   User? _currentUser;
   String? _fcmToken;
   
-  bool _isTyping = false;
+  final bool _isTyping = false;
   bool get isTyping => _isTyping;
   bool get isServerServiceInitialized => _dashService.isInitialized;
   
@@ -80,12 +73,12 @@ class DashChatProvider extends ChangeNotifier {
     // Cancel any previous message subscription
     _messageSubscription?.cancel();
 
-    print('DashChatProvider: Setting up message listener (keeping existing messages).');
+    DebugConfig.debugPrint('DashChatProvider: Setting up message listener (keeping existing messages).');
 
     // Subscribe to the DashMessagingService message stream
     _messageSubscription = _dashService.messageStream.listen((message) {
       if (_chatProvider == null) {
-        print('DashChatProvider: ChatProvider is null, cannot add message.');
+        DebugConfig.debugPrint('DashChatProvider: ChatProvider is null, cannot add message.');
         return;
       }
       
@@ -113,41 +106,41 @@ class DashChatProvider extends ChangeNotifier {
       notifyListeners();
       
     }, onError: (error) {
-      print('DashChatProvider: Error listening to messages: $error');
+      DebugConfig.debugPrint('DashChatProvider: Error listening to messages: $error');
     });
     
-    print('DashChatProvider: Message listener set up successfully');
+    DebugConfig.debugPrint('DashChatProvider: Message listener set up successfully');
   }
 
   // Initialize the server message service
   Future<void> initializeServerService(String userId, String fcmToken) async {
-    print('[DashChatProvider] Initializing DashMessagingService for user $userId');
+    DebugConfig.debugPrint('[DashChatProvider] Initializing DashMessagingService for user $userId');
     try {
       await _dashService.initialize(userId);
-      print('[DashChatProvider] DashMessagingService initialized successfully');
+      DebugConfig.debugPrint('[DashChatProvider] DashMessagingService initialized successfully');
       
       // Setup message listener after successful initialization
       if (_chatProvider != null) {
         _setupMessageListener();
-        print('[DashChatProvider] Message listener set up');
+        DebugConfig.debugPrint('[DashChatProvider] Message listener set up');
         
         // Force reload all messages to ensure they use the new unified format
         Future.delayed(const Duration(milliseconds: 500), () {
           forceMessageReload();
         });
       } else {
-        print('[DashChatProvider] Warning: ChatProvider is null, cannot set up message listener');
+        DebugConfig.debugPrint('[DashChatProvider] Warning: ChatProvider is null, cannot set up message listener');
       }
       notifyListeners();
     } catch (error) {
-      print('[DashChatProvider] Error initializing DashMessagingService: $error');
+      DebugConfig.debugPrint('[DashChatProvider] Error initializing DashMessagingService: $error');
       rethrow; // Re-throw to let the caller handle the error
     }
   }
 
   // Clear state on logout
   void clearOnLogout() {
-    print('[DashChatProvider] Clearing state on logout.');
+    DebugConfig.debugPrint('[DashChatProvider] Clearing state on logout.');
     
     // Cancel subscriptions
     _messageSubscription?.cancel();
@@ -180,7 +173,7 @@ class DashChatProvider extends ChangeNotifier {
   // Send a message 
   Future<void> sendMessage(String message) async {
     if (message.trim().isEmpty || _currentUser == null) {
-      print('Message empty or user not logged in. Cannot send.');
+      DebugConfig.debugPrint('Message empty or user not logged in. Cannot send.');
       return;
     }
     
@@ -189,7 +182,7 @@ class DashChatProvider extends ChangeNotifier {
     
     // Prevent duplicate sends (debounce)
     if (_isSendingMessage) {
-      print('Already sending a message. Ignoring duplicate request.');
+      DebugConfig.debugPrint('Already sending a message. Ignoring duplicate request.');
       return;
     }
     
@@ -197,7 +190,7 @@ class DashChatProvider extends ChangeNotifier {
     if (_lastMessageSent == messageContent && _lastSendTime != null) {
       final timeSinceLastSend = DateTime.now().difference(_lastSendTime!);
       if (timeSinceLastSend.inSeconds < 2) {
-        print('Duplicate message detected within 2 seconds. Ignoring: $messageContent');
+        DebugConfig.debugPrint('Duplicate message detected within 2 seconds. Ignoring: $messageContent');
         return;
       }
     }
@@ -210,7 +203,7 @@ class DashChatProvider extends ChangeNotifier {
     try {
       // If the messaging service is not initialized, initialize it now
       if (!_dashService.isInitialized && _currentUser != null) {
-        print('DashMessagingService not initialized. Initializing now.');
+        DebugConfig.debugPrint('DashMessagingService not initialized. Initializing now.');
         await _dashService.initialize(_currentUser!.uid);
       }
       
@@ -218,15 +211,15 @@ class DashChatProvider extends ChangeNotifier {
       try {
         final success = await _dashService.sendMessage(messageContent);
         if (success) {
-          print('Message sent successfully to server');
+          DebugConfig.debugPrint('Message sent successfully to server');
         } else {
-          print('Failed to send message to server - check server logs');
+          DebugConfig.debugPrint('Failed to send message to server - check server logs');
         }
       } catch (e) {
-        print('Error sending message to server: $e');
+        DebugConfig.debugPrint('Error sending message to server: $e');
       }
     } catch (e) {
-      print('Error in DashChatProvider.sendMessage: $e');
+      DebugConfig.debugPrint('Error in DashChatProvider.sendMessage: $e');
     } finally {
       // Reset debounce flags
       _isSendingMessage = false;
@@ -235,16 +228,16 @@ class DashChatProvider extends ChangeNotifier {
   
   // Handle quick reply selection
   Future<void> handleQuickReply(QuickReply reply) async {
-    print("[HandleQuickReply] Selected reply: text='${reply.text}', value='${reply.value}'");
+    DebugConfig.debugPrint("[HandleQuickReply] Selected reply: text='${reply.text}', value='${reply.value}'");
     
     if (reply.value.isEmpty || _currentUser == null) {
-      print('[HandleQuickReply] Reply value empty or user not logged in. Cannot send.');
+      DebugConfig.debugPrint('[HandleQuickReply] Reply value empty or user not logged in. Cannot send.');
       return;
     }
     
     // Prevent duplicate sends
     if (_isSendingMessage) {
-      print('Already sending a message. Ignoring duplicate quick reply.');
+      DebugConfig.debugPrint('Already sending a message. Ignoring duplicate quick reply.');
       return;
     }
     
@@ -256,7 +249,7 @@ class DashChatProvider extends ChangeNotifier {
       
       // If in demo mode or testing, simulate response
       if (!_dashService.isInitialized) {
-        print('DashMessagingService not initialized. Using simulation mode.');
+        DebugConfig.debugPrint('DashMessagingService not initialized. Using simulation mode.');
         // Add user message only in demo mode when service isn't handling it
         if (_chatProvider != null) {
           _chatProvider!.addTextMessage(reply.text, isMe: true);
@@ -271,14 +264,14 @@ class DashChatProvider extends ChangeNotifier {
       // with proper timestamps and chronological ordering
       final success = await _dashService.sendQuickReply(reply.value, reply.text);
       if (success) {
-        print('Quick reply sent successfully to server');
+        DebugConfig.debugPrint('Quick reply sent successfully to server');
       } else {
-        print('Failed to send quick reply to server');
+        DebugConfig.debugPrint('Failed to send quick reply to server');
         // If server send failed, simulate response in demo mode
         await _dashService.simulateServerResponse(reply.text);
       }
     } catch (e) {
-      print('Error sending quick reply: $e');
+      DebugConfig.debugPrint('Error sending quick reply: $e');
       // On error, use simulation as fallback
       await _dashService.simulateServerResponse(reply.text);
     } finally {
@@ -290,9 +283,9 @@ class DashChatProvider extends ChangeNotifier {
   Future<void> updateHostUrl(String newUrl) async {
     try {
       await _dashService.updateHostUrl(newUrl);
-      print('Host URL updated successfully');
+      DebugConfig.debugPrint('Host URL updated successfully');
     } catch (e) {
-      print('Error updating host URL: $e');
+      DebugConfig.debugPrint('Error updating host URL: $e');
       throw Exception('Failed to update host URL: $e');
     }
   }
@@ -305,23 +298,23 @@ class DashChatProvider extends ChangeNotifier {
   // Process custom JSON input
   Future<void> processCustomJsonInput(String jsonInput) async {
     if (jsonInput.trim().isEmpty || _currentUser == null) {
-      print('JSON input empty or user not logged in. Cannot process.');
+      DebugConfig.debugPrint('JSON input empty or user not logged in. Cannot process.');
       return;
     }
     
     _isSendingMessage = true;
     
     try {
-      print('[DashChatProvider] Processing custom JSON input');
+      DebugConfig.debugPrint('[DashChatProvider] Processing custom JSON input');
       
       // Call the service method to process the custom JSON
       if (_dashService.isInitialized) {
         await _dashService.processCustomJsonInput(jsonInput);
       } else {
-        print('DashMessagingService not initialized. Cannot process custom JSON.');
+        DebugConfig.debugPrint('DashMessagingService not initialized. Cannot process custom JSON.');
       }
     } catch (e) {
-      print('Error processing custom JSON input: $e');
+      DebugConfig.debugPrint('Error processing custom JSON input: $e');
     } finally {
       _isSendingMessage = false;
     }
@@ -343,7 +336,7 @@ class DashChatProvider extends ChangeNotifier {
 
   @override
   void dispose() {
-    print('DashChatProvider: Disposing...');
+    DebugConfig.debugPrint('DashChatProvider: Disposing...');
     _authSubscription?.cancel();
     _messageSubscription?.cancel();
     _dashService.dispose();
@@ -352,10 +345,10 @@ class DashChatProvider extends ChangeNotifier {
   
   // Force a manual sync of messages from Firestore
   void forceMessageSync() {
-    print('[DashChatProvider] Manually forcing message sync');
+    DebugConfig.debugPrint('[DashChatProvider] Manually forcing message sync');
     
     if (!_dashService.isInitialized) {
-      print('[DashChatProvider] Cannot force sync - DashMessagingService not initialized');
+      DebugConfig.debugPrint('[DashChatProvider] Cannot force sync - DashMessagingService not initialized');
       return;
     }
     
@@ -365,10 +358,10 @@ class DashChatProvider extends ChangeNotifier {
   
   // Force reload messages from Firestore
   Future<void> forceMessageReload() async {
-    print('[DashChatProvider] Forcing message reload with cache clear');
+    DebugConfig.debugPrint('[DashChatProvider] Forcing message reload with cache clear');
     
     if (!_dashService.isInitialized) {
-      print('[DashChatProvider] Cannot force reload - DashMessagingService not initialized');
+      DebugConfig.debugPrint('[DashChatProvider] Cannot force reload - DashMessagingService not initialized');
       return;
     }
     
@@ -381,23 +374,23 @@ class DashChatProvider extends ChangeNotifier {
     try {
       // Use the new unified force reload method
       await _dashService.forceReloadMessages();
-      print('[DashChatProvider] ✅ Force reload completed successfully');
+      DebugConfig.debugPrint('[DashChatProvider] ✅ Force reload completed successfully');
     } catch (e) {
-      print('[DashChatProvider] Error during force reload: $e');
+      DebugConfig.debugPrint('[DashChatProvider] Error during force reload: $e');
     }
   }
 
   // Get conversation history from Firebase (for debugging/verification)
   Future<List<Map<String, dynamic>>> getConversationHistory({int limit = 20}) async {
     if (!_dashService.isInitialized) {
-      print('[DashChatProvider] Service not initialized, cannot get conversation history');
+      DebugConfig.debugPrint('[DashChatProvider] Service not initialized, cannot get conversation history');
       return [];
     }
     
     try {
       return await _dashService.getConversationHistory(limit: limit);
     } catch (e) {
-      print('[DashChatProvider] Error getting conversation history: $e');
+      DebugConfig.debugPrint('[DashChatProvider] Error getting conversation history: $e');
       return [];
     }
   }
@@ -405,55 +398,55 @@ class DashChatProvider extends ChangeNotifier {
   // Verify message ordering (for debugging)
   Future<void> verifyMessageOrdering() async {
     if (!_dashService.isInitialized) {
-      print('[DashChatProvider] Service not initialized, cannot verify message ordering');
+      DebugConfig.debugPrint('[DashChatProvider] Service not initialized, cannot verify message ordering');
       return;
     }
     
     try {
       await _dashService.verifyMessageOrdering();
     } catch (e) {
-      print('[DashChatProvider] Error verifying message ordering: $e');
+      DebugConfig.debugPrint('[DashChatProvider] Error verifying message ordering: $e');
     }
   }
 
   // Debug message alignment fix
   Future<void> debugMessageAlignment() async {
     if (!_dashService.isInitialized) {
-      print('[DashChatProvider] Service not initialized, cannot debug alignment');
+      DebugConfig.debugPrint('[DashChatProvider] Service not initialized, cannot debug alignment');
       return;
     }
     
     try {
       await _dashService.debugMessageAlignment();
     } catch (e) {
-      print('[DashChatProvider] Error debugging message alignment: $e');
+      DebugConfig.debugPrint('[DashChatProvider] Error debugging message alignment: $e');
     }
   }
 
   // Debug chronological message ordering
   void debugMessageOrdering() {
     if (_chatProvider == null) {
-      print('[DashChatProvider] ChatProvider not available, cannot debug message ordering');
+      DebugConfig.debugPrint('[DashChatProvider] ChatProvider not available, cannot debug message ordering');
       return;
     }
     
-    print('[DashChatProvider] 🔍 Debugging message ordering (chronological by timestamp)...');
-    print('[DashChatProvider] Total messages: ${_chatProvider!.messages.length}');
+    DebugConfig.debugPrint('[DashChatProvider] 🔍 Debugging message ordering (chronological by timestamp)...');
+    DebugConfig.debugPrint('[DashChatProvider] Total messages: ${_chatProvider!.messages.length}');
     
     // Verify chronological order is maintained
     _chatProvider!.verifyMessageOrder();
-    print('[DashChatProvider] ✅ Message ordering debug completed');
+    DebugConfig.debugPrint('[DashChatProvider] ✅ Message ordering debug completed');
   }
 
   // Test chronological ordering by clearing and reloading
   Future<void> testChronologicalOrdering() async {
     if (!_dashService.isInitialized) {
-      print('[DashChatProvider] Service not initialized, cannot test ordering');
+      DebugConfig.debugPrint('[DashChatProvider] Service not initialized, cannot test ordering');
       return;
     }
     
     try {
-      print('[DashChatProvider] 🧪 Testing chronological ordering...');
+      DebugConfig.debugPrint('[DashChatProvider] 🧪 Testing chronological ordering...');
       
       // Clear current messages
       _chatProvider?.clearChatHistory();
@@ -468,42 +461,42 @@ class DashChatProvider extends ChangeNotifier {
       // Verify ordering
       await _dashService.verifyMessageOrdering();
       
-      print('[DashChatProvider] ✅ Chronological ordering test completed');
+      DebugConfig.debugPrint('[DashChatProvider] ✅ Chronological ordering test completed');
     } catch (e) {
-      print('[DashChatProvider] Error testing chronological ordering: $e');
+      DebugConfig.debugPrint('[DashChatProvider] Error testing chronological ordering: $e');
     }
   }
   
   // Refresh messages from server (called when app resumes)
   Future<void> refreshMessages() async {
     if (!_dashService.isInitialized) {
-      print('[DashChatProvider] Service not initialized, cannot refresh messages');
+      DebugConfig.debugPrint('[DashChatProvider] Service not initialized, cannot refresh messages');
       return;
     }
     
     try {
-      print('[DashChatProvider] 🔄 Refreshing messages from server...');
+      DebugConfig.debugPrint('[DashChatProvider] 🔄 Refreshing messages from server...');
       await _dashService.loadExistingMessages();
-      print('[DashChatProvider] ✅ Messages refreshed successfully');
+      DebugConfig.debugPrint('[DashChatProvider] ✅ Messages refreshed successfully');
     } catch (e) {
-      print('[DashChatProvider] ❌ Error refreshing messages: $e');
+      DebugConfig.debugPrint('[DashChatProvider] ❌ Error refreshing messages: $e');
     }
   }
 
   // Test message shifting functionality
   Future<void> testMessageShifting() async {
     if (!_dashService.isInitialized) {
-      print('[DashChatProvider] Service not initialized, cannot test message shifting');
+      DebugConfig.debugPrint('[DashChatProvider] Service not initialized, cannot test message shifting');
       return;
     }
     
     try {
-      print('[DashChatProvider] 🧪 Testing message shifting functionality...');
+      DebugConfig.debugPrint('[DashChatProvider] 🧪 Testing message shifting functionality...');
       
       // Simulate message shifting by reordering some messages temporarily
       if (_chatProvider != null && _chatProvider!.messages.length > 1) {
         final originalMessages = List<ChatMessage>.from(_chatProvider!.messages);
-        print('[DashChatProvider] Original message count: ${originalMessages.length}');
+        DebugConfig.debugPrint('[DashChatProvider] Original message count: ${originalMessages.length}');
         
         // Test by clearing and reloading to see if order is maintained
         _chatProvider!.clearChatHistory();
@@ -515,13 +508,13 @@ class DashChatProvider extends ChangeNotifier {
         // Reload from service
         await _dashService.loadExistingMessages();
         
-        print('[DashChatProvider] Message shifting test completed');
-        print('[DashChatProvider] Message count after reload: ${_chatProvider!.messages.length}');
+        DebugConfig.debugPrint('[DashChatProvider] Message shifting test completed');
+        DebugConfig.debugPrint('[DashChatProvider] Message count after reload: ${_chatProvider!.messages.length}');
       } else {
-        print('[DashChatProvider] Not enough messages to test shifting (need at least 2)');
+        DebugConfig.debugPrint('[DashChatProvider] Not enough messages to test shifting (need at least 2)');
       }
     } catch (e) {
-      print('[DashChatProvider] Error testing message shifting: $e');
+      DebugConfig.debugPrint('[DashChatProvider] Error testing message shifting: $e');
     }
   }
 
@@ -532,12 +525,12 @@ class DashChatProvider extends ChangeNotifier {
   // Toggle message shifting functionality on/off
   void toggleMessageShifting() {
     _messageShiftingEnabled = !_messageShiftingEnabled;
-    print('[DashChatProvider] Message shifting ${_messageShiftingEnabled ? "enabled" : "disabled"}');
+    DebugConfig.debugPrint('[DashChatProvider] Message shifting ${_messageShiftingEnabled ? "enabled" : "disabled"}');
     
     if (_messageShiftingEnabled) {
-      print('[DashChatProvider] ✅ Message shifting is now ENABLED - messages will be ordered chronologically');
+      DebugConfig.debugPrint('[DashChatProvider] ✅ Message shifting is now ENABLED - messages will be ordered chronologically');
     } else {
-      print('[DashChatProvider] ⚠️ Message shifting is now DISABLED - messages will maintain original order');
+      DebugConfig.debugPrint('[DashChatProvider] ⚠️ Message shifting is now DISABLED - messages will maintain original order');
     }
     
     // Notify listeners to update UI if needed

@@ -4,6 +4,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
 import 'firebase_messaging_service.dart';
+import '../utils/debug_config.dart';
 
 /// Service to test and manage Firebase connection
 class FirebaseConnectionService {
@@ -14,41 +15,41 @@ class FirebaseConnectionService {
 
   /// Test Firebase connection and print results
   Future<bool> testConnection() async {
-    print('Testing Firebase connection...');
+    DebugConfig.debugPrint('Testing Firebase connection...');
     
     try {
       // Test Firestore connectivity
       bool firestoreOk = await _testFirestore();
-      print('Firestore connection: ${firestoreOk ? "OK" : "FAILED"}');
+      DebugConfig.debugPrint('Firestore connection: ${firestoreOk ? "OK" : "FAILED"}');
       
       // Test FCM connectivity and get token
       String? fcmToken = await _testMessaging();
-      print('FCM connection: ${fcmToken != null ? "OK" : "FAILED"}');
+      DebugConfig.debugPrint('FCM connection: ${fcmToken != null ? "OK" : "FAILED"}');
       if (fcmToken != null) {
-        print('FCM Token: $fcmToken');
+        DebugConfig.debugPrint('FCM Token: $fcmToken');
       }
       
       // Test Auth state
       bool authOk = await _testAuth();
-      print('Firebase Auth state: ${authOk ? "AUTHENTICATED" : "NOT AUTHENTICATED"}');
+      DebugConfig.debugPrint('Firebase Auth state: ${authOk ? "AUTHENTICATED" : "NOT AUTHENTICATED"}');
       
       // Initialize Firebase Messaging Service
       try {
         // Get token from messaging service
         final serviceToken = await _messagingService.getFcmToken();
-        print('Messaging Service FCM Token: ${serviceToken != null ? "Retrieved" : "Not available"}');
+        DebugConfig.debugPrint('Messaging Service FCM Token: ${serviceToken != null ? "Retrieved" : "Not available"}');
         
         // Setup message handlers
         await _messagingService.setupMessaging();
-        print('Firebase Messaging Service initialized successfully');
+        DebugConfig.debugPrint('Firebase Messaging Service initialized successfully');
       } catch (messagingError) {
-        print('Error initializing Firebase Messaging Service: $messagingError');
+        DebugConfig.debugPrint('Error initializing Firebase Messaging Service: $messagingError');
       }
       
-      print('Firebase connection test completed');
+      DebugConfig.debugPrint('Firebase connection test completed');
       return firestoreOk && fcmToken != null;
     } catch (e) {
-      print('Firebase connection test failed with error: $e');
+      DebugConfig.debugPrint('Firebase connection test failed with error: $e');
       return false;
     }
   }
@@ -60,7 +61,7 @@ class FirebaseConnectionService {
       final testQuery = await _firestore.collection('_connection_test').limit(1).get();
       return true;
     } catch (e) {
-      print('Firestore test error: $e');
+      DebugConfig.debugPrint('Firestore test error: $e');
       return false;
     }
   }
@@ -77,14 +78,14 @@ class FirebaseConnectionService {
           provisional: false,
         );
         
-        print('FCM Authorization status: ${settings.authorizationStatus}');
+        DebugConfig.debugPrint('FCM Authorization status: ${settings.authorizationStatus}');
       }
       
       // Get the token
       final token = await _messaging.getToken();
       return token;
     } catch (e) {
-      print('FCM test error: $e');
+      DebugConfig.debugPrint('FCM test error: $e');
       return null;
     }
   }
@@ -118,14 +119,14 @@ class FirebaseConnectionService {
         "fcmToken": fcmToken,
       };
       
-      print('Sending message to Dash server: $payload');
+      DebugConfig.debugPrint('Sending message to Dash server: $payload');
       
       // Implementation for HTTP request would go here
       // Using a placeholder for now
-      print('Message sent successfully to Dash server.');
+      DebugConfig.debugPrint('Message sent successfully to Dash server.');
       return true;
     } catch (e) {
-      print('Error sending message to Dash server: $e');
+      DebugConfig.debugPrint('Error sending message to Dash server: $e');
       return false;
     }
   }

@@ -1,6 +1,7 @@
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import '../utils/debug_config.dart';
 
 class FirebaseUtils {
   static final FirebaseMessaging _messaging = FirebaseMessaging.instance;
@@ -13,7 +14,7 @@ class FirebaseUtils {
       final token = await _messaging.getToken();
       return token;
     } catch (e) {
-      print('Error getting FCM token: $e');
+      DebugConfig.debugPrint('Error getting FCM token: $e');
       return null;
     }
   }
@@ -28,7 +29,7 @@ class FirebaseUtils {
       );
       return settings.authorizationStatus == AuthorizationStatus.authorized;
     } catch (e) {
-      print('Error requesting notification permissions: $e');
+      DebugConfig.debugPrint('Error requesting notification permissions: $e');
       return false;
     }
   }
@@ -87,7 +88,7 @@ class FirebaseUtils {
         'lastTokenUpdate': FieldValue.serverTimestamp(),
       });
     } catch (e) {
-      print('Error updating FCM token: $e');
+      DebugConfig.debugPrint('Error updating FCM token: $e');
     }
   }
 
@@ -120,7 +121,7 @@ class FirebaseUtils {
         'lastMessageSenderId': senderId,
       });
     } catch (e) {
-      print('Error sending message: $e');
+      DebugConfig.debugPrint('Error sending message: $e');
       rethrow;
     }
   }
@@ -133,7 +134,7 @@ class FirebaseUtils {
         'statusUpdatedAt': FieldValue.serverTimestamp(),
       });
     } catch (e) {
-      print('Error updating message status: $e');
+      DebugConfig.debugPrint('Error updating message status: $e');
     }
   }
 
@@ -160,7 +161,7 @@ class FirebaseUtils {
       final docRef = await getConversationsCollection().add(conversationData);
       return docRef.id;
     } catch (e) {
-      print('Error creating conversation: $e');
+      DebugConfig.debugPrint('Error creating conversation: $e');
       rethrow;
     }
   }
@@ -176,7 +177,7 @@ class FirebaseUtils {
         'updatedAt': FieldValue.serverTimestamp(),
       });
     } catch (e) {
-      print('Error updating conversation: $e');
+      DebugConfig.debugPrint('Error updating conversation: $e');
       rethrow;
     }
   }
@@ -199,7 +200,7 @@ class FirebaseUtils {
 
       await batch.commit();
     } catch (e) {
-      print('Error deleting conversation: $e');
+      DebugConfig.debugPrint('Error deleting conversation: $e');
       rethrow;
     }
   }

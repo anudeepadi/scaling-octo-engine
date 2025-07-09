@@ -17,6 +17,7 @@ import '../theme/app_theme.dart';
 import '../utils/app_localizations.dart';
 import 'profile_screen.dart';
 import 'clean_chat_screen.dart';
+import '../utils/debug_config.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -44,7 +45,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         final chatProvider = context.read<ChatProvider>();
         final dashProvider = context.read<DashChatProvider>();
         dashProvider.setChatProvider(chatProvider);
-        print('HomeScreen: Linked DashChatProvider and ChatProvider.');
+        DebugConfig.debugPrint('HomeScreen: Linked DashChatProvider and ChatProvider.');
       }
     });
   }
@@ -64,7 +65,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     
     switch (state) {
       case AppLifecycleState.resumed:
-        print('App resumed - checking for new messages');
+        DebugConfig.debugPrint('App resumed - checking for new messages');
         // Refresh messages when app comes back to foreground
         if (mounted) {
           final dashProvider = context.read<DashChatProvider>();
@@ -72,16 +73,16 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         }
         break;
       case AppLifecycleState.paused:
-        print('App paused');
+        DebugConfig.debugPrint('App paused');
         break;
       case AppLifecycleState.inactive:
-        print('App inactive');
+        DebugConfig.debugPrint('App inactive');
         break;
       case AppLifecycleState.detached:
-        print('App detached');
+        DebugConfig.debugPrint('App detached');
         break;
       case AppLifecycleState.hidden:
-        print('App hidden');
+        DebugConfig.debugPrint('App hidden');
         break;
     }
   }
@@ -105,7 +106,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   void _handleSubmitted(String text) {
     if (text.isEmpty) return;
 
-    print('[SendMessage] Sending message with ID: ${DateTime.now().millisecondsSinceEpoch}');
+    DebugConfig.debugPrint('[SendMessage] Sending message with ID: ${DateTime.now().millisecondsSinceEpoch}');
     
     final dashChatProvider = context.read<DashChatProvider>();
     
@@ -183,7 +184,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                           gifPaths[index],
                           fit: BoxFit.cover,
                           errorBuilder: (context, error, stackTrace) {
-                            print('Error loading GIF: $error');
+                            DebugConfig.debugPrint('Error loading GIF: $error');
                             return Container(
                               color: Colors.grey[300],
                               child: const Center(
@@ -597,7 +598,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                   }
 
                   // Show quick reply buttons for ALL poll messages, not just the most recent one
-                  print('🔍 HomeScreen: Analyzing ${dashChatProvider.messages.length} messages for quick replies');
+                  DebugConfig.debugPrint('🔍 HomeScreen: Analyzing ${dashChatProvider.messages.length} messages for quick replies');
                   
                   return ListView.builder(
                     controller: _scrollController,
@@ -611,7 +612,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                           message.suggestedReplies != null && 
                           message.suggestedReplies!.isNotEmpty;
                       
-                      print('🔍 HomeScreen: Message ${index}: type=${message.type}, hasReplies=${message.suggestedReplies?.isNotEmpty}, shouldShow=$shouldShowQuickReplies');
+                      DebugConfig.debugPrint('🔍 HomeScreen: Message ${index}: type=${message.type}, hasReplies=${message.suggestedReplies?.isNotEmpty}, shouldShow=$shouldShowQuickReplies');
                       
                       if (shouldShowQuickReplies) {
                         // For poll messages with quick replies, show both content and buttons

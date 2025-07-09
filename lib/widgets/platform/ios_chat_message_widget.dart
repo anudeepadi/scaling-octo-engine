@@ -4,6 +4,7 @@ import '../../models/chat_message.dart';
 import '../video_player_widget.dart';
 import '../youtube_player_widget.dart';
 import '../quick_reply_widget.dart';
+import '../../utils/debug_config.dart';
 
 class IosChatMessageWidget extends StatefulWidget {
   final ChatMessage message;
@@ -67,7 +68,7 @@ class _IosChatMessageWidgetState extends State<IosChatMessageWidget> {
             width: 200,
             height: 150,
             errorBuilder: (context, error, stackTrace) {
-              print('Error loading GIF as asset: $error');
+              DebugConfig.debugPrint('Error loading GIF as asset: $error');
               try {
                 return Image.file(
                   File(widget.message.mediaUrl!),
@@ -75,7 +76,7 @@ class _IosChatMessageWidgetState extends State<IosChatMessageWidget> {
                   height: 150,
                   fit: BoxFit.cover,
                   errorBuilder: (context, error, stackTrace) {
-                    print('Error loading local GIF: $error');
+                    DebugConfig.debugPrint('Error loading local GIF: $error');
                     return Image.network(
                       widget.message.mediaUrl!,
                       width: 200,
@@ -92,7 +93,7 @@ class _IosChatMessageWidgetState extends State<IosChatMessageWidget> {
                   },
                 );
               } catch (e) {
-                print('Error loading GIF: $e');
+                DebugConfig.debugPrint('Error loading GIF: $e');
                 return const Icon(CupertinoIcons.photo, size: 50, color: CupertinoColors.systemGrey);
               }
             },

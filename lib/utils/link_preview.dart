@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:html/parser.dart' as parser;
 import 'dart:async';
+import '../utils/debug_config.dart';
 
 /// A utility class to fetch and handle website link previews
 class LinkPreview {
@@ -55,7 +56,7 @@ class LinkPreview {
       isLoading = false;
       hasError = true;
       errorMessage = e.toString();
-      print('Error fetching link preview: $e');
+      DebugConfig.debugPrint('Error fetching link preview: $e');
     }
   }
   

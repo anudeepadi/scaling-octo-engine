@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 import '../models/chat_message.dart';
 import '../providers/dash_chat_provider.dart';
 import '../theme/app_theme.dart';
+import '../utils/debug_config.dart';
 
 class ChatMessageWidget extends StatefulWidget {
   final ChatMessage message;
@@ -61,7 +62,7 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
     if (await canLaunchUrl(uri)) {
       await launchUrl(uri);
     } else {
-      print('Could not launch $url');
+      DebugConfig.debugPrint('Could not launch $url');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Could not open link')),
@@ -161,7 +162,7 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
              height: 150,
              fit: BoxFit.contain,
              errorBuilder: (context, error, stackTrace) {
-                print("Image.asset Error loading ${widget.message.content}: $error");
+                DebugConfig.debugPrint("Image.asset Error loading ${widget.message.content}: $error");
                 return Container(
                    height: 150,
                    color: Colors.grey[300],
@@ -170,7 +171,7 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
              },
           );
        } catch (e) {
-           print("Error loading asset ${widget.message.content}: $e");
+           DebugConfig.debugPrint("Error loading asset ${widget.message.content}: $e");
            return Text("[Error loading asset: ${widget.message.content}]", style: const TextStyle(color: Colors.red));
        }
     }
@@ -265,7 +266,7 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
                     );
                   },
                   errorBuilder: (context, error, stackTrace) {
-                    print("Error loading $thumbnailUrl: $error");
+                    DebugConfig.debugPrint("Error loading $thumbnailUrl: $error");
                     return Container(
                         height: 150,
                         width: double.infinity,
@@ -352,7 +353,7 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
                 );
               },
               errorBuilder: (context, error, stackTrace) {
-                print("Error loading $firstUrl: $error");
+                DebugConfig.debugPrint("Error loading $firstUrl: $error");
                 return Container(
                     height: 150,
                     width: double.infinity,

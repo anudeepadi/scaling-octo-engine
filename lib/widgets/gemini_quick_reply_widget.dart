@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
 import 'dart:io' show Platform;
 import '../models/quick_reply.dart';
+import '../utils/debug_config.dart';
 
 class GeminiQuickReplyWidget extends StatelessWidget {
   final List<QuickReply> quickReplies;
@@ -17,13 +18,13 @@ class GeminiQuickReplyWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    print('GeminiQuickReplyWidget.build called with ${quickReplies.length} replies');
+    DebugConfig.debugPrint('GeminiQuickReplyWidget.build called with ${quickReplies.length} replies');
     if (quickReplies.isEmpty) {
-      print('No quick replies to display');
+      DebugConfig.debugPrint('No quick replies to display');
       return const SizedBox.shrink();
     }
 
-    print('Displaying quick replies: ${quickReplies.map((qr) => qr.text).join(', ')}');
+    DebugConfig.debugPrint('Displaying quick replies: ${quickReplies.map((qr) => qr.text).join(', ')}');
 
     // Get screen width to properly constrain the widget
     final screenWidth = MediaQuery.of(context).size.width;

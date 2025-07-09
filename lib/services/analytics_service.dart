@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_analytics/firebase_analytics.dart';
+import '../utils/debug_config.dart';
 
 class AnalyticsService {
   final FirebaseAnalytics _analytics;
@@ -28,7 +29,7 @@ class AnalyticsService {
         'timestamp': FieldValue.serverTimestamp(),
       });
     } catch (e) {
-      print('Error tracking event: $e');
+      DebugConfig.debugPrint('Error tracking event: $e');
     }
   }
 
@@ -37,7 +38,7 @@ class AnalyticsService {
     try {
       await _analytics.logScreenView(screenName: screenName);
     } catch (e) {
-      print('Error tracking screen view: $e');
+      DebugConfig.debugPrint('Error tracking screen view: $e');
     }
   }
 
@@ -46,7 +47,7 @@ class AnalyticsService {
     try {
       await _analytics.setUserProperty(name: name, value: value);
     } catch (e) {
-      print('Error setting user property: $e');
+      DebugConfig.debugPrint('Error setting user property: $e');
     }
   }
 
@@ -55,7 +56,7 @@ class AnalyticsService {
     try {
       await _analytics.setUserId(id: userId);
     } catch (e) {
-      print('Error setting user ID: $e');
+      DebugConfig.debugPrint('Error setting user ID: $e');
     }
   }
 
@@ -137,7 +138,7 @@ class AnalyticsService {
         },
       );
     } catch (e) {
-      print('Error logging error: $e');
+      DebugConfig.debugPrint('Error logging error: $e');
     }
   }
 
@@ -164,7 +165,7 @@ class AnalyticsService {
         'unique_users': snapshot.docs.map((doc) => doc.data()['parameters']?['userId'] as String? ?? '').where((id) => id.isNotEmpty).toSet().length,
       };
     } catch (e) {
-      print('Error getting event counts: $e');
+      DebugConfig.debugPrint('Error getting event counts: $e');
       return {
         'total_events': 0,
         'event_counts': {},
@@ -190,7 +191,7 @@ class AnalyticsService {
         };
       }).toList();
     } catch (e) {
-      print('Error getting user journey: $e');
+      DebugConfig.debugPrint('Error getting user journey: $e');
       return [];
     }
   }
@@ -210,7 +211,7 @@ class AnalyticsService {
         'retention_rate': _calculateRetentionRate(events),
       };
     } catch (e) {
-      print('Error getting study metrics: $e');
+      DebugConfig.debugPrint('Error getting study metrics: $e');
       return {
         'total_participants': 0,
         'completion_rate': 0.0,
@@ -254,7 +255,7 @@ class AnalyticsService {
         'quit_successful': _countEventType(events, 'quit_successful'),
       };
     } catch (e) {
-      print('Error getting conversion funnel: $e');
+      DebugConfig.debugPrint('Error getting conversion funnel: $e');
       return {
         'onboarding_started': 0,
         'onboarding_completed': 0,

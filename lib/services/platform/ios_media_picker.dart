@@ -1,6 +1,7 @@
 import 'package:file_picker/file_picker.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:path/path.dart' as path;
+import '../utils/debug_config.dart';
 
 class IosMediaPicker {
   static final ImagePicker _picker = ImagePicker();
@@ -19,7 +20,7 @@ class IosMediaPicker {
         )
       ]);
     } catch (e) {
-      print('Error picking image from gallery: $e');
+      DebugConfig.debugPrint('Error picking image from gallery: $e');
       return null;
     }
   }
@@ -38,7 +39,7 @@ class IosMediaPicker {
         )
       ]);
     } catch (e) {
-      print('Error taking photo: $e');
+      DebugConfig.debugPrint('Error taking photo: $e');
       return null;
     }
   }
@@ -57,7 +58,7 @@ class IosMediaPicker {
         )
       ]);
     } catch (e) {
-      print('Error recording video: $e');
+      DebugConfig.debugPrint('Error recording video: $e');
       return null;
     }
   }

@@ -3,6 +3,7 @@ import '../models/chat_message.dart';
 import '../models/quick_reply.dart';
 import '../services/gemini_service.dart';
 import 'package:uuid/uuid.dart';
+import '../utils/debug_config.dart';
 
 class GeminiChatProvider extends ChangeNotifier {
   final List<ChatMessage> _messages = [];
@@ -54,8 +55,8 @@ class GeminiChatProvider extends ChangeNotifier {
   Future<void> sendMessage(String message) async {
     if (message.trim().isEmpty) return;
     final userMessageId = _uuid.v4();
-    print('[GeminiProvider.sendMessage] START - User message: "$message" (ID: $userMessageId)');
-    print('[GeminiProvider.sendMessage] Messages BEFORE user add: ${_messages.length}');
+    DebugConfig.debugPrint('[GeminiProvider.sendMessage] START - User message: "$message" (ID: $userMessageId)');
+    DebugConfig.debugPrint('[GeminiProvider.sendMessage] Messages BEFORE user add: ${_messages.length}');
 
     // Add user message
     _messages.add(
@@ -67,25 +68,25 @@ class GeminiChatProvider extends ChangeNotifier {
         timestamp: DateTime.now(),
       ),
     );
-    print('[GeminiProvider.sendMessage] Messages AFTER user add: ${_messages.length}');
+    DebugConfig.debugPrint('[GeminiProvider.sendMessage] Messages AFTER user add: ${_messages.length}');
     notifyListeners();
-    print('[GeminiProvider.sendMessage] Notified after user add.');
+    DebugConfig.debugPrint('[GeminiProvider.sendMessage] Notified after user add.');
 
     // Show loading indicator
     _isLoading = true;
     notifyListeners();
-    print('[GeminiProvider.sendMessage] Notified for loading start.');
+    DebugConfig.debugPrint('[GeminiProvider.sendMessage] Notified for loading start.');
 
     String? geminiResponseContent;
     String? geminiMessageId;
     try {
       // Generate response from Gemini
-      print('[GeminiProvider.sendMessage] Calling GeminiService...');
+      DebugConfig.debugPrint('[GeminiProvider.sendMessage] Calling GeminiService...');
       final response = await _geminiService.generateResponse(message);
       geminiResponseContent = response; // Store response content
       geminiMessageId = _uuid.v4(); // Generate ID for Gemini message
-      print('[GeminiProvider.sendMessage] Gemini response received: "$geminiResponseContent" (ID: $geminiMessageId)');
-      print('[GeminiProvider.sendMessage] Messages BEFORE Gemini add: ${_messages.length}');
+      DebugConfig.debugPrint('[GeminiProvider.sendMessage] Gemini response received: "$geminiResponseContent" (ID: $geminiMessageId)');
+      DebugConfig.debugPrint('[GeminiProvider.sendMessage] Messages BEFORE Gemini add: ${_messages.length}');
 
       // Add Gemini response
       _messages.add(
@@ -97,28 +98,28 @@ class GeminiChatProvider extends ChangeNotifier {
           timestamp: DateTime.now(),
         ),
       );
-      print('[GeminiProvider.sendMessage] Messages AFTER Gemini add: ${_messages.length}');
+      DebugConfig.debugPrint('[GeminiProvider.sendMessage] Messages AFTER Gemini add: ${_messages.length}');
 
       // Get suggested replies (using the mock service for now)
-      print('[GeminiProvider.sendMessage] Calling getSuggestedReplies...');
-      final replies = await _geminiService.getSuggestedReplies(response); 
+      DebugConfig.debugPrint('[GeminiProvider.sendMessage] Calling getSuggestedReplies...');
+      final replies = await _geminiService.getSuggestedReplies(response ?? ''); 
       if (replies.isNotEmpty) {
          _addQuickReplies(replies);
-         print('[GeminiProvider.sendMessage] Quick replies added. Count: ${replies.length}');
+         DebugConfig.debugPrint('[GeminiProvider.sendMessage] Quick replies added. Count: ${replies.length}');
       } else {
-         print('[GeminiProvider.sendMessage] No quick replies generated.');
+         DebugConfig.debugPrint('[GeminiProvider.sendMessage] No quick replies generated.');
       }
-      // print('[GeminiProvider.sendMessage] Quick replies added.'); // Optional log for replies
+      // DebugConfig.debugPrint('[GeminiProvider.sendMessage] Quick replies added.'); // Optional log for replies
 
       _error = null;
     } catch (e) {
       _error = 'Failed to generate response: $e';
-      print('[GeminiProvider.sendMessage] ERROR: $_error');
+      DebugConfig.debugPrint('[GeminiProvider.sendMessage] ERROR: $_error');
     } finally {
       _isLoading = false;
-      print('[GeminiProvider.sendMessage] FINALLY block - Loading false.');
+      DebugConfig.debugPrint('[GeminiProvider.sendMessage] FINALLY block - Loading false.');
       notifyListeners();
-      print('[GeminiProvider.sendMessage] Notified in finally block. Final message count: ${_messages.length}');
+      DebugConfig.debugPrint('[GeminiProvider.sendMessage] Notified in finally block. Final message count: ${_messages.length}');
     }
   }
 
@@ -182,7 +183,7 @@ class GeminiChatProvider extends ChangeNotifier {
       _error = null;
     } catch (e) {
       _error = 'Failed to generate response: $e';
-      print(_error);
+      DebugConfig.debugPrint(_error);
     } finally {
       _isLoading = false;
       notifyListeners();

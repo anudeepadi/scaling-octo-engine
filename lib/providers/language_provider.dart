@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../utils/debug_config.dart';
 
 class LanguageProvider extends ChangeNotifier {
   static const String _languageCodeKey = 'language_code';
@@ -33,7 +34,7 @@ class LanguageProvider extends ChangeNotifier {
         notifyListeners();
       }
     } catch (e) {
-      print('Error loading saved language: $e');
+      DebugConfig.debugPrint('Error loading saved language: $e');
     }
   }
   
@@ -49,7 +50,7 @@ class LanguageProvider extends ChangeNotifier {
       
       notifyListeners();
     } catch (e) {
-      print('Error setting language: $e');
+      DebugConfig.debugPrint('Error setting language: $e');
     }
   }
 }

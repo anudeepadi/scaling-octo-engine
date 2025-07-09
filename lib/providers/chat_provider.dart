@@ -66,7 +66,7 @@ class ChatProvider extends ChangeNotifier {
     _currentConversationId = defaultConversationId;
 
     // Start with empty conversation (no demo messages)
-    print('ChatProvider: Starting with empty conversation to preserve user message order');
+    DebugConfig.debugPrint('ChatProvider: Starting with empty conversation to preserve user message order');
   }
 
   // Add a message to the current conversation in chronological order
@@ -79,7 +79,7 @@ class ChatProvider extends ChangeNotifier {
     _updateCurrentConversationTime();
     notifyListeners();
     
-    print('ChatProvider: Added message "${message.content.isEmpty ? "[${message.type}]" : message.content.substring(0, message.content.length > 30 ? 30 : message.content.length)}" - Total: ${_messages.length}');
+    DebugConfig.debugPrint('ChatProvider: Added message "${message.content.isEmpty ? "[${message.type}]" : message.content.substring(0, message.content.length > 30 ? 30 : message.content.length)}" - Total: ${_messages.length}');
   }
 
   // Add multiple messages while preserving chronological order
@@ -92,7 +92,7 @@ class ChatProvider extends ChangeNotifier {
     _updateCurrentConversationTime();
     notifyListeners();
     
-    print('ChatProvider: Added ${newMessages.length} messages in chronological order - Total: ${_messages.length}');
+    DebugConfig.debugPrint('ChatProvider: Added ${newMessages.length} messages in chronological order - Total: ${_messages.length}');
   }
 
   // Set messages (replaces current messages, maintaining chronological order)
@@ -106,14 +106,14 @@ class ChatProvider extends ChangeNotifier {
     _updateCurrentConversationTime();
     notifyListeners();
     
-    print('ChatProvider: Set ${newMessages.length} messages in chronological order');
+    DebugConfig.debugPrint('ChatProvider: Set ${newMessages.length} messages in chronological order');
   }
 
   // Clear all messages
   void clearMessages() {
     _messages.clear();
     notifyListeners();
-    print('ChatProvider: Cleared all messages');
+    DebugConfig.debugPrint('ChatProvider: Cleared all messages');
   }
 
   // Send a text message (creates user message with current timestamp)
@@ -167,7 +167,7 @@ class ChatProvider extends ChangeNotifier {
       _messages.sort((a, b) => a.timestamp.compareTo(b.timestamp));
       
       notifyListeners();
-      print('ChatProvider: Updated message $messageId and re-sorted chronologically');
+      DebugConfig.debugPrint('ChatProvider: Updated message $messageId and re-sorted chronologically');
     }
   }
 
@@ -175,7 +175,7 @@ class ChatProvider extends ChangeNotifier {
   void removeMessage(String messageId) {
     _messages.removeWhere((msg) => msg.id == messageId);
     notifyListeners();
-    print('ChatProvider: Removed message $messageId');
+    DebugConfig.debugPrint('ChatProvider: Removed message $messageId');
   }
 
   // Create a new conversation
@@ -223,7 +223,7 @@ class ChatProvider extends ChangeNotifier {
     _messages.clear();
     _messages.addAll(selectedConversation.messages);
 
-    print('ChatProvider: Switched conversation - loaded ${_messages.length} messages in chronological order');
+    DebugConfig.debugPrint('ChatProvider: Switched conversation - loaded ${_messages.length} messages in chronological order');
 
     notifyListeners();
   }
@@ -356,7 +356,7 @@ class ChatProvider extends ChangeNotifier {
 
   // Add reaction to message (for compatibility)
   Future<void> addReaction(String messageId, String emoji) async {
-    print('ChatProvider: Adding reaction $emoji to message $messageId');
+    DebugConfig.debugPrint('ChatProvider: Adding reaction $emoji to message $messageId');
     // In a real implementation, you would add reactions to the message
     // For now, just print for debugging
   }
@@ -376,20 +376,20 @@ class ChatProvider extends ChangeNotifier {
 
   // Debug method to verify message ordering
   void verifyMessageOrder() {
-    print('ChatProvider: Verifying message order (should be chronological):');
+    DebugConfig.debugPrint('ChatProvider: Verifying message order (should be chronological):');
     for (int i = 0; i < _messages.length; i++) {
       final message = _messages[i];
       final timeStr = message.timestamp.toIso8601String();
       final preview = message.content.isEmpty ? "[${message.type}]" : message.content.substring(0, message.content.length > 30 ? 30 : message.content.length);
-      print('  $i: $timeStr - "$preview" (isMe: ${message.isMe})');
+      DebugConfig.debugPrint('  $i: $timeStr - "$preview" (isMe: ${message.isMe})');
       
       if (i > 0) {
         final prevMessage = _messages[i - 1];
         if (message.timestamp.isBefore(prevMessage.timestamp)) {
-          print('  ⚠️ WARNING: Message $i is earlier than message ${i-1} - ordering violated!');
+          DebugConfig.debugPrint('  ⚠️ WARNING: Message $i is earlier than message ${i-1} - ordering violated!');
         }
       }
     }
-    print('ChatProvider: ✅ Message order verification completed');
+    DebugConfig.debugPrint('ChatProvider: ✅ Message order verification completed');
   }
 }

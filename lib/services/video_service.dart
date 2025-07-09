@@ -1,5 +1,6 @@
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import '../utils/debug_config.dart';
 
 class VideoService {
   static final VideoService _instance = VideoService._internal();
@@ -22,7 +23,7 @@ class VideoService {
       }
       return null;
     } catch (e) {
-      print('Error getting video info: $e');
+      DebugConfig.debugPrint('Error getting video info: $e');
       return null;
     }
   }
@@ -37,7 +38,7 @@ class VideoService {
       }
       return null;
     } catch (e) {
-      print('Error extracting video ID: $e');
+      DebugConfig.debugPrint('Error extracting video ID: $e');
       return null;
     }
   }

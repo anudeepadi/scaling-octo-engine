@@ -2,13 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:provider/provider.dart';
 import '../providers/gemini_chat_provider.dart';
-import '../providers/chat_mode_provider.dart';
+
 import '../models/chat_message.dart';
 import '../models/quick_reply.dart';
 import '../widgets/chat_message_widget.dart';
 import '../widgets/platform/ios_chat_message_widget.dart';
 import 'dart:io';
-import 'package:file_picker/file_picker.dart';
+
+import '../utils/debug_config.dart';
 
 class GeminiChatScreen extends StatefulWidget {
   const GeminiChatScreen({Key? key}) : super(key: key);
@@ -31,10 +32,10 @@ class _GeminiChatScreenState extends State<GeminiChatScreen> {
 
   @override
   Widget build(BuildContext context) {
-    print('[GeminiChatScreen] Build method called.');
+    DebugConfig.debugPrint('[GeminiChatScreen] Build method called.');
     return Consumer<GeminiChatProvider>(
       builder: (context, geminiChatProvider, child) {
-        print('[GeminiChatScreen] Consumer builder running. Message count from provider: ${geminiChatProvider.messages.length}');
+        DebugConfig.debugPrint('[GeminiChatScreen] Consumer builder running. Message count from provider: ${geminiChatProvider.messages.length}');
         return Column(
           children: [
             // Use Flexible instead of Expanded to see if layout calculation changes
@@ -61,7 +62,7 @@ class _GeminiChatScreenState extends State<GeminiChatScreen> {
         Future.delayed(const Duration(milliseconds: 50), () {
            if (_scrollController.hasClients) { // Check again after delay
                final targetScroll = _scrollController.position.maxScrollExtent;
-               print("[GeminiChatScreen.Scroll] Scrolling to: $targetScroll");
+               DebugConfig.debugPrint("[GeminiChatScreen.Scroll] Scrolling to: $targetScroll");
               _scrollController.animateTo(
                 targetScroll,
                 duration: const Duration(milliseconds: 300),
@@ -72,14 +73,14 @@ class _GeminiChatScreenState extends State<GeminiChatScreen> {
       }
     });
 
-    print("[GeminiChatScreen._buildMessageList] ListView itemCount: ${provider.messages.length}"); // Add log here
+    DebugConfig.debugPrint("[GeminiChatScreen._buildMessageList] ListView itemCount: ${provider.messages.length}"); // Add log here
     return ListView.builder(
       controller: _scrollController,
       padding: const EdgeInsets.all(8.0),
       itemCount: provider.messages.length,
       itemBuilder: (context, index) {
         final message = provider.messages[index];
-        print('[GeminiChatScreen.itemBuilder] Building item index: $index, Message ID: ${message.id}, Content: "${message.content.substring(0, (message.content.length > 20 ? 20 : message.content.length))}..."');
+        DebugConfig.debugPrint('[GeminiChatScreen.itemBuilder] Building item index: $index, Message ID: ${message.id}, Content: "${message.content.substring(0, (message.content.length > 20 ? 20 : message.content.length))}..."');
         
         // --- REMOVE Temporary Text widget --- 
         // return Container(
@@ -291,7 +292,7 @@ class _GeminiChatScreenState extends State<GeminiChatScreen> {
         }
       });
     } catch (e) {
-      print('Error picking GIF: $e');
+      DebugConfig.debugPrint('Error picking GIF: $e');
     }
   }
 

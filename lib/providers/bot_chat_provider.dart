@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../models/quick_reply.dart';
+import '../utils/debug_config.dart';
 
 class BotChatProvider extends ChangeNotifier {
   List<QuickReply> getSuggestedReplies() {
@@ -24,7 +25,7 @@ class BotChatProvider extends ChangeNotifier {
 
   void handleQuickReply(String value) {
     // Handle quick reply selection
-    print('Quick reply selected: $value');
+    DebugConfig.debugPrint('Quick reply selected: $value');
     notifyListeners();
   }
 }

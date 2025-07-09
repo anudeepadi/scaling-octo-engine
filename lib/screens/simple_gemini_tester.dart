@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http; // Need http for direct API call
 import 'dart:convert'; // For jsonEncode/Decode
+import '../utils/debug_config.dart';
 
 // --- IMPORTANT: Replace with your new, valid API key securely! ---
 // --- DO NOT COMMIT THIS KEY TO VERSION CONTROL ---
@@ -63,8 +64,8 @@ class _SimpleGeminiTesterScreenState extends State<SimpleGeminiTesterScreen> {
       // "generationConfig": { ... } 
     });
 
-    print("[SimpleTester] Calling Gemini API: $url");
-    print("[SimpleTester] Request Body: $requestBody");
+    DebugConfig.debugPrint("[SimpleTester] Calling Gemini API: $url");
+    DebugConfig.debugPrint("[SimpleTester] Request Body: $requestBody");
 
 
     try {
@@ -74,8 +75,8 @@ class _SimpleGeminiTesterScreenState extends State<SimpleGeminiTesterScreen> {
         body: requestBody,
       );
 
-      print("[SimpleTester] API Response Status: ${response.statusCode}");
-      print("[SimpleTester] API Response Body: ${response.body}");
+      DebugConfig.debugPrint("[SimpleTester] API Response Status: ${response.statusCode}");
+      DebugConfig.debugPrint("[SimpleTester] API Response Body: ${response.body}");
 
 
       if (response.statusCode == 200) {
@@ -117,7 +118,7 @@ class _SimpleGeminiTesterScreenState extends State<SimpleGeminiTesterScreen> {
         throw Exception('API Error: ${response.statusCode}\n${response.body}');
       }
     } catch (e) {
-      print("[SimpleTester] Error calling API: $e");
+      DebugConfig.debugPrint("[SimpleTester] Error calling API: $e");
       setState(() {
         _errorText = "Error: $e";
         _responseText = '';
@@ -126,7 +127,7 @@ class _SimpleGeminiTesterScreenState extends State<SimpleGeminiTesterScreen> {
       setState(() {
         _isLoading = false;
       });
-       print("[SimpleTester] Request Finished.");
+       DebugConfig.debugPrint("[SimpleTester] Request Finished.");
     }
   }
 

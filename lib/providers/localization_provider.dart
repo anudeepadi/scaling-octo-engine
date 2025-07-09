@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../utils/debug_config.dart';
 
 enum AppLanguage {
   english,
@@ -130,7 +131,7 @@ class LocalizationProvider extends ChangeNotifier {
       _currentLanguage = AppLanguage.values[languageIndex];
       notifyListeners();
     } catch (e) {
-      print('Error loading language preference: $e');
+      DebugConfig.debugPrint('Error loading language preference: $e');
     }
   }
   
@@ -140,7 +141,7 @@ class LocalizationProvider extends ChangeNotifier {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setInt('language_preference', _currentLanguage.index);
     } catch (e) {
-      print('Error saving language preference: $e');
+      DebugConfig.debugPrint('Error saving language preference: $e');
     }
   }
 }

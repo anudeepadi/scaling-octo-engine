@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../models/quick_reply.dart';
+import '../utils/debug_config.dart';
 
 class GeminiService {
   // IMPORTANT: Replace with your new, valid API key securely!
@@ -13,10 +14,10 @@ class GeminiService {
   
   // Actual API call implementation
   Future<String> generateResponse(String prompt) async {
-    print('[GeminiService] Generating response for: "$prompt"');
+    DebugConfig.debugPrint('[GeminiService] Generating response for: "$prompt"');
 
     if (_apiKey == 'YOUR_GEMINI_API_KEY') {
-       print('[GeminiService] ERROR: API Key is placeholder!');
+       DebugConfig.debugPrint('[GeminiService] ERROR: API Key is placeholder!');
        return "ERROR: API Key not set in GeminiService."; // Return error if key missing
     }
 
@@ -33,8 +34,8 @@ class GeminiService {
       // "generationConfig": { ... } 
     });
 
-    print("[GeminiService] Calling API: $url");
-    // print("[GeminiService] Request Body: $requestBody"); // Optional: Log body if needed
+    DebugConfig.debugPrint("[GeminiService] Calling API: $url");
+    // DebugConfig.debugPrint("[GeminiService] Request Body: $requestBody"); // Optional: Log body if needed
 
     try {
       final response = await http.post(
@@ -43,8 +44,8 @@ class GeminiService {
         body: requestBody,
       );
 
-      print("[GeminiService] API Response Status: ${response.statusCode}");
-      // print("[GeminiService] API Response Body: ${response.body}"); // Optional: Log full body if needed
+      DebugConfig.debugPrint("[GeminiService] API Response Status: ${response.statusCode}");
+      // DebugConfig.debugPrint("[GeminiService] API Response Body: ${response.body}"); // Optional: Log full body if needed
 
       if (response.statusCode == 200) {
         final decodedResponse = jsonDecode(response.body);
@@ -56,7 +57,7 @@ class GeminiService {
               if (parts != null && parts.isNotEmpty) {
                  final text = parts[0]['text'] as String?;
                  if (text != null) {
-                    print('[GeminiService] Extracted text: "${text.substring(0, (text.length > 50 ? 50 : text.length))}..."');
+                    DebugConfig.debugPrint('[GeminiService] Extracted text: "${text.substring(0, (text.length > 50 ? 50 : text.length))}..."');
                     return text; // Success
                  } 
               }
@@ -66,18 +67,18 @@ class GeminiService {
         final promptFeedback = decodedResponse['promptFeedback'] as Map<String, dynamic>?;
          if (promptFeedback != null && promptFeedback['blockReason'] != null) {
             final reason = promptFeedback['blockReason'];
-            print('[GeminiService] Response blocked: $reason');
+            DebugConfig.debugPrint('[GeminiService] Response blocked: $reason');
             return "Response blocked due to: $reason"; // Return info about blocking
          } else {
-           print('[GeminiService] Error: Could not extract valid candidate text from response.');
+           DebugConfig.debugPrint('[GeminiService] Error: Could not extract valid candidate text from response.');
            throw Exception('Could not extract valid candidate text from API response.');
          }
       } else {
-        print('[GeminiService] API Error ${response.statusCode}: ${response.body}');
+        DebugConfig.debugPrint('[GeminiService] API Error ${response.statusCode}: ${response.body}');
         throw Exception('API Error: ${response.statusCode}\n${response.body}');
       }
     } catch (e) {
-      print('[GeminiService] Error during API call: $e');
+      DebugConfig.debugPrint('[GeminiService] Error during API call: $e');
       // Consider returning a user-friendly error message instead of rethrowing
       return "Error communicating with Gemini: $e"; 
       // throw Exception('Failed to generate response: $e'); // Or rethrow if caller handles it
@@ -88,7 +89,7 @@ class GeminiService {
   // TODO: Implement actual API call for suggested replies if needed, or keep mock?
   Future<List<QuickReply>> getSuggestedReplies(String lastMessage) async {
     // For demo purposes, return predefined quick replies
-    print('[GeminiService] Generating mock suggested replies for: "$lastMessage"');
+    DebugConfig.debugPrint('[GeminiService] Generating mock suggested replies for: "$lastMessage"');
     await Future.delayed(const Duration(milliseconds: 500));
     
     if (lastMessage.toLowerCase().contains('hello') || 

@@ -1,5 +1,6 @@
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../utils/debug_config.dart';
 
 enum Environment {
   development,
@@ -26,12 +27,12 @@ class EnvSwitcher {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString('current_env', env.toString());
       
-      print('Switched to ${env.toString()} environment');
-      print('SERVER_URL: ${dotenv.env['SERVER_URL']}');
+      DebugConfig.debugPrint('Switched to ${env.toString()} environment');
+      DebugConfig.debugPrint('SERVER_URL: ${dotenv.env['SERVER_URL']}');
       
       // You can add app restart logic here if needed
     } catch (e) {
-      print('Error switching environment: $e');
+      DebugConfig.debugPrint('Error switching environment: $e');
     }
   }
   
@@ -46,7 +47,7 @@ class EnvSwitcher {
       
       return Environment.development;
     } catch (e) {
-      print('Error getting current environment: $e');
+      DebugConfig.debugPrint('Error getting current environment: $e');
       return Environment.development; // Default to development
     }
   }

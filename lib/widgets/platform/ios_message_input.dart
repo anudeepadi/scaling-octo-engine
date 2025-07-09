@@ -8,13 +8,13 @@ class IosMessageInput extends StatelessWidget {
   final bool isComposing;
 
   const IosMessageInput({
-    Key? key,
+    super.key,
     required this.controller,
     required this.onSubmitted,
     required this.onPickMedia,
     required this.onPickGif,
     required this.isComposing,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {

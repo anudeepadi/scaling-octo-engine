@@ -1,4 +1,3 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import '../models/user_profile.dart';
 import '../services/user_profile_service.dart';

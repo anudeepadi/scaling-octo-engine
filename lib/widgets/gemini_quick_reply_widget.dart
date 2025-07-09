@@ -12,12 +12,12 @@ class GeminiQuickReplyWidget extends StatefulWidget {
   final String? messageId; // Add messageId to group quick replies
 
   const GeminiQuickReplyWidget({
-    Key? key,
+    super.key,
     required this.quickReplies,
     required this.onReplySelected,
     this.animated = true,
     this.messageId,
-  }) : super(key: key);
+  });
 
   @override
   State<GeminiQuickReplyWidget> createState() => _GeminiQuickReplyWidgetState();
@@ -291,11 +291,11 @@ class _AnimatedQuickReply extends StatefulWidget {
   final bool animated;
 
   const _AnimatedQuickReply({
-    Key? key,
+    super.key,
     required this.child,
     required this.index,
     this.animated = true,
-  }) : super(key: key);
+  });
 
   @override
   State<_AnimatedQuickReply> createState() => _AnimatedQuickReplyState();

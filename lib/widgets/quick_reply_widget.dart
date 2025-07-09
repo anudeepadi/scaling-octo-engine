@@ -10,11 +10,11 @@ class QuickReplyWidget extends StatefulWidget {
   final String? messageId; // Add messageId to group quick replies
 
   const QuickReplyWidget({
-    Key? key,
+    super.key,
     required this.quickReplies,
     required this.onReplySelected,
     this.messageId,
-  }) : super(key: key);
+  });
 
   @override
   State<QuickReplyWidget> createState() => _QuickReplyWidgetState();

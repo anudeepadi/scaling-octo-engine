@@ -11,13 +11,13 @@ class ModernChatInput extends StatefulWidget {
   final bool isComposing;
 
   const ModernChatInput({
-    Key? key,
+    super.key,
     required this.controller,
     required this.onSubmitted,
     required this.onAttachmentPressed,
     required this.onGifPressed,
     required this.isComposing,
-  }) : super(key: key);
+  });
 
   @override
   State<ModernChatInput> createState() => _ModernChatInputState();

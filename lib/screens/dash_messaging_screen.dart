@@ -437,7 +437,7 @@ class _DashMessagingScreenState extends State<DashMessagingScreen> {
       builder: (BuildContext context) {
         return AlertDialog(
           title: const Text('Conversation History'),
-          content: Container(
+          content: SizedBox(
             width: double.maxFinite,
             child: FutureBuilder<List<Map<String, dynamic>>>(
               future: dashChatProvider.getConversationHistory(limit: 30),
@@ -456,7 +456,7 @@ class _DashMessagingScreenState extends State<DashMessagingScreen> {
                   return const Text('No conversation history found.');
                 }
                 
-                return Container(
+                return SizedBox(
                   height: 400,
                   child: ListView.builder(
                     itemCount: history.length,

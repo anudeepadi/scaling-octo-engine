@@ -1,10 +1,7 @@
 import 'package:flutter/material.dart';
-import 'dart:io' show Platform, File;
 import 'package:flutter_linkify/flutter_linkify.dart';
 import 'package:url_launcher/url_launcher.dart';
-import 'package:provider/provider.dart';
 import '../models/chat_message.dart';
-import '../providers/dash_chat_provider.dart';
 import '../theme/app_theme.dart';
 import '../utils/debug_config.dart';
 
@@ -14,11 +11,11 @@ class ChatMessageWidget extends StatefulWidget {
   final Function(String)? onReactionAdd;
 
   const ChatMessageWidget({
-    Key? key,
+    super.key,
     required this.message,
     this.onReplyTap,
     this.onReactionAdd,
-  }) : super(key: key);
+  });
 
   @override
   State<ChatMessageWidget> createState() => _ChatMessageWidgetState();

@@ -4,19 +4,14 @@ import '../models/chat_message.dart';
 import '../models/quick_reply.dart';
 import '../providers/auth_provider.dart';
 import '../providers/chat_provider.dart';
-import '../providers/service_provider.dart';
 import '../providers/dash_chat_provider.dart';
-import '../providers/language_provider.dart';
 import '../providers/user_profile_provider.dart';
 import '../services/media_picker_service.dart';
 import '../services/gif_service.dart';
-import '../services/dash_messaging_service.dart';
 import '../widgets/chat_message_widget.dart';
 import '../widgets/quick_reply_widget.dart';
-import '../theme/app_theme.dart';
 import '../utils/app_localizations.dart';
 import 'profile_screen.dart';
-import 'clean_chat_screen.dart';
 import '../utils/debug_config.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -464,8 +459,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   }
 
   Widget _buildMessageInput() {
-    final localizations = AppLocalizations.of(context);
-    
     return Container(
       padding: const EdgeInsets.all(16.0),
       color: Colors.white,

@@ -37,7 +37,7 @@ class ChatProvider extends ChangeNotifier {
 
   final _uuid = Uuid();
 
-  bool _isLoading = false;
+  final bool _isLoading = false;
   bool get isLoading => _isLoading;
 
   String? _error;

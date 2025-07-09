@@ -6,7 +6,7 @@ import '../providers/service_provider.dart';
 import '../services/service_manager.dart';
 
 class ServiceToggleButton extends StatelessWidget {
-  const ServiceToggleButton({Key? key}) : super(key: key);
+  const ServiceToggleButton({super.key});
 
   @override
   Widget build(BuildContext context) {

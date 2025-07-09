@@ -3,7 +3,6 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import '../providers/user_profile_provider.dart';
 import '../models/user_profile.dart';
-import '../theme/app_theme.dart';
 import '../utils/app_localizations.dart';
 import 'home_screen.dart';
 
@@ -433,7 +432,7 @@ class _IntakeQuestionnaireScreenState extends State<IntakeQuestionnaireScreen> w
                       }
                     });
                   },
-                  backgroundColor: theme.colorScheme.surfaceVariant,
+                  backgroundColor: theme.colorScheme.surfaceContainerHighest,
                   selectedColor: theme.colorScheme.primary,
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(20),

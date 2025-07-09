@@ -77,8 +77,8 @@ class GeminiChatProvider extends ChangeNotifier {
     notifyListeners();
     DebugConfig.debugPrint('[GeminiProvider.sendMessage] Notified for loading start.');
 
-    String? geminiResponseContent;
-    String? geminiMessageId;
+    String geminiResponseContent = '';
+    String geminiMessageId = '';
     try {
       // Generate response from Gemini
       DebugConfig.debugPrint('[GeminiProvider.sendMessage] Calling GeminiService...');
@@ -102,7 +102,7 @@ class GeminiChatProvider extends ChangeNotifier {
 
       // Get suggested replies (using the mock service for now)
       DebugConfig.debugPrint('[GeminiProvider.sendMessage] Calling getSuggestedReplies...');
-      final replies = await _geminiService.getSuggestedReplies(response ?? ''); 
+      final replies = await _geminiService.getSuggestedReplies(response); 
       if (replies.isNotEmpty) {
          _addQuickReplies(replies);
          DebugConfig.debugPrint('[GeminiProvider.sendMessage] Quick replies added. Count: ${replies.length}');
@@ -183,7 +183,7 @@ class GeminiChatProvider extends ChangeNotifier {
       _error = null;
     } catch (e) {
       _error = 'Failed to generate response: $e';
-      DebugConfig.debugPrint(_error);
+      DebugConfig.debugPrint(_error ?? 'Unknown error');
     } finally {
       _isLoading = false;
       notifyListeners();

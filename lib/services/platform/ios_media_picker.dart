@@ -1,7 +1,7 @@
 import 'package:file_picker/file_picker.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:path/path.dart' as path;
-import '../utils/debug_config.dart';
+import '../../utils/debug_config.dart';
 
 class IosMediaPicker {
   static final ImagePicker _picker = ImagePicker();

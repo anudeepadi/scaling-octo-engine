@@ -12,7 +12,7 @@ import 'dart:io';
 import '../utils/debug_config.dart';
 
 class GeminiChatScreen extends StatefulWidget {
-  const GeminiChatScreen({Key? key}) : super(key: key);
+  const GeminiChatScreen({super.key});
 
   @override
   State<GeminiChatScreen> createState() => _GeminiChatScreenState();

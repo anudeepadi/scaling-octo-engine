@@ -20,7 +20,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> with TickerProvider
   late Animation<double> _fadeAnimation;
   
   int _currentPage = 0;
-  bool _isLoading = false;
+  final bool _isLoading = false;
 
   final List<OnboardingPage> _pages = [
     OnboardingPage(
@@ -118,7 +118,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> with TickerProvider
                     builder: (context, languageProvider, _) {
                       return Container(
                         decoration: BoxDecoration(
-                          color: theme.colorScheme.surfaceVariant,
+                          color: theme.colorScheme.surfaceContainerHighest,
                           borderRadius: BorderRadius.circular(20),
                         ),
                         child: Row(
@@ -415,7 +415,7 @@ class _TermsOfServiceDialogState extends State<TermsOfServiceDialog> {
                 height: 300,
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
-                  color: theme.colorScheme.surfaceVariant.withValues(alpha: 0.5),
+                  color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: SingleChildScrollView(

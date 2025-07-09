@@ -10,7 +10,7 @@ const String _geminiApiKey = 'AIzaSyCODVjQ7aIyDAcHXXW3XBiB9quiPwznocs';
 // const String _geminiApiKey = String.fromEnvironment('GEMINI_API_KEY');
 
 class SimpleGeminiTesterScreen extends StatefulWidget {
-  const SimpleGeminiTesterScreen({Key? key}) : super(key: key);
+  const SimpleGeminiTesterScreen({super.key});
 
   @override
   _SimpleGeminiTesterScreenState createState() =>

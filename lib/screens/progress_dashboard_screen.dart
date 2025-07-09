@@ -1,9 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'dart:math' as math;
 import '../providers/user_profile_provider.dart';
 import '../models/user_profile.dart';
-import '../theme/app_theme.dart';
 import '../utils/app_localizations.dart';
 
 class ProgressDashboardScreen extends StatefulWidget {
@@ -222,7 +220,7 @@ class _ProgressDashboardScreenState extends State<ProgressDashboardScreen> with 
               child: Container(
                 padding: const EdgeInsets.all(20),
                 decoration: BoxDecoration(
-                  color: theme.colorScheme.surfaceVariant.withValues(alpha: 0.5),
+                  color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
                   borderRadius: BorderRadius.circular(16),
                   border: Border.all(
                     color: (stat['color'] as Color).withValues(alpha: 0.3),
@@ -267,7 +265,7 @@ class _ProgressDashboardScreenState extends State<ProgressDashboardScreen> with 
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: theme.colorScheme.surfaceVariant.withValues(alpha: 0.3),
+        color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
         borderRadius: BorderRadius.circular(16),
       ),
       child: Column(
@@ -391,7 +389,7 @@ class _ProgressDashboardScreenState extends State<ProgressDashboardScreen> with 
               decoration: BoxDecoration(
                 color: isUnlocked 
                     ? theme.colorScheme.primaryContainer.withValues(alpha: 0.3)
-                    : theme.colorScheme.surfaceVariant.withValues(alpha: 0.3),
+                    : theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(
                   color: isUnlocked 
@@ -575,10 +573,7 @@ class _ProgressDashboardScreenState extends State<ProgressDashboardScreen> with 
     final profile = context.read<UserProfileProvider>().userProfile;
     
     if (profile != null) {
-      final message = localizations.translate('share_progress_message')
-          .replaceAll('{days}', '${profile.daysSmokeFree}')
-          .replaceAll('{money}', '\$${profile.moneySaved.toStringAsFixed(2)}')
-          .replaceAll('{cigarettes}', '${profile.cigarettesAvoided}');
+      // Message is prepared but not currently used (would be used with share_plus package)
       
       // In a real app, you would use share_plus package
       ScaffoldMessenger.of(context).showSnackBar(

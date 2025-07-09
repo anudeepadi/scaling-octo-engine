@@ -14,12 +14,12 @@ class IosChatMessageWidget extends StatefulWidget {
   final Function(String)? onQuickReplyTap;
 
   const IosChatMessageWidget({
-    Key? key,
+    super.key,
     required this.message,
     this.onReplyTap,
     this.onReactionAdd,
     this.onQuickReplyTap,
-  }) : super(key: key);
+  });
 
   @override
   State<IosChatMessageWidget> createState() => _IosChatMessageWidgetState();

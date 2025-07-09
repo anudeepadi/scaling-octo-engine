@@ -178,7 +178,6 @@ class DashChatProvider extends ChangeNotifier {
     }
     
     final messageContent = message.trim();
-    final userId = _currentUser!.uid;
     
     // Prevent duplicate sends (debounce)
     if (_isSendingMessage) {

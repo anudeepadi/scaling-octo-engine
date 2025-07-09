@@ -128,9 +128,7 @@ class AuthProvider extends ChangeNotifier {
       GoogleSignInAccount? currentUser = _googleSignIn.currentUser;
       
       // If no current user, trigger the authentication flow
-      if (currentUser == null) {
-        currentUser = await _googleSignIn.signIn();
-      }
+      currentUser ??= await _googleSignIn.signIn();
       
       if (currentUser == null) {
         // User canceled the sign-in process

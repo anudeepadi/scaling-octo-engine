@@ -9,13 +9,13 @@ class ImprovedMessageItem extends StatelessWidget {
   final bool showReactions;
 
   const ImprovedMessageItem({
-    Key? key,
+    super.key,
     required this.message,
     required this.isMe,
     this.onLongPress,
     this.onReactionTap,
     this.showReactions = true,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -82,7 +82,7 @@ class ImprovedMessageItem extends StatelessWidget {
               fit: BoxFit.cover,
               loadingBuilder: (context, child, loadingProgress) {
                 if (loadingProgress == null) return child;
-                return Container(
+                return SizedBox(
                   height: 200,
                   child: Center(
                     child: CircularProgressIndicator(
@@ -116,7 +116,7 @@ class ImprovedMessageItem extends StatelessWidget {
                   fit: BoxFit.cover,
                   loadingBuilder: (context, child, loadingProgress) {
                     if (loadingProgress == null) return child;
-                    return Container(
+                    return SizedBox(
                       height: 200,
                       child: Center(
                         child: CircularProgressIndicator(

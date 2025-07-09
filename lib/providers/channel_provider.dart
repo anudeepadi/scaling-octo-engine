@@ -2,7 +2,7 @@ import 'package:flutter/foundation.dart';
 
 class ChannelProvider with ChangeNotifier {
   String _currentChannel = 'general';
-  List<String> _channels = ['general'];
+  final List<String> _channels = ['general'];
 
   String get currentChannel => _currentChannel;
   List<String> get channels => _channels;

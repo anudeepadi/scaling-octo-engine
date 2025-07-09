@@ -1,14 +1,11 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/cupertino.dart';
-import 'dart:io' show Platform;
 import '../models/chat_message.dart';
 import '../providers/auth_provider.dart';
 import 'package:provider/provider.dart';
-import '../services/gemini_service.dart';
 import '../widgets/chat_message_widget.dart';
 
 class GeminiScreen extends StatefulWidget {
-  const GeminiScreen({Key? key}) : super(key: key);
+  const GeminiScreen({super.key});
 
   @override
   State<GeminiScreen> createState() => _GeminiScreenState();
@@ -121,7 +118,7 @@ class _GeminiScreenState extends State<GeminiScreen> {
         color: Theme.of(context).cardColor,
         boxShadow: [
           BoxShadow(
-            color: Colors.grey.withOpacity(0.2),
+            color: Colors.grey.withValues(alpha: 0.2),
             spreadRadius: 1,
             blurRadius: 3,
             offset: const Offset(0, -1),

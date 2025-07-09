@@ -176,7 +176,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                       borderRadius: BorderRadius.circular(16),
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.black.withOpacity(0.1),
+                          color: Colors.black.withValues(alpha: 0.1),
                           blurRadius: 8,
                           offset: const Offset(0, 2),
                         ),
@@ -398,7 +398,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                                     backgroundColor: AppTheme.quitxtTeal,
                                     foregroundColor: Colors.white,
                                     elevation: 4,
-                                    shadowColor: AppTheme.quitxtTeal.withOpacity(0.3),
+                                    shadowColor: AppTheme.quitxtTeal.withValues(alpha: 0.3),
                                     shape: RoundedRectangleBorder(
                                       borderRadius: BorderRadius.circular(12),
                                     ),
@@ -514,7 +514,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                         return Container(
                           padding: const EdgeInsets.all(16),
                           decoration: BoxDecoration(
-                            color: Colors.white.withOpacity(0.9),
+                            color: Colors.white.withValues(alpha: 0.9),
                             borderRadius: BorderRadius.circular(12),
                           ),
                           child: const Row(

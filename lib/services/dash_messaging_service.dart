@@ -1,19 +1,13 @@
 import 'dart:async';
 import 'dart:convert';
-import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:uuid/uuid.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/chat_message.dart';
 import '../models/quick_reply.dart';
-import '../utils/app_localizations.dart';
-import '../utils/context_holder.dart';
-import '../utils/platform_utils.dart';
 import '../utils/debug_config.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
-import 'dart:developer';
 
 class DashMessagingService {
   static final DashMessagingService _instance = DashMessagingService._internal();

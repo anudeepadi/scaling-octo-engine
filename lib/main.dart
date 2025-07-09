@@ -28,6 +28,7 @@ import 'services/firebase_messaging_service.dart';
 import 'services/notification_service.dart';
 import 'services/user_profile_service.dart';
 import 'services/analytics_service.dart';
+import 'services/quick_reply_state_service.dart';
 
 // Import dotenv for environment variables
 import 'package:flutter_dotenv/flutter_dotenv.dart';
@@ -116,6 +117,16 @@ void main() async {
       } catch (connectionError) {
         developer.log('Firebase connection test failed: $connectionError', name: 'App');
         developer.log('Continuing in demo mode', name: 'App');
+      }
+      
+      // Initialize Quick Reply State Service
+      try {
+        final quickReplyStateService = QuickReplyStateService();
+        await quickReplyStateService.initialize();
+        developer.log('Quick Reply State Service initialized successfully', name: 'App');
+      } catch (quickReplyError) {
+        developer.log('Quick Reply State Service initialization failed: $quickReplyError', name: 'App');
+        developer.log('Continuing without quick reply state persistence', name: 'App');
       }
     } catch (e) {
       // If Firebase initialization fails, log it but don't crash

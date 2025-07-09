@@ -3,28 +3,101 @@ import 'package:flutter/cupertino.dart';
 import 'dart:io' show Platform;
 import '../models/quick_reply.dart';
 import '../utils/debug_config.dart';
+import '../services/quick_reply_state_service.dart';
 
-class GeminiQuickReplyWidget extends StatelessWidget {
+class GeminiQuickReplyWidget extends StatefulWidget {
   final List<QuickReply> quickReplies;
   final Function(String) onReplySelected;
   final bool animated;
+  final String? messageId; // Add messageId to group quick replies
 
   const GeminiQuickReplyWidget({
     Key? key,
     required this.quickReplies,
     required this.onReplySelected,
     this.animated = true,
+    this.messageId,
   }) : super(key: key);
 
   @override
+  State<GeminiQuickReplyWidget> createState() => _GeminiQuickReplyWidgetState();
+}
+
+class _GeminiQuickReplyWidgetState extends State<GeminiQuickReplyWidget> {
+  final QuickReplyStateService _quickReplyService = QuickReplyStateService();
+
+  void _showAlreadySelectedDialog() {
+    if (Platform.isIOS) {
+      showCupertinoDialog(
+        context: context,
+        builder: (BuildContext context) {
+          return CupertinoAlertDialog(
+            title: const Text('Option Already Selected'),
+            content: const Text('You have already selected an option for this question and cannot select another one.'),
+            actions: [
+              CupertinoDialogAction(
+                child: const Text('OK'),
+                onPressed: () {
+                  Navigator.of(context).pop();
+                },
+              ),
+            ],
+          );
+        },
+      );
+    } else {
+      showDialog(
+        context: context,
+        builder: (BuildContext context) {
+          return AlertDialog(
+            title: const Text('Option Already Selected'),
+            content: const Text('You have already selected an option for this question and cannot select another one.'),
+            actions: [
+              TextButton(
+                child: const Text('OK'),
+                onPressed: () {
+                  Navigator.of(context).pop();
+                },
+              ),
+            ],
+          );
+        },
+      );
+    }
+  }
+
+  void _handleQuickReplyTap(String value) {
+    // If no messageId provided, use old behavior (single selection)
+    if (widget.messageId == null) {
+      widget.onReplySelected(value);
+      return;
+    }
+
+    // Check if any option has already been selected for this message
+    if (_quickReplyService.isMessageSetDisabled(widget.messageId!)) {
+      _showAlreadySelectedDialog();
+      return;
+    }
+    
+    // Select this option and disable all others in the set
+    _quickReplyService.selectQuickReply(widget.messageId!, value);
+    
+    // Trigger UI update
+    setState(() {});
+    
+    // Call the original callback
+    widget.onReplySelected(value);
+  }
+
+  @override
   Widget build(BuildContext context) {
-    DebugConfig.debugPrint('GeminiQuickReplyWidget.build called with ${quickReplies.length} replies');
-    if (quickReplies.isEmpty) {
+    DebugConfig.debugPrint('GeminiQuickReplyWidget.build called with ${widget.quickReplies.length} replies');
+    if (widget.quickReplies.isEmpty) {
       DebugConfig.debugPrint('No quick replies to display');
       return const SizedBox.shrink();
     }
 
-    DebugConfig.debugPrint('Displaying quick replies: ${quickReplies.map((qr) => qr.text).join(', ')}');
+    DebugConfig.debugPrint('Displaying quick replies: ${widget.quickReplies.map((qr) => qr.text).join(', ')}');
 
     // Get screen width to properly constrain the widget
     final screenWidth = MediaQuery.of(context).size.width;
@@ -84,11 +157,19 @@ class GeminiQuickReplyWidget extends StatelessWidget {
           Wrap(
             spacing: 6.0,
             runSpacing: 6.0,
-            children: quickReplies.map((reply) {
+            children: widget.quickReplies.map((reply) {
+              final bool isSelected = widget.messageId != null && 
+                  _quickReplyService.isQuickReplySelected(widget.messageId!, reply.value);
+              final bool isDisabled = widget.messageId != null && 
+                  _quickReplyService.isOptionDisabled(widget.messageId!, reply.value);
+              final bool isGreyedOut = isDisabled || isSelected;
+              
               return _buildQuickReplyButton(
                 context, 
                 reply, 
-                quickReplies.indexOf(reply)
+                widget.quickReplies.indexOf(reply),
+                isGreyedOut,
+                isSelected
               );
             }).toList(),
           ),
@@ -97,29 +178,47 @@ class GeminiQuickReplyWidget extends StatelessWidget {
     );
   }
 
-  Widget _buildQuickReplyButton(BuildContext context, QuickReply reply, int index) {
+  Widget _buildQuickReplyButton(BuildContext context, QuickReply reply, int index, bool isGreyedOut, bool isSelected) {
     if (Platform.isIOS) {
       return _AnimatedQuickReply(
         index: index,
-        animated: animated,
+        animated: widget.animated,
         child: GestureDetector(
-          onTap: () => onReplySelected(reply.value),
+          onTap: () => _handleQuickReplyTap(reply.value),
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
             decoration: BoxDecoration(
-              color: CupertinoColors.systemBlue.withValues(alpha: 0.15),
+              color: isGreyedOut 
+                  ? CupertinoColors.systemGrey4.withValues(alpha: 0.5)
+                  : CupertinoColors.systemBlue.withValues(alpha: 0.15),
               borderRadius: BorderRadius.circular(8),
             ),
-            child: Text(
-              reply.text,
-              style: const TextStyle(
-                color: CupertinoColors.systemBlue,
-                fontSize: 11,
-                fontWeight: FontWeight.w500,
-              ),
-              textAlign: TextAlign.center,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (isSelected)
+                  const Padding(
+                    padding: EdgeInsets.only(right: 4),
+                    child: Icon(
+                      CupertinoIcons.check_mark_circled_solid,
+                      color: CupertinoColors.systemGreen,
+                      size: 10,
+                    ),
+                  ),
+                Text(
+                  reply.text,
+                  style: TextStyle(
+                    color: isGreyedOut 
+                        ? CupertinoColors.systemGrey2
+                        : CupertinoColors.systemBlue,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w500,
+                  ),
+                  textAlign: TextAlign.center,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
             ),
           ),
         ),
@@ -131,32 +230,52 @@ class GeminiQuickReplyWidget extends StatelessWidget {
     
     return _AnimatedQuickReply(
       index: index,
-      animated: animated,
+      animated: widget.animated,
       child: Material(
         color: Colors.transparent,
         child: InkWell(
-          onTap: () => onReplySelected(reply.value),
+          onTap: () => _handleQuickReplyTap(reply.value),
           borderRadius: BorderRadius.circular(8),
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
             decoration: BoxDecoration(
-              color: geminiBlue.withValues(alpha: 0.1),
+              color: isGreyedOut 
+                  ? Colors.grey[300]
+                  : geminiBlue.withValues(alpha: 0.1),
               border: Border.all(
-                color: geminiBlue.withValues(alpha: 0.3),
+                color: isGreyedOut 
+                    ? Colors.grey[400]!
+                    : geminiBlue.withValues(alpha: 0.3),
                 width: 0.5,
               ),
               borderRadius: BorderRadius.circular(8),
             ),
-            child: Text(
-              reply.text,
-              style: TextStyle(
-                color: geminiBlue,
-                fontSize: 11,
-                fontWeight: FontWeight.w500,
-              ),
-              textAlign: TextAlign.center,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (isSelected)
+                  const Padding(
+                    padding: EdgeInsets.only(right: 4),
+                    child: Icon(
+                      Icons.check_circle,
+                      color: Colors.green,
+                      size: 10,
+                    ),
+                  ),
+                Text(
+                  reply.text,
+                  style: TextStyle(
+                    color: isGreyedOut 
+                        ? Colors.grey[600]
+                        : geminiBlue,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w500,
+                  ),
+                  textAlign: TextAlign.center,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
             ),
           ),
         ),

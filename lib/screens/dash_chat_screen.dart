@@ -188,6 +188,7 @@ class _DashChatScreenState extends State<DashChatScreen> {
                                   ChatMessageWidget(message: message),
                                 QuickReplyWidget(
                                   quickReplies: message.suggestedReplies!,
+                                  messageId: message.id,
                                   onReplySelected: (reply) {
                                     chatProvider.sendMessage(reply.value);
                                     _scrollToBottom();

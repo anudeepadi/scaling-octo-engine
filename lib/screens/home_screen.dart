@@ -632,6 +632,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                             ),
                             QuickReplyWidget(
                               quickReplies: message.suggestedReplies!,
+                              messageId: message.id,
                               onReplySelected: (reply) {
                                 dashChatProvider.handleQuickReply(reply);
                                 _scrollToBottom();

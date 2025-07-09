@@ -5,6 +5,7 @@ import '../video_player_widget.dart';
 import '../youtube_player_widget.dart';
 import '../quick_reply_widget.dart';
 import '../../utils/debug_config.dart';
+import '../../services/quick_reply_state_service.dart';
 
 class IosChatMessageWidget extends StatefulWidget {
   final ChatMessage message;
@@ -25,6 +26,45 @@ class IosChatMessageWidget extends StatefulWidget {
 }
 
 class _IosChatMessageWidgetState extends State<IosChatMessageWidget> {
+  final QuickReplyStateService _quickReplyService = QuickReplyStateService();
+
+  void _showAlreadySelectedDialog() {
+    showCupertinoDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return CupertinoAlertDialog(
+          title: const Text('Option Already Selected'),
+          content: const Text('You have already selected an option for this question and cannot select another one.'),
+          actions: [
+            CupertinoDialogAction(
+              child: const Text('OK'),
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  void _handleQuickReplyTap(String value) {
+    // Check if any option has already been selected for this message
+    if (_quickReplyService.isMessageSetDisabled(widget.message.id)) {
+      _showAlreadySelectedDialog();
+      return;
+    }
+    
+    // Select this option and disable all others in the set
+    _quickReplyService.selectQuickReply(widget.message.id, value);
+    
+    // Trigger UI update
+    setState(() {});
+    
+    // Call the original callback
+    widget.onQuickReplyTap?.call(value);
+  }
+
   Widget _buildContent() {
     switch (widget.message.type) {
       case MessageType.text:
@@ -165,26 +205,52 @@ class _IosChatMessageWidgetState extends State<IosChatMessageWidget> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: widget.message.suggestedReplies!
-                      .map((reply) => Container(
-                            margin: const EdgeInsets.only(bottom: 8),
-                            child: CupertinoButton(
-                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                              color: widget.message.isMe
-                                  ? CupertinoColors.white.withValues(alpha: 0.2)
-                                  : CupertinoColors.activeBlue.withValues(alpha: 0.1),
-                              borderRadius: BorderRadius.circular(16),
-                              child: Text(
-                                reply.text,
-                                style: TextStyle(
-                                  color: widget.message.isMe
-                                      ? CupertinoColors.white
-                                      : CupertinoColors.activeBlue,
+                      .map((reply) {
+                        final bool isSelected = _quickReplyService.isQuickReplySelected(widget.message.id, reply.value);
+                        final bool isDisabled = _quickReplyService.isOptionDisabled(widget.message.id, reply.value);
+                        final bool isGreyedOut = isDisabled || isSelected;
+                        
+                        return Container(
+                          margin: const EdgeInsets.only(bottom: 8),
+                          child: CupertinoButton(
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                            color: isGreyedOut 
+                                ? CupertinoColors.systemGrey4 // Greyed out color
+                                : (widget.message.isMe
+                                    ? CupertinoColors.white.withValues(alpha: 0.2)
+                                    : CupertinoColors.activeBlue.withValues(alpha: 0.1)),
+                            borderRadius: BorderRadius.circular(16),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                if (isSelected)
+                                  const Padding(
+                                    padding: EdgeInsets.only(right: 8),
+                                    child: Icon(
+                                      CupertinoIcons.check_mark_circled_solid,
+                                      color: CupertinoColors.systemGreen,
+                                      size: 16,
+                                    ),
+                                  ),
+                                Expanded(
+                                  child: Text(
+                                    reply.text,
+                                    style: TextStyle(
+                                      color: isGreyedOut
+                                          ? CupertinoColors.systemGrey2 // Greyed out text
+                                          : (widget.message.isMe
+                                              ? CupertinoColors.white
+                                              : CupertinoColors.activeBlue),
+                                    ),
+                                    textAlign: TextAlign.center,
+                                  ),
                                 ),
-                                textAlign: TextAlign.center,
-                              ),
-                              onPressed: () => widget.onQuickReplyTap?.call(reply.value),
+                              ],
                             ),
-                          ))
+                            onPressed: () => _handleQuickReplyTap(reply.value),
+                          ),
+                        );
+                      })
                       .toList(),
                 ),
               ),

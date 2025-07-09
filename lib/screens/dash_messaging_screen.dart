@@ -355,6 +355,7 @@ class _DashMessagingScreenState extends State<DashMessagingScreen> {
                           ChatMessageWidget(message: message),
                           QuickReplyWidget(
                             quickReplies: message.suggestedReplies!,
+                            messageId: message.id,
                             onReplySelected: (reply) {
                               dashChatProvider.handleQuickReply(reply);
                               _scrollToBottom();

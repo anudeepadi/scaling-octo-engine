@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'dart:io' show Platform;
+import 'dart:async' show TimeoutException;
 import 'package:provider/provider.dart';
 import 'providers/chat_provider.dart';
 import 'providers/channel_provider.dart';
@@ -15,6 +16,7 @@ import 'theme/app_theme.dart';
 import 'utils/app_localizations.dart';
 import 'utils/env_switcher.dart';
 import 'utils/platform_utils.dart';
+import 'utils/ios_performance_utils.dart';
 
 // Import Flutter localizations
 import 'package:flutter_localizations/flutter_localizations.dart';
@@ -39,6 +41,12 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   try {
+    // Apply platform-specific optimizations
+    if (Platform.isIOS) {
+      developer.log('Applying iOS performance optimizations', name: 'App');
+      await IOSPerformanceUtils.applyOptimizations();
+    }
+    
     // Determine which .env file to load
     final prefs = await SharedPreferences.getInstance();
     final currentEnv = prefs.getString('current_env');
@@ -70,9 +78,20 @@ void main() async {
     developer.log('Original server URL: $originalUrl', name: 'App');
     developer.log('Transformed server URL: $transformedUrl', name: 'App');
     
-    // Initialize Firebase
+    // Initialize Firebase with platform-specific optimizations
     try {
-      await Firebase.initializeApp();
+      // For iOS, use a longer timeout for Firebase initialization
+      final firebaseInitTimeout = Platform.isIOS 
+          ? const Duration(seconds: 15)
+          : const Duration(seconds: 10);
+          
+      await Firebase.initializeApp().timeout(
+        firebaseInitTimeout,
+        onTimeout: () {
+          developer.log('Firebase initialization timed out after ${firebaseInitTimeout.inSeconds}s', name: 'App');
+          throw TimeoutException('Firebase initialization timed out');
+        },
+      );
       developer.log('Firebase initialized successfully', name: 'App');
       
       // Initialize Firebase App Check to fix "No AppCheckProvider installed" error

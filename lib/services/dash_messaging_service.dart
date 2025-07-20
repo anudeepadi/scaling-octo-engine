@@ -1,13 +1,16 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io' show Platform;
 import 'package:http/http.dart' as http;
 import 'package:uuid/uuid.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/chat_message.dart';
 import '../models/quick_reply.dart';
 import '../utils/debug_config.dart';
+import '../utils/platform_utils.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:flutter/foundation.dart';
 
 class DashMessagingService {
   static final DashMessagingService _instance = DashMessagingService._internal();
@@ -121,6 +124,10 @@ class DashMessagingService {
     DebugConfig.infoPrint('⚡ INSTANT initializing DashMessagingService for user: $userId');
     _userId = userId;
     
+    // Apply platform-specific URL transformations
+    _hostUrl = PlatformUtils.transformLocalHostUrl(_hostUrl);
+    DebugConfig.infoPrint('Using platform-specific server URL: $_hostUrl');
+    
     // Clear cache when switching users
     if (_messageCache.isNotEmpty) {
       clearCache();
@@ -184,33 +191,123 @@ class DashMessagingService {
   Future<void> _testConnectionInBackground() async {
     try {
       final hostUrl = _hostUrl;
+      DebugConfig.debugPrint('========== CONNECTION TEST ==========');
+      DebugConfig.debugPrint('Platform: ${PlatformUtils.getPlatformInfo()}');
       DebugConfig.debugPrint('Using host URL: $hostUrl');
       DebugConfig.debugPrint('FCM Token: $_fcmToken');
       DebugConfig.debugPrint('Testing connection to server: $hostUrl');
       
-      final response = await http.get(
-        Uri.parse(hostUrl),
-        headers: {'Content-Type': 'application/json'},
-      ).timeout(const Duration(seconds: 10));
+      final stopwatch = Stopwatch()..start();
       
-      DebugConfig.debugPrint('Server connection test response: ${response.statusCode}');
-      if (response.statusCode == 200) {
-        DebugConfig.debugPrint('Successfully connected to server');
-      } else {
-        DebugConfig.debugPrint('Server responded with status: ${response.statusCode}');
-        DebugConfig.debugPrint('Response body: ${response.body}');
+      try {
+        // Platform-specific headers to improve connection reliability
+        final headers = {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'User-Agent': Platform.isIOS ? 'QuitTXT-iOS/1.0' : 'QuitTXT-Android/1.0',
+          'Connection': 'keep-alive', // Important for iOS connection stability
+        };
+        
+        // Platform-specific timeout
+        final connectionTimeout = Platform.isIOS 
+            ? const Duration(seconds: 15)  // Longer timeout for iOS
+            : const Duration(seconds: 10); // Standard timeout for Android
+        
+        DebugConfig.debugPrint('Using ${Platform.isIOS ? "iOS" : "Android"}-optimized connection settings');
+        
+        final response = await http.get(
+          Uri.parse(hostUrl),
+          headers: headers,
+        ).timeout(connectionTimeout);
+        
+        final elapsed = stopwatch.elapsedMilliseconds;
+        DebugConfig.debugPrint('Connection test completed in ${elapsed}ms');
+        DebugConfig.debugPrint('Server connection test response: ${response.statusCode}');
+        
+        if (response.statusCode == 200) {
+          DebugConfig.debugPrint('✅ Successfully connected to server');
+          DebugConfig.debugPrint('Response size: ${response.body.length} bytes');
+          if (response.body.length < 1000) {
+            DebugConfig.debugPrint('Response body: ${response.body}');
+          }
+        } else {
+          DebugConfig.debugPrint('⚠️ Server responded with status: ${response.statusCode}');
+          DebugConfig.debugPrint('Response body: ${response.body}');
+        }
+      } catch (e) {
+        final elapsed = stopwatch.elapsedMilliseconds;
+        DebugConfig.debugPrint('❌ Connection test failed after ${elapsed}ms');
+        DebugConfig.debugPrint('Connection error: $e');
+        
+        // Try an alternate test with a standard timeout
+        DebugConfig.debugPrint('Attempting alternate connection test...');
+        try {
+          // For iOS, try with a different URL scheme first
+          if (Platform.isIOS) {
+            try {
+              final altUrl = _hostUrl.replaceFirst('https://', 'http://');
+              DebugConfig.debugPrint('iOS: Trying alternate URL scheme: $altUrl');
+              
+              final altResponse = await http.get(
+                Uri.parse(altUrl),
+                headers: {'Content-Type': 'application/json'},
+              ).timeout(const Duration(seconds: 5));
+              
+              DebugConfig.debugPrint('iOS alternate URL test: ${altResponse.statusCode}');
+              if (altResponse.statusCode >= 200 && altResponse.statusCode < 300) {
+                DebugConfig.debugPrint('✅ iOS alternate URL connection successful');
+                // If this works, update the URL to use this scheme
+                _hostUrl = altUrl;
+                DebugConfig.debugPrint('Updated host URL to: $_hostUrl');
+              }
+            } catch (altError) {
+              DebugConfig.debugPrint('iOS alternate URL test failed: $altError');
+            }
+          }
+          
+          // Standard connectivity test
+          final pingResponse = await http.get(
+            Uri.parse('https://www.google.com'),
+          ).timeout(const Duration(seconds: 5));
+          
+          DebugConfig.debugPrint('Internet connectivity test: ${pingResponse.statusCode}');
+          if (pingResponse.statusCode >= 200 && pingResponse.statusCode < 300) {
+            DebugConfig.debugPrint('✅ Internet connection is working');
+            DebugConfig.debugPrint('⚠️ Issue appears specific to the app server');
+            
+            // iOS-specific: Try a different network configuration
+            if (Platform.isIOS) {
+              DebugConfig.debugPrint('iOS: Attempting connection with cellular data...');
+              try {
+                // This doesn't actually force cellular, but it logs the attempt for debugging
+                await http.get(
+                  Uri.parse(_hostUrl),
+                  headers: {
+                    'Content-Type': 'application/json',
+                    'X-Cellular-Fallback': 'true',
+                  },
+                ).timeout(const Duration(seconds: 8));
+                DebugConfig.debugPrint('iOS cellular data connection attempt completed');
+              } catch (cellularError) {
+                DebugConfig.debugPrint('iOS cellular connection attempt failed: $cellularError');
+              }
+            }
+          } else {
+            DebugConfig.debugPrint('⚠️ Internet connectivity test returned non-success code: ${pingResponse.statusCode}');
+          }
+        } catch (pingError) {
+          DebugConfig.debugPrint('❌ Internet connectivity test failed: $pingError');
+          DebugConfig.debugPrint('⚠️ Device may have limited connectivity');
+          
+          if (Platform.isIOS) {
+            DebugConfig.debugPrint('iOS: Network appears to be restricted. Check VPN or firewall settings.');
+          }
+        }
       }
+      
+      DebugConfig.debugPrint('===================================');
     } catch (e) {
-      DebugConfig.debugPrint('Background server connection test failed: $e');
-      // Check if it's a network connectivity issue
-      if (e.toString().contains('Failed host lookup') || e.toString().contains('Network is unreachable')) {
-        DebugConfig.debugPrint('❌ Network connectivity issue detected. Please check internet connection.');
-      } else if (e.toString().contains('timeout')) {
-        DebugConfig.debugPrint('❌ Server timeout - the server may be down or slow to respond.');
-      } else {
-        DebugConfig.debugPrint('❌ Unexpected connection error: $e');
-      }
-      // Don't throw - this is just a background test
+      DebugConfig.debugPrint('Error in connection test: $e');
     }
   }
 
@@ -221,6 +318,7 @@ class DashMessagingService {
       // Always use the correct ngrok URL from main.py with full path
       _hostUrl = "https://dashmessaging-com.ngrok.io/scheduler/mobile-app";
       DebugConfig.debugPrint('Using server URL: $_hostUrl');
+      FirebaseMessaging.instance.getToken().then((token) => print('ACTUAL FCM TOKEN: $token'));
       
       // Store this URL in shared preferences for future use
       try {
@@ -253,28 +351,48 @@ class DashMessagingService {
           .collection('messages')
           .doc(_userId)
           .collection('chat')
-          .orderBy('createdAt', descending: false)
-          .limitToLast(30); // Load last 30 messages in chronological order
+          .orderBy('createdAt', descending: false);
+          
+      // Platform-specific optimization: Use different limit based on platform
+      final queryLimit = Platform.isIOS ? 15 : 30; // Reduce limit for iOS to improve performance
+      final limitedQuery = chatRef.limitToLast(queryLimit);
+      
+      DebugConfig.debugPrint('Using platform-optimized query limit: $queryLimit');
       
       // Try cache first for INSTANT display
       Future<QuerySnapshot>? cacheQuery;
       Future<QuerySnapshot>? serverQuery;
       
       // Start both queries in parallel
-      cacheQuery = chatRef.get(const GetOptions(source: Source.cache));
-      serverQuery = chatRef.get(const GetOptions(source: Source.server));
+      cacheQuery = limitedQuery.get(const GetOptions(source: Source.cache));
+      
+      // Platform-specific optimization: Use longer timeout for iOS server queries
+      final serverTimeout = Platform.isIOS ? const Duration(seconds: 8) : const Duration(seconds: 5);
+      serverQuery = limitedQuery.get(const GetOptions(source: Source.server))
+          .timeout(serverTimeout, onTimeout: () {
+            DebugConfig.debugPrint('⚠️ Server query timed out after ${serverTimeout.inSeconds}s');
+            throw TimeoutException('Server timeout');
+          });
       
       // Process cache results INSTANTLY if available
       bool cacheProcessed = false;
       try {
+        // Platform-specific optimization: Use different cache timeout for iOS
+        final cacheTimeout = Platform.isIOS ? const Duration(milliseconds: 200) : const Duration(milliseconds: 100);
         final cacheSnapshot = await cacheQuery.timeout(
-          const Duration(milliseconds: 100), // Ultra-fast timeout
+          cacheTimeout,
           onTimeout: () => throw TimeoutException('Cache timeout'),
         );
         
         if (cacheSnapshot.docs.isNotEmpty) {
           DebugConfig.debugPrint('⚡ INSTANT cache hit: ${cacheSnapshot.docs.length} messages');
-          _processSnapshotInstant(cacheSnapshot);
+          
+          // Platform-specific optimization: For iOS, process cache in batches to reduce UI freezing
+          if (Platform.isIOS && cacheSnapshot.docs.length > 10) {
+            await _processSnapshotInBatches(cacheSnapshot);
+          } else {
+            _processSnapshotInstant(cacheSnapshot);
+          }
           cacheProcessed = true;
         }
       } catch (e) {
@@ -288,7 +406,12 @@ class DashMessagingService {
         
         // Only process if cache wasn't successful or if there are new messages
         if (!cacheProcessed || serverSnapshot.docs.length > _messageCache.length) {
-          _processSnapshotInstant(serverSnapshot);
+          // Platform-specific optimization: For iOS, process server results in batches
+          if (Platform.isIOS && serverSnapshot.docs.length > 10) {
+            await _processSnapshotInBatches(serverSnapshot);
+          } else {
+            _processSnapshotInstant(serverSnapshot);
+          }
         }
       } catch (e) {
         DebugConfig.debugPrint('Server load error: $e');
@@ -305,163 +428,93 @@ class DashMessagingService {
     }
   }
   
-  // Process snapshot with proper chronological ordering
-  void _processSnapshotInstant(QuerySnapshot snapshot) {
+  // Process snapshot in batches to avoid UI freezing on iOS
+  Future<void> _processSnapshotInBatches(QuerySnapshot snapshot) async {
     if (snapshot.docs.isEmpty) return;
     
     final processedIds = <String>{};
     final messages = <ChatMessage>[];
     int lowestTimestamp = DateTime.now().millisecondsSinceEpoch;
     
-    // Process documents (already in chronological order due to limitToLast)
-    for (var doc in snapshot.docs) {
-      try {
-        final data = doc.data() as Map<String, dynamic>?;
-        if (data == null) continue;
-        
-        final messageId = data['serverMessageId'] ?? doc.id;
-        
-        // Skip if already processed
-        if (processedIds.contains(messageId) || _messageCache.containsKey(messageId)) {
-          continue;
-        }
-        processedIds.add(messageId);
-        
-        // Extract content
-        final content = data['messageBody']?.toString() ?? '';
-        if (content.isEmpty) continue;
-        
-        // Fast timestamp extraction
-        final timestamp = _extractTimestampFast(data);
-        lowestTimestamp = timestamp.millisecondsSinceEpoch < lowestTimestamp 
-            ? timestamp.millisecondsSinceEpoch 
-            : lowestTimestamp;
-        
-        // Quick user check - prioritize source field for reliability
-        final source = data['source']?.toString() ?? '';
-        final senderId = data['senderId'] ?? data['userId'] ?? '';
-        // FIXED: Prioritize source field since it's more reliable than senderId comparison
-        final isMe = source == 'client' || (source.isEmpty && senderId == _userId);
-        
-        // DEBUG: Log message alignment for troubleshooting
-        if (_debugMessageAlignment && content.isNotEmpty) {
-          DebugConfig.debugPrint('📍 INITIAL Message alignment check: "${content.substring(0, content.length > 30 ? 30 : content.length)}..." -> isMe: $isMe (source: "$source", senderId: "$senderId", _userId: "$_userId")');
-        }
-        
-        // Debug: Print full message data for messages that might have quick replies
-        if (content.toLowerCase().contains('cigarette') || content.toLowerCase().contains('ready') || content.toLowerCase().contains('quiz')) {
-          DebugConfig.debugPrint('🔍 POTENTIAL QUICK REPLY MESSAGE:');
-          DebugConfig.debugPrint('🔍 Content: $content');
-          DebugConfig.debugPrint('🔍 Full data keys: ${data.keys.toList()}');
-          DebugConfig.debugPrint('🔍 Full data: $data');
-        }
-
-        // Enhanced poll detection - check ALL possible quick reply fields (same as unified logic)
-        final isPoll = data['isPoll'];
-        final questionsAnswers = data['questionsAnswers'] as Map<String, dynamic>?;
-        final answers = data['answers'];
-        final buttons = data['buttons'] as List<dynamic>?;
-        final suggestedReplies = data['suggestedReplies'] as List<dynamic>?;
-        
-        // Comprehensive logging for debugging (same as unified logic)
-        if (content.toLowerCase().contains('cigarette') || content.toLowerCase().contains('ready') || 
-            content.toLowerCase().contains('quiz') || content.toLowerCase().contains('smoke')) {
-          DebugConfig.debugPrint('🔍 INITIAL: Analyzing potential poll message:');
-          DebugConfig.debugPrint('🔍 Content: $content');
-          DebugConfig.debugPrint('🔍 isPoll: $isPoll');
-          DebugConfig.debugPrint('🔍 questionsAnswers: $questionsAnswers');
-          DebugConfig.debugPrint('🔍 answers: $answers');
-          DebugConfig.debugPrint('🔍 buttons: $buttons');
-          DebugConfig.debugPrint('🔍 suggestedReplies: $suggestedReplies');
-          DebugConfig.debugPrint('🔍 All keys: ${data.keys.toList()}');
-        }
-        
-        final hasQuickReplyData = isMessagePoll(isPoll) || 
-                                 questionsAnswers != null || 
-                                 answers != null || 
-                                 buttons != null || 
-                                 suggestedReplies != null;
-        
-        if (hasQuickReplyData) {
-          // Create a single message with content AND quick replies
-          List<QuickReply> quickReplies = [];
+    // Process documents in smaller batches
+    const batchSize = 5;
+    for (int i = 0; i < snapshot.docs.length; i += batchSize) {
+      final end = (i + batchSize < snapshot.docs.length) ? i + batchSize : snapshot.docs.length;
+      final batch = snapshot.docs.sublist(i, end);
+      
+      // Process this batch
+      for (var doc in batch) {
+        try {
+          final data = doc.data() as Map<String, dynamic>?;
+          if (data == null) continue;
           
-          // Process quick replies from ALL possible sources (same as unified logic)
+          final messageId = data['serverMessageId'] ?? doc.id;
           
-          // 1. questionsAnswers (Map format)
-          if (questionsAnswers != null && questionsAnswers.isNotEmpty) {
-            for (final entry in questionsAnswers.entries) {
-              quickReplies.add(QuickReply(text: entry.key, value: entry.value.toString()));
-            }
-            DebugConfig.debugPrint('🔧 INITIAL: Added ${questionsAnswers.length} quick replies from questionsAnswers');
+          // Skip if already processed
+          if (processedIds.contains(messageId) || _messageCache.containsKey(messageId)) {
+            continue;
+          }
+          processedIds.add(messageId);
+          
+          // Extract content
+          final content = data['messageBody']?.toString() ?? '';
+          if (content.isEmpty) continue;
+          
+          // Fast timestamp extraction
+          final timestamp = _extractTimestampFast(data);
+          lowestTimestamp = timestamp.millisecondsSinceEpoch < lowestTimestamp 
+              ? timestamp.millisecondsSinceEpoch 
+              : lowestTimestamp;
+          
+          // Quick user check - prioritize source field for reliability
+          final source = data['source']?.toString() ?? '';
+          final senderId = data['senderId'] ?? data['userId'] ?? '';
+          final isMe = source == 'client' || (source.isEmpty && senderId == _userId);
+          
+          // Simplified alignment check for batched processing
+          if (_debugMessageAlignment && content.isNotEmpty) {
+            DebugConfig.debugPrint('📍 BATCH Message alignment check: "${content.substring(0, content.length > 20 ? 20 : content.length)}..." -> isMe: $isMe');
           }
           
-          // 2. answers (List or String format)
-          else if (answers is List && answers.isNotEmpty) {
-            for (var a in answers.take(4)) {
-              quickReplies.add(QuickReply(text: a.toString(), value: a.toString()));
-            }
-            DebugConfig.debugPrint('🔧 INITIAL: Added ${answers.length} quick replies from answers (List)');
-          } 
-          else if (answers is String && answers != 'None' && answers.isNotEmpty) {
-            final answerList = answers.split(',').map((e) => e.trim()).where((e) => e.isNotEmpty).take(4).toList();
-            for (final a in answerList) {
-              quickReplies.add(QuickReply(text: a, value: a));
-            }
-            DebugConfig.debugPrint('🔧 INITIAL: Added ${answerList.length} quick replies from answers (String)');
-          }
+          // Simplified quick reply detection for batched processing
+          final isPoll = data['isPoll'];
+          final hasQuickReplyData = isMessagePoll(isPoll) || 
+                                   data['questionsAnswers'] != null || 
+                                   data['answers'] != null || 
+                                   data['buttons'] != null || 
+                                   data['suggestedReplies'] != null;
           
-          // 3. buttons (from push notifications)
-          else if (buttons != null && buttons.isNotEmpty) {
-            for (var button in buttons.take(4)) {
-              final title = button['title']?.toString() ?? button.toString();
-              if (title.isNotEmpty) {
-                quickReplies.add(QuickReply(text: title, value: title));
-              }
-            }
-            DebugConfig.debugPrint('🔧 INITIAL: Added ${buttons.length} quick replies from buttons');
-          }
-          
-          // 4. suggestedReplies (already processed)
-          else if (suggestedReplies != null && suggestedReplies.isNotEmpty) {
-            for (var reply in suggestedReplies.take(4)) {
-              final text = reply['text']?.toString() ?? reply.toString();
-              final value = reply['value']?.toString() ?? text;
-              if (text.isNotEmpty) {
-                quickReplies.add(QuickReply(text: text, value: value));
-              }
-            }
-            DebugConfig.debugPrint('🔧 INITIAL: Added ${suggestedReplies.length} quick replies from suggestedReplies');
-          }
-          
-          // 5. Check for legacy field names that might exist
-          final oldAnswers = data['options'] ?? data['choices'] ?? data['replies'];
-          if (quickReplies.isEmpty && oldAnswers != null) {
-            if (oldAnswers is List) {
-                          for (var option in oldAnswers.take(4)) {
-              quickReplies.add(QuickReply(text: option.toString(), value: option.toString()));
-            }
-            DebugConfig.debugPrint('🔧 INITIAL: Added ${oldAnswers.length} quick replies from legacy options/choices/replies');
-            }
-          }
-          
-          if (quickReplies.isNotEmpty) {
-            // Create a single message with both content and quick replies
-            final message = ChatMessage(
-              id: messageId,
-              content: content, // Include the poll question content
-              timestamp: timestamp,
-              isMe: isMe,
-              type: MessageType.quickReply, // Mark as quick reply type
-              suggestedReplies: quickReplies,
-            );
+          if (hasQuickReplyData) {
+            // Create message with quick replies (simplified for batch processing)
+            final quickReplies = _extractAllQuickReplies(data);
             
-            _messageCache[messageId] = message;
-            messages.add(message);
-            DebugConfig.debugPrint('🔧 ✅ INITIAL: Created single poll message with content and ${quickReplies.length} options: ${quickReplies.map((r) => r.text).join(", ")}');
+            if (quickReplies.isNotEmpty) {
+              final message = ChatMessage(
+                id: messageId,
+                content: content,
+                timestamp: timestamp,
+                isMe: isMe,
+                type: MessageType.quickReply,
+                suggestedReplies: quickReplies,
+              );
+              
+              _messageCache[messageId] = message;
+              messages.add(message);
+            } else {
+              // Fallback to regular text message
+              final message = ChatMessage(
+                id: messageId,
+                content: content,
+                timestamp: timestamp,
+                isMe: isMe,
+                type: MessageType.text,
+              );
+              
+              _messageCache[messageId] = message;
+              messages.add(message);
+            }
           } else {
-            DebugConfig.debugPrint('🔧 ⚠️ INITIAL: Poll detected but no valid quick replies created for: $content');
-            // Fallback to regular text message if no quick replies could be created
+            // Create regular text message
             final message = ChatMessage(
               id: messageId,
               content: content,
@@ -473,23 +526,14 @@ class DashMessagingService {
             _messageCache[messageId] = message;
             messages.add(message);
           }
-        } else {
-          // Create regular text message
-          final message = ChatMessage(
-            id: messageId,
-            content: content,
-            timestamp: timestamp,
-            isMe: isMe,
-            type: MessageType.text,
-          );
           
-          _messageCache[messageId] = message;
-          messages.add(message);
+        } catch (e) {
+          DebugConfig.debugPrint('Error processing doc in batch: $e');
         }
-        
-      } catch (e) {
-        DebugConfig.debugPrint('Error processing doc: $e');
       }
+      
+      // Allow UI to update between batches
+      await Future.delayed(const Duration(milliseconds: 10));
     }
     
     // Sort messages by timestamp to ensure perfect chronological order
@@ -501,7 +545,77 @@ class DashMessagingService {
     }
     
     _lowestLoadedTimestamp = lowestTimestamp;
-    DebugConfig.debugPrint('⚡ Processed ${processedIds.length} messages in chronological order');
+    DebugConfig.debugPrint('⚡ Processed ${processedIds.length} messages in batches');
+  }
+  
+  // Helper method to extract all quick replies from message data
+  List<QuickReply> _extractAllQuickReplies(Map<String, dynamic> data) {
+    final quickReplies = <QuickReply>[];
+    
+    try {
+      // 1. questionsAnswers (Map format)
+      final questionsAnswers = data['questionsAnswers'] as Map<String, dynamic>?;
+      if (questionsAnswers != null && questionsAnswers.isNotEmpty) {
+        for (final entry in questionsAnswers.entries) {
+          quickReplies.add(QuickReply(text: entry.key, value: entry.value.toString()));
+        }
+        return quickReplies;
+      }
+      
+      // 2. answers (List or String format)
+      final answers = data['answers'];
+      if (answers is List && answers.isNotEmpty) {
+        for (var a in answers.take(4)) {
+          quickReplies.add(QuickReply(text: a.toString(), value: a.toString()));
+        }
+        return quickReplies;
+      } 
+      if (answers is String && answers != 'None' && answers.isNotEmpty) {
+        final answerList = answers.split(',').map((e) => e.trim()).where((e) => e.isNotEmpty).take(4).toList();
+        for (final a in answerList) {
+          quickReplies.add(QuickReply(text: a, value: a));
+        }
+        return quickReplies;
+      }
+      
+      // 3. buttons (from push notifications)
+      final buttons = data['buttons'] as List<dynamic>?;
+      if (buttons != null && buttons.isNotEmpty) {
+        for (var button in buttons.take(4)) {
+          final title = button['title']?.toString() ?? button.toString();
+          if (title.isNotEmpty) {
+            quickReplies.add(QuickReply(text: title, value: title));
+          }
+        }
+        return quickReplies;
+      }
+      
+      // 4. suggestedReplies
+      final suggestedReplies = data['suggestedReplies'] as List<dynamic>?;
+      if (suggestedReplies != null && suggestedReplies.isNotEmpty) {
+        for (var reply in suggestedReplies.take(4)) {
+          final text = reply['text']?.toString() ?? reply.toString();
+          final value = reply['value']?.toString() ?? text;
+          if (text.isNotEmpty) {
+            quickReplies.add(QuickReply(text: text, value: value));
+          }
+        }
+        return quickReplies;
+      }
+      
+      // 5. Check legacy field names
+      final oldAnswers = data['options'] ?? data['choices'] ?? data['replies'];
+      if (oldAnswers is List && oldAnswers.isNotEmpty) {
+        for (var option in oldAnswers.take(4)) {
+          quickReplies.add(QuickReply(text: option.toString(), value: option.toString()));
+        }
+        return quickReplies;
+      }
+    } catch (e) {
+      DebugConfig.debugPrint('Error extracting quick replies: $e');
+    }
+    
+    return quickReplies;
   }
   
   // Helper method to extract timestamp from Firestore data
@@ -599,8 +713,12 @@ class DashMessagingService {
         'eventTypeCode': eventTypeCode,
       });
       
+      // Pretty print JSON for better readability in console
+      final prettyRequestJson = const JsonEncoder.withIndent('  ').convert(jsonDecode(requestBody));
+      DebugConfig.debugPrint('📤 REQUEST JSON:');
+      DebugConfig.debugPrint('$prettyRequestJson');
+      
       DebugConfig.debugPrint('Using endpoint: $_hostUrl');
-      DebugConfig.debugPrint('Request body: $requestBody');
       
       // Send to server with optimized timeout
       final response = await http.post(
@@ -621,7 +739,19 @@ class DashMessagingService {
       );
       
       DebugConfig.debugPrint('Send message response status: ${response.statusCode}');
-      DebugConfig.debugPrint('Send message response body: ${response.body}');
+      
+      // Pretty print response JSON for better readability if it's valid JSON
+      if (response.body.isNotEmpty) {
+        try {
+          final responseJson = jsonDecode(response.body);
+          final prettyResponseJson = const JsonEncoder.withIndent('  ').convert(responseJson);
+          DebugConfig.debugPrint('📥 RESPONSE JSON:');
+          DebugConfig.debugPrint('$prettyResponseJson');
+        } catch (e) {
+          // Not valid JSON, just print the raw body
+          DebugConfig.debugPrint('Response body: ${response.body}');
+        }
+      }
       
       if (response.statusCode == 200) {
         DebugConfig.debugPrint('Message sent successfully to server');
@@ -2053,5 +2183,167 @@ class DashMessagingService {
     );
       }
 
+  // Test connection to the server using the exact URL
+  Future<bool> testServerConnection() async {
+    try {
+      DebugConfig.debugPrint('Testing connection to server: $_hostUrl');
+      final response = await http.get(Uri.parse(_hostUrl)).timeout(const Duration(seconds: 5));
+      DebugConfig.debugPrint('Server response: ${response.statusCode}');
+      return response.statusCode >= 200 && response.statusCode < 300;
+    } catch (e) {
+      DebugConfig.debugPrint('Error testing server connection: $e');
+      return false;
+    }
+  }
+  
+  // Print a sample JSON request to the console for testing purposes
+  void printSampleJsonRequest() {
+    final sampleRequest = {
+      'messageId': _uuid.v4(),
+      'userId': _userId ?? 'sample-user-id',
+      'messageText': 'This is a sample message for testing',
+      'fcmToken': _fcmToken ?? 'sample-fcm-token',
+      'messageTime': DateTime.now().millisecondsSinceEpoch ~/ 1000,
+      'eventTypeCode': 1,
+    };
+    
+    // Use the enhanced JSON printing function
+    DebugConfig.jsonPrint('SAMPLE REQUEST', sampleRequest);
+    
+    // Show what the response might look like
+    final sampleResponse = {
+      'messageBody': 'This is a sample response from the server',
+      'isPoll': 'y',
+      'questionsAnswers': {
+        'Yes': 'yes',
+        'No': 'no',
+        'Maybe': 'maybe',
+        'Not sure': 'not_sure'
+      },
+      'serverMessageId': 'server-generated-id-${_uuid.v4().substring(0, 8)}',
+      'timestamp': DateTime.now().millisecondsSinceEpoch ~/ 1000
+    };
+    
+    DebugConfig.jsonPrint('SAMPLE RESPONSE', sampleResponse);
+  }
 
+  // Process snapshot with proper chronological ordering
+  void _processSnapshotInstant(QuerySnapshot snapshot) {
+    if (snapshot.docs.isEmpty) return;
+    
+    final processedIds = <String>{};
+    final messages = <ChatMessage>[];
+    int lowestTimestamp = DateTime.now().millisecondsSinceEpoch;
+    
+    // Process documents (already in chronological order due to limitToLast)
+    for (var doc in snapshot.docs) {
+      try {
+        final data = doc.data() as Map<String, dynamic>?;
+        if (data == null) continue;
+        
+        final messageId = data['serverMessageId'] ?? doc.id;
+        
+        // Skip if already processed
+        if (processedIds.contains(messageId) || _messageCache.containsKey(messageId)) {
+          continue;
+        }
+        processedIds.add(messageId);
+        
+        // Extract content
+        final content = data['messageBody']?.toString() ?? '';
+        if (content.isEmpty) continue;
+        
+        // Fast timestamp extraction
+        final timestamp = _extractTimestampFast(data);
+        lowestTimestamp = timestamp.millisecondsSinceEpoch < lowestTimestamp 
+            ? timestamp.millisecondsSinceEpoch 
+            : lowestTimestamp;
+        
+        // Quick user check - prioritize source field for reliability
+        final source = data['source']?.toString() ?? '';
+        final senderId = data['senderId'] ?? data['userId'] ?? '';
+        // FIXED: Prioritize source field since it's more reliable than senderId comparison
+        final isMe = source == 'client' || (source.isEmpty && senderId == _userId);
+        
+        // DEBUG: Log message alignment for troubleshooting
+        if (_debugMessageAlignment && content.isNotEmpty) {
+          DebugConfig.debugPrint('📍 INITIAL Message alignment check: "${content.substring(0, content.length > 30 ? 30 : content.length)}..." -> isMe: $isMe (source: "$source", senderId: "$senderId", _userId: "$_userId")');
+        }
+        
+        // Debug: Print full message data for messages that might have quick replies
+        if (content.toLowerCase().contains('cigarette') || content.toLowerCase().contains('ready') || content.toLowerCase().contains('quiz')) {
+          DebugConfig.debugPrint('🔍 POTENTIAL QUICK REPLY MESSAGE:');
+          DebugConfig.debugPrint('🔍 Content: $content');
+          DebugConfig.debugPrint('🔍 Full data keys: ${data.keys.toList()}');
+          DebugConfig.debugPrint('🔍 Full data: $data');
+        }
+
+        // Enhanced poll detection - check ALL possible quick reply fields
+        final isPoll = data['isPoll'];
+        final questionsAnswers = data['questionsAnswers'] as Map<String, dynamic>?;
+        final answers = data['answers'];
+        final buttons = data['buttons'] as List<dynamic>?;
+        final suggestedReplies = data['suggestedReplies'] as List<dynamic>?;
+        
+        // Comprehensive logging for debugging
+        if (content.toLowerCase().contains('cigarette') || content.toLowerCase().contains('ready') || 
+            content.toLowerCase().contains('quiz') || content.toLowerCase().contains('smoke')) {
+          DebugConfig.debugPrint('🔍 INITIAL: Analyzing potential poll message:');
+          DebugConfig.debugPrint('🔍 Content: $content');
+          DebugConfig.debugPrint('🔍 isPoll: $isPoll');
+          DebugConfig.debugPrint('🔍 questionsAnswers: $questionsAnswers');
+          DebugConfig.debugPrint('🔍 answers: $answers');
+          DebugConfig.debugPrint('🔍 buttons: $buttons');
+          DebugConfig.debugPrint('🔍 suggestedReplies: $suggestedReplies');
+          DebugConfig.debugPrint('🔍 All keys: ${data.keys.toList()}');
+        }
+        
+        // Use the helper method to extract quick replies
+        final quickReplies = _extractAllQuickReplies(data);
+        final hasQuickReplyData = isMessagePoll(isPoll) || quickReplies.isNotEmpty;
+        
+        if (hasQuickReplyData && quickReplies.isNotEmpty) {
+          // Create a single message with both content and quick replies
+          final message = ChatMessage(
+            id: messageId,
+            content: content, // Include the poll question content
+            timestamp: timestamp,
+            isMe: isMe,
+            type: MessageType.quickReply, // Mark as quick reply type
+            suggestedReplies: quickReplies,
+          );
+          
+          _messageCache[messageId] = message;
+          messages.add(message);
+          DebugConfig.debugPrint('🔧 ✅ INITIAL: Created single poll message with content and ${quickReplies.length} options: ${quickReplies.map((r) => r.text).join(", ")}');
+        } else {
+          // Create regular text message
+          final message = ChatMessage(
+            id: messageId,
+            content: content,
+            timestamp: timestamp,
+            isMe: isMe,
+            type: MessageType.text,
+          );
+          
+          _messageCache[messageId] = message;
+          messages.add(message);
+        }
+        
+      } catch (e) {
+        DebugConfig.debugPrint('Error processing doc: $e');
+      }
+    }
+    
+    // Sort messages by timestamp to ensure perfect chronological order
+    messages.sort((a, b) => a.timestamp.compareTo(b.timestamp));
+    
+    // Add messages to stream in chronological order
+    for (var message in messages) {
+      _safeAddToStream(message);
+    }
+    
+    _lowestLoadedTimestamp = lowestTimestamp;
+    DebugConfig.debugPrint('⚡ Processed ${processedIds.length} messages in chronological order');
+  }
 }

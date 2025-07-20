@@ -3,19 +3,24 @@ import 'package:http/http.dart' as http;
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:uuid/uuid.dart';
 import '../utils/debug_config.dart';
+import '../utils/platform_utils.dart';
 
 class ServerMessageService {
   final FirebaseFirestore _firestore;
   final String _userId;
   final String _fcmToken;
-  final String _serverUrl = "http://localhost:8080/scheduler";
+  late String _serverUrl;
 
   ServerMessageService({
     required String userId,
     required String fcmToken,
   }) : _userId = userId,
        _fcmToken = fcmToken,
-       _firestore = FirebaseFirestore.instance;
+       _firestore = FirebaseFirestore.instance {
+    // Apply platform-specific URL transformation
+    _serverUrl = PlatformUtils.transformLocalHostUrl("http://localhost:8080/scheduler");
+    DebugConfig.infoPrint('Using platform-specific server URL: $_serverUrl');
+  }
 
   // Process a message both locally (Firebase) and remotely (Java server)
   Future<void> processMessage({
@@ -60,13 +65,20 @@ class ServerMessageService {
         'fcmToken': _fcmToken,
       };
       
-      DebugConfig.debugPrint('Sending message to server: $payload');
+      // Pretty print JSON for better readability in console
+      final prettyRequestJson = const JsonEncoder.withIndent('  ').convert(payload);
+      DebugConfig.debugPrint('📤 SERVER REQUEST JSON:');
+      DebugConfig.debugPrint('$prettyRequestJson');
+      
+      DebugConfig.debugPrint('Sending message to server endpoint: $endpoint');
       
       final response = await http.post(
         Uri.parse(endpoint),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode(payload),
       ).timeout(const Duration(seconds: 10));
+      
+      DebugConfig.debugPrint('Server response status: ${response.statusCode}');
       
       if (response.statusCode == 200 || response.statusCode == 202) {
         DebugConfig.debugPrint('Message sent successfully to Java server');
@@ -75,6 +87,12 @@ class ServerMessageService {
         if (response.body.isNotEmpty) {
           try {
             final responseData = jsonDecode(response.body);
+            
+            // Pretty print response JSON
+            final prettyResponseJson = const JsonEncoder.withIndent('  ').convert(responseData);
+            DebugConfig.debugPrint('📥 SERVER RESPONSE JSON:');
+            DebugConfig.debugPrint('$prettyResponseJson');
+            
             if (responseData['messageBody'] != null) {
               final serverMessageId = const Uuid().v4();
               final serverMessagePayload = {

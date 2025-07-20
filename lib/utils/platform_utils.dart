@@ -26,12 +26,61 @@ class PlatformUtils {
     return 'http://localhost:$port$path';
   }
   
+  /// Get detailed platform information for debugging
+  static String getPlatformInfo() {
+    if (kIsWeb) {
+      return 'Web';
+    }
+    
+    if (Platform.isAndroid) {
+      return 'Android ${Platform.operatingSystemVersion}';
+    }
+    
+    if (Platform.isIOS) {
+      return 'iOS ${Platform.operatingSystemVersion}';
+    }
+    
+    if (Platform.isMacOS) {
+      return 'macOS ${Platform.operatingSystemVersion}';
+    }
+    
+    if (Platform.isWindows) {
+      return 'Windows ${Platform.operatingSystemVersion}';
+    }
+    
+    if (Platform.isLinux) {
+      return 'Linux ${Platform.operatingSystemVersion}';
+    }
+    
+    return 'Unknown ${Platform.operatingSystem} ${Platform.operatingSystemVersion}';
+  }
+  
   /// Transforms any URL that contains localhost to use the appropriate
   /// platform-specific address
   static String transformLocalHostUrl(String url) {
-    if (url.contains('localhost') && Platform.isAndroid) {
-      return url.replaceAll('localhost', '10.0.2.2');
+    if (url.contains('localhost')) {
+      // For Android emulators, replace localhost with 10.0.2.2
+      if (Platform.isAndroid) {
+        return url.replaceAll('localhost', '10.0.2.2');
+      }
+      // For iOS, make sure we're not using 10.0.2.2
+      if (Platform.isIOS && url.contains('10.0.2.2')) {
+        return url.replaceAll('10.0.2.2', 'localhost');
+      }
     }
+    
+    // Handle ngrok URLs consistently across platforms
+    if (url.contains('ngrok.io')) {
+      // Ensure we're using https for ngrok URLs
+      if (!url.startsWith('https://') && !url.startsWith('http://')) {
+        return 'https://$url';
+      }
+      // Convert http to https for ngrok URLs if needed
+      if (url.startsWith('http://')) {
+        return url.replaceFirst('http://', 'https://');
+      }
+    }
+    
     return url;
   }
   

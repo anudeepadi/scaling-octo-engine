@@ -1,7 +1,8 @@
 import 'package:flutter/foundation.dart';
+import 'dart:convert';
 
 class DebugConfig {
-  static const bool _enableDebugLogging = false; // Set to false to disable all debug logs
+  static const bool _enableDebugLogging = true; // Set to false to disable all debug logs
   
   /// Whether debug logging is enabled
   static bool get isDebugLoggingEnabled => _enableDebugLogging && kDebugMode;
@@ -27,6 +28,34 @@ class DebugConfig {
     if (isDebugLoggingEnabled) {
       // ignore: avoid_print
       print('📨 $message');
+    }
+  }
+
+  /// JSON pretty print (always shown for better debugging)
+  static void jsonPrint(String label, dynamic jsonData) {
+    // Always show JSON data regardless of debug setting
+    try {
+      final encoder = JsonEncoder.withIndent('  ');
+      final prettyJson = encoder.convert(jsonData);
+      
+      // ignore: avoid_print
+      print('\n📋 $label:');
+      
+      // ignore: avoid_print
+      print('╔════════════════════════════════════════════');
+      
+      // Print each line with a border
+      for (var line in prettyJson.split('\n')) {
+        // ignore: avoid_print
+        print('║ $line');
+      }
+      
+      // ignore: avoid_print
+      print('╚════════════════════════════════════════════\n');
+    } catch (e) {
+      // If there's an error formatting the JSON, fallback to standard toString()
+      // ignore: avoid_print
+      print('\n📋 $label (raw): ${jsonData.toString()}\n');
     }
   }
   

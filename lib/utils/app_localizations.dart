@@ -73,6 +73,14 @@ class AppLocalizations {
       'save_money': 'Save Money',
       'more_energy': 'More Energy',
       
+      // Clear messages feature
+      'clear_all_messages': 'Clear All Messages',
+      'clear_messages_title': 'Clear All Messages',
+      'clear_messages_confirmation': 'Are you sure you want to delete all messages? This action cannot be undone.',
+      'cancel': 'Cancel',
+      'clear': 'Clear',
+      'messages_cleared': 'All messages have been cleared',
+      
       // Error messages
       'error': 'Error',
       'ok': 'OK',
@@ -127,6 +135,14 @@ class AppLocalizations {
       'better_health': 'Mejor Salud',
       'save_money': 'Ahorrar Dinero',
       'more_energy': 'Más Energía',
+      
+      // Clear messages feature
+      'clear_all_messages': 'Borrar Todos los Mensajes',
+      'clear_messages_title': 'Borrar Todos los Mensajes',
+      'clear_messages_confirmation': '¿Estás seguro de que deseas eliminar todos los mensajes? Esta acción no se puede deshacer.',
+      'cancel': 'Cancelar',
+      'clear': 'Borrar',
+      'messages_cleared': 'Todos los mensajes han sido borrados',
       
       // Error messages
       'error': 'Error',

@@ -44,6 +44,45 @@ class _DashChatScreenState extends State<DashChatScreen> {
     _scrollToBottom();
   }
 
+  // Show confirmation dialog before clearing messages
+  Future<void> _showClearConfirmationDialog() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: Text(AppLocalizations.of(context).translate('clear_messages_title')),
+          content: Text(AppLocalizations.of(context).translate('clear_messages_confirmation')),
+          actions: <Widget>[
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: Text(AppLocalizations.of(context).translate('cancel')),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              child: Text(AppLocalizations.of(context).translate('clear'),
+                style: const TextStyle(color: Colors.red),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+    
+    if (confirmed == true) {
+      final chatProvider = context.read<DashChatProvider>();
+      await chatProvider.clearAllMessages();
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(AppLocalizations.of(context).translate('messages_cleared')),
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      }
+    }
+  }
+
   Widget _buildMessageInput() {
     return Consumer<DashChatProvider>(
       builder: (context, chatProvider, child) {
@@ -112,7 +151,13 @@ class _DashChatScreenState extends State<DashChatScreen> {
         title: Text(AppLocalizations.of(context).translate('dash_chat')),
         backgroundColor: Theme.of(context).primaryColor,
         foregroundColor: Colors.white,
-        actions: [],
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.delete_sweep),
+            tooltip: AppLocalizations.of(context).translate('clear_all_messages'),
+            onPressed: _showClearConfirmationDialog,
+          ),
+        ],
       ),
       body: Consumer<DashChatProvider>(
         builder: (context, chatProvider, child) {

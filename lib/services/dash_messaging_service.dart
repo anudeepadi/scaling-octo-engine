@@ -6,11 +6,13 @@ import 'package:uuid/uuid.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/chat_message.dart';
 import '../models/quick_reply.dart';
+import '../models/link_preview.dart';
 import '../utils/debug_config.dart';
 import '../utils/platform_utils.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
+import '../constants/app_constants.dart';
 
 class DashMessagingService {
   static final DashMessagingService _instance = DashMessagingService._internal();
@@ -2345,5 +2347,62 @@ class DashMessagingService {
     
     _lowestLoadedTimestamp = lowestTimestamp;
     DebugConfig.debugPrint('⚡ Processed ${processedIds.length} messages in chronological order');
+  }
+
+  // Clear all messages in Firebase for the current user
+  Future<void> clearAllMessagesInFirebase() async {
+    if (_userId == null) {
+      DebugConfig.debugPrint('Cannot clear messages in Firebase: user ID is null');
+      return;
+    }
+    
+    DebugConfig.debugPrint('Clearing all messages in Firebase for user: $_userId');
+    
+    try {
+      // Reference to the user's chat collection
+      final chatRef = FirebaseFirestore.instance
+          .collection('messages')
+          .doc(_userId)
+          .collection('chat');
+      
+      // Get all messages
+      final snapshot = await chatRef.get();
+      
+      if (snapshot.docs.isEmpty) {
+        DebugConfig.debugPrint('No messages found to delete');
+        return;
+      }
+      
+      DebugConfig.debugPrint('Deleting ${snapshot.docs.length} messages from Firebase');
+      
+      // Use batched writes for efficiency (max 500 operations per batch)
+      const int batchSize = 500;
+      int count = 0;
+      WriteBatch batch = FirebaseFirestore.instance.batch();
+      
+      for (var doc in snapshot.docs) {
+        batch.delete(doc.reference);
+        count++;
+        
+        // Commit batch when it reaches the limit and create a new batch
+        if (count >= batchSize) {
+          await batch.commit();
+          DebugConfig.debugPrint('Committed batch of $count deletions');
+          count = 0;
+          batch = FirebaseFirestore.instance.batch();
+        }
+      }
+      
+      // Commit any remaining operations
+      if (count > 0) {
+        await batch.commit();
+        DebugConfig.debugPrint('Committed final batch of $count deletions');
+      }
+      
+      DebugConfig.debugPrint('Successfully cleared all messages in Firebase');
+    } catch (e) {
+      DebugConfig.errorPrint('Error clearing messages in Firebase: $e');
+      rethrow;
+    }
   }
 }

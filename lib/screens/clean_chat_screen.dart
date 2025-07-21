@@ -35,6 +35,45 @@ class _CleanChatScreenState extends State<CleanChatScreen> {
     }
   }
 
+  // Show confirmation dialog before clearing messages
+  Future<void> _showClearConfirmationDialog(BuildContext context) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Clear All Messages'),
+          content: const Text('Are you sure you want to delete all messages? This action cannot be undone.'),
+          actions: <Widget>[
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              child: const Text('Clear',
+                style: TextStyle(color: Colors.red),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+    
+    if (confirmed == true) {
+      final chatProvider = Provider.of<DashChatProvider>(context, listen: false);
+      await chatProvider.clearAllMessages();
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('All messages have been cleared'),
+            duration: Duration(seconds: 2),
+          ),
+        );
+      }
+    }
+  }
+
   Future<void> _handleSubmitted(String text) async {
     if (text.trim().isEmpty) return;
     
@@ -99,6 +138,13 @@ class _CleanChatScreenState extends State<CleanChatScreen> {
         backgroundColor: const Color(0xFF009688), // QuiTXT teal
         foregroundColor: Colors.white,
         elevation: 0,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.delete_sweep),
+            tooltip: 'Clear All Messages',
+            onPressed: () => _showClearConfirmationDialog(context),
+          ),
+        ],
       ),
       body: Consumer<DashChatProvider>(
         builder: (context, chatProvider, child) {

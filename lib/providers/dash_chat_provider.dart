@@ -50,6 +50,34 @@ class DashChatProvider extends ChangeNotifier {
     }
   }
 
+  // Clear all messages for the current user both in UI and Firebase
+  Future<void> clearAllMessages() async {
+    if (_currentUser == null) {
+      DebugConfig.debugPrint('DashChatProvider: Cannot clear messages - user not logged in');
+      return;
+    }
+    
+    try {
+      DebugConfig.debugPrint('DashChatProvider: Clearing all messages for user ${_currentUser!.uid}');
+      
+      // Clear messages in UI via ChatProvider
+      if (_chatProvider != null) {
+        _chatProvider!.clearMessages();
+      }
+      
+      // Clear message cache in DashMessagingService
+      _dashService.clearCache();
+      
+      // Clear messages in Firebase via DashMessagingService
+      await _dashService.clearAllMessagesInFirebase();
+      
+      DebugConfig.debugPrint('DashChatProvider: Successfully cleared all messages');
+      notifyListeners();
+    } catch (e) {
+      DebugConfig.debugPrint('DashChatProvider: Error clearing messages: $e');
+    }
+  }
+
   void _listenToAuthChanges() {
     _authSubscription = _auth.authStateChanges().listen((User? user) {
       DebugConfig.debugPrint('DashChatProvider: Auth state changed. User: ${user?.uid}');

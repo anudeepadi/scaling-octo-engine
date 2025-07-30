@@ -1,6 +1,7 @@
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../utils/debug_config.dart';
+import 'dart:async' show TimeoutException;
 
 enum Environment {
   development,
@@ -20,8 +21,27 @@ class EnvSwitcher {
           break;
       }
       
-      // Load the appropriate environment file
-      await dotenv.load(fileName: fileName, mergeWith: {});
+      // Try to load the environment file but don't fail if it doesn't exist
+      try {
+        await dotenv.load(fileName: fileName, mergeWith: {}).timeout(
+          const Duration(seconds: 2),
+          onTimeout: () {
+            DebugConfig.debugPrint('Loading $fileName timed out, using defaults');
+            throw TimeoutException('Loading $fileName timed out');
+          },
+        );
+      } catch (e) {
+        DebugConfig.debugPrint('Could not load $fileName: $e');
+        DebugConfig.debugPrint('Continuing with default environment variables');
+        // Set default values based on environment
+        if (env == Environment.development) {
+          dotenv.env['SERVER_URL'] = 'http://localhost:8080';
+          dotenv.env['ENV'] = 'development';
+        } else {
+          dotenv.env['SERVER_URL'] = 'https://production-server.com';
+          dotenv.env['ENV'] = 'production';
+        }
+      }
       
       // Save the current environment to preferences
       final prefs = await SharedPreferences.getInstance();

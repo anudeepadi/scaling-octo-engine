@@ -1,89 +1,58 @@
-import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter/foundation.dart';
+import 'dash_messaging_service.dart';
 
-// Enum to represent the available messaging services
-enum MessagingService {
-  gemini,
-  dash,
+// Abstract class that defines what a messaging service should implement
+abstract class MessagingService {
+  bool get isInitialized;
+  Stream<dynamic> get messageStream;
+  Future<void> initialize(String userId, String? fcmToken);
+  Future<void> sendMessage(String message, {Map<String, dynamic>? metadata});
 }
 
-class ServiceManager with ChangeNotifier {
-  static const String _prefsKey = 'selected_messaging_service';
-  MessagingService _currentService = MessagingService.gemini; // Default to Gemini
+class ServiceManager extends ChangeNotifier {
+  // Available services
+  final DashMessagingService _dashService = DashMessagingService();
   
+  // Current active service
+  MessagingService _currentService;
+  String _serviceDisplayName = "Dash";
+  
+  // Constructor
+  ServiceManager() : _currentService = DashMessagingService();
+  
+  // Getters
   MessagingService get currentService => _currentService;
+  String get serviceDisplayName => _serviceDisplayName;
   
-  // Constructor loads the saved preference
-  ServiceManager() {
-    _loadSavedService();
+  // Initialize with a user ID and FCM token
+  Future<void> initialize(String userId, String? fcmToken) async {
+    await _currentService.initialize(userId, fcmToken);
+    notifyListeners();
   }
   
-  // Load the saved service preference
-  Future<void> _loadSavedService() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final savedService = prefs.getString(_prefsKey);
-      
-      if (savedService != null) {
-        if (savedService == 'dash') {
-          _currentService = MessagingService.dash;
-        } else {
-          _currentService = MessagingService.gemini;
-        }
-        notifyListeners();
-      }
-    } catch (e) {
-      debugPrint('Error loading saved service: $e');
-    }
-  }
-  
-  // Switch to Gemini service
-  Future<void> useGemini() async {
-    if (_currentService != MessagingService.gemini) {
-      _currentService = MessagingService.gemini;
-      await _saveServicePreference();
-      notifyListeners();
-    }
-  }
-  
-  // Switch to Dash Messaging service
+  // Switch to Dash service
   Future<void> useDash() async {
-    if (_currentService != MessagingService.dash) {
-      _currentService = MessagingService.dash;
-      await _saveServicePreference();
+    if (_currentService is! DashMessagingService) {
+      _currentService = _dashService;
+      _serviceDisplayName = "Dash";
       notifyListeners();
     }
   }
   
-  // Toggle between services
+  // Switch to Gemini service (placeholder for future implementation)
+  Future<void> useGemini() async {
+    // This would be implemented when Gemini service is available
+    // For now, we'll just notify that it's not implemented
+    print("Gemini service not implemented yet");
+    notifyListeners();
+  }
+  
+  // Toggle between available services
   Future<void> toggleService() async {
-    if (_currentService == MessagingService.gemini) {
-      await useDash();
-    } else {
+    if (_currentService is DashMessagingService) {
       await useGemini();
+    } else {
+      await useDash();
     }
   }
-  
-  // Save the current service preference
-  Future<void> _saveServicePreference() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setString(
-        _prefsKey, 
-        _currentService == MessagingService.gemini ? 'gemini' : 'dash'
-      );
-    } catch (e) {
-      debugPrint('Error saving service preference: $e');
-    }
-  }
-  
-  // Get the display name of the current service
-  String get serviceDisplayName {
-    switch (_currentService) {
-      case MessagingService.gemini:
-        return 'Gemini';
-      case MessagingService.dash:
-        return 'Dash Messaging';
-    }
-  }
-}
+} 

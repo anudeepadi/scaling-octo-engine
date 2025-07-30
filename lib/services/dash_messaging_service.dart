@@ -13,8 +13,9 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
 import '../constants/app_constants.dart';
+import 'service_manager.dart';
 
-class DashMessagingService {
+class DashMessagingService implements MessagingService {
   static final DashMessagingService _instance = DashMessagingService._internal();
   factory DashMessagingService() => _instance;
   DashMessagingService._internal() {
@@ -65,6 +66,7 @@ class DashMessagingService {
   
   // Flag to track initialization state
   bool _isInitialized = false;
+  @override
   bool get isInitialized => _isInitialized;
   
   // Add flag to track if stream is closed
@@ -116,8 +118,8 @@ class DashMessagingService {
     DebugConfig.debugPrint('Message cache cleared');
   }
 
-  // Initialize the service with user info
-  Future<void> initialize(String userId) async {
+  @override
+  Future<void> initialize(String userId, String? fcmToken) async {
     if (_isInitialized && _userId == userId) {
       DebugConfig.debugPrint('DashMessagingService already initialized for user: $userId');
       return;
@@ -125,6 +127,7 @@ class DashMessagingService {
     
     DebugConfig.infoPrint('⚡ INSTANT initializing DashMessagingService for user: $userId');
     _userId = userId;
+    _fcmToken = fcmToken;
     
     // Apply platform-specific URL transformations
     _hostUrl = PlatformUtils.transformLocalHostUrl(_hostUrl);
@@ -669,20 +672,20 @@ class DashMessagingService {
     return null;
   }
 
-  // Send a message to the server
-  Future<bool> sendMessage(String text, {int eventTypeCode = 1}) async {
-    if (text.trim().isEmpty) {
+  @override
+  Future<void> sendMessage(String message, {Map<String, dynamic>? metadata}) async {
+    if (message.trim().isEmpty) {
       DebugConfig.debugPrint('Cannot send empty message');
-      return false;
+      return;
     }
     
     // Prevent rapid duplicate messages (debouncing)
     final now = DateTime.now();
-    if (_lastMessageText == text && _lastResponseTime != null) {
+    if (_lastMessageText == message && _lastResponseTime != null) {
       final timeSinceLastSend = now.difference(_lastResponseTime!);
       if (timeSinceLastSend.inSeconds < 3) {
-        DebugConfig.debugPrint('Preventing duplicate message within 3 seconds: $text');
-        return false;
+        DebugConfig.debugPrint('Preventing duplicate message within 3 seconds: $message');
+        return;
       }
     }
     
@@ -691,7 +694,7 @@ class DashMessagingService {
     final requestStartTime = now.millisecondsSinceEpoch ~/ 1000; // Convert to seconds for server
     
     // Update tracking variables
-    _lastMessageText = text;
+    _lastMessageText = message;
     _lastResponseTime = now;
     
     // REMOVED: Don't add user message to stream immediately to prevent timestamp conflicts
@@ -699,20 +702,20 @@ class DashMessagingService {
     // with proper server timestamps ensuring correct chronological ordering
     
     // CONVERSATION HISTORY: Store user message in Firebase for complete conversation history
-    await _storeUserMessageInFirebase(messageId, text, now, eventTypeCode);
+    await _storeUserMessageInFirebase(messageId, message, now, 1);
     
     DebugConfig.debugPrint('🕐 User message stored in Firebase, will appear through real-time listener with correct server timestamp');
     
-    DebugConfig.debugPrint('Sending message to server: {messageId: $messageId, userId: $_userId, messageText: $text, eventTypeCode: $eventTypeCode}');
+    DebugConfig.debugPrint('Sending message to server: {messageId: $messageId, userId: $_userId, messageText: $message, eventTypeCode: 1}');
     
     try {
       final requestBody = jsonEncode({
         'messageId': messageId,
         'userId': _userId,
-        'messageText': text,
+        'messageText': message,
         'fcmToken': _fcmToken,
         'messageTime': requestStartTime,
-        'eventTypeCode': eventTypeCode,
+        'eventTypeCode': 1,
       });
       
       // Pretty print JSON for better readability in console
@@ -734,7 +737,7 @@ class DashMessagingService {
       ).timeout(
         const Duration(seconds: 8), // Reduced from 10 to 8 seconds
         onTimeout: () {
-          DebugConfig.debugPrint('⚠️ Server request timeout for message: $text');
+          DebugConfig.debugPrint('⚠️ Server request timeout for message: $message');
           // Don't throw - let Firebase handle the response
           return http.Response('', 408); // Request timeout
         },
@@ -758,22 +761,22 @@ class DashMessagingService {
       if (response.statusCode == 200) {
         DebugConfig.debugPrint('Message sent successfully to server');
         // Server will send response via Firebase, no need to process here
-        return true;
+        return;
       } else if (response.statusCode == 408) {
         // Timeout - message might still be delivered via Firebase
         DebugConfig.debugPrint('Server timeout, but message may still be delivered');
-        return true;
+        return;
       } else {
         DebugConfig.debugPrint('Failed to send message. Status: ${response.statusCode}');
         DebugConfig.debugPrint('Response body: ${response.body}');
         // Remove the message from stream if server rejected it
         // Note: In a real app, you might want to show an error state instead
-        return false;
+        return;
       }
     } catch (e) {
       DebugConfig.debugPrint('Error sending message to server: $e');
       // Message already shown in UI, server might still process it
-      return true; // Return true to avoid confusing the user
+      return; // Return true to avoid confusing the user
     }
   }
   
@@ -1293,9 +1296,9 @@ class DashMessagingService {
   }
   
   // Send a quick reply to the server
-  Future<bool> sendQuickReply(String value, String text) async {
+  Future<void> sendQuickReply(String value, String text) async {
     DebugConfig.debugPrint('Sending quick reply: value="$value", text="$text"');
-    return sendMessage(text, eventTypeCode: 2);
+    return sendMessage(text, metadata: {'eventTypeCode': 2, 'quickReplyValue': value});
   }
   
   // Process predefined server responses from JSON input

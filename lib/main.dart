@@ -58,10 +58,24 @@ void main() async {
       envFile = '.env.development';
     }
     
-    // Load environment variables
-    await dotenv.load(fileName: envFile);
-    developer.log('Environment variables loaded from $envFile', name: 'App');
-    developer.log('Using environment: ${dotenv.env['ENV']}', name: 'App');
+    // Try to load environment variables, but continue if files don't exist
+    try {
+      await dotenv.load(fileName: envFile).timeout(
+        const Duration(seconds: 2),
+        onTimeout: () {
+          developer.log('Loading $envFile timed out, using defaults', name: 'App');
+          throw TimeoutException('Loading $envFile timed out');
+        },
+      );
+      developer.log('Environment variables loaded from $envFile', name: 'App');
+      developer.log('Using environment: ${dotenv.env['ENV']}', name: 'App');
+    } catch (e) {
+      developer.log('Could not load $envFile: $e', name: 'App');
+      developer.log('Continuing with default environment variables', name: 'App');
+      // Provide default values when env files are missing
+      dotenv.env['SERVER_URL'] = 'http://localhost:8080';
+      dotenv.env['ENV'] = 'development';
+    }
     
     // Print platform information for debugging
     final platformInfo = Platform.isAndroid 

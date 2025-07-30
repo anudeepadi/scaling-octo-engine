@@ -3,12 +3,14 @@ import 'package:flutter/material.dart';
 import '../models/chat_message.dart';
 import '../models/quick_reply.dart';
 import '../services/dash_messaging_service.dart';
+import '../services/firebase_messaging_service.dart';
 import '../utils/debug_config.dart';
 import 'chat_provider.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
 class DashChatProvider extends ChangeNotifier {
   final DashMessagingService _dashService = DashMessagingService();
+  final FirebaseMessagingService _firebaseMessagingService = FirebaseMessagingService();
   final FirebaseAuth _auth = FirebaseAuth.instance;
   
   ChatProvider? _chatProvider;
@@ -144,7 +146,7 @@ class DashChatProvider extends ChangeNotifier {
   Future<void> initializeServerService(String userId, String fcmToken) async {
     DebugConfig.debugPrint('[DashChatProvider] Initializing DashMessagingService for user $userId');
     try {
-      await _dashService.initialize(userId);
+      await _dashService.initialize(userId, fcmToken);
       DebugConfig.debugPrint('[DashChatProvider] DashMessagingService initialized successfully');
       
       // Setup message listener after successful initialization
@@ -231,17 +233,13 @@ class DashChatProvider extends ChangeNotifier {
       // If the messaging service is not initialized, initialize it now
       if (!_dashService.isInitialized && _currentUser != null) {
         DebugConfig.debugPrint('DashMessagingService not initialized. Initializing now.');
-        await _dashService.initialize(_currentUser!.uid);
+        await _dashService.initialize(_currentUser!.uid, await _firebaseMessagingService.getFcmToken());
       }
       
       // Send message to the server via DashMessagingService
       try {
-        final success = await _dashService.sendMessage(messageContent);
-        if (success) {
-          DebugConfig.debugPrint('Message sent successfully to server');
-        } else {
-          DebugConfig.debugPrint('Failed to send message to server - check server logs');
-        }
+        await _dashService.sendMessage(messageContent);
+        DebugConfig.debugPrint('Message sent successfully to server');
       } catch (e) {
         DebugConfig.debugPrint('Error sending message to server: $e');
       }
@@ -289,14 +287,8 @@ class DashChatProvider extends ChangeNotifier {
       // Send the quick reply to the server
       // DashMessagingService.sendQuickReply() will handle adding the user message to the stream
       // with proper timestamps and chronological ordering
-      final success = await _dashService.sendQuickReply(reply.value, reply.text);
-      if (success) {
-        DebugConfig.debugPrint('Quick reply sent successfully to server');
-      } else {
-        DebugConfig.debugPrint('Failed to send quick reply to server');
-        // If server send failed, simulate response in demo mode
-        await _dashService.simulateServerResponse(reply.text);
-      }
+      await _dashService.sendQuickReply(reply.value, reply.text);
+      DebugConfig.debugPrint('Quick reply sent successfully to server');
     } catch (e) {
       DebugConfig.debugPrint('Error sending quick reply: $e');
       // On error, use simulation as fallback

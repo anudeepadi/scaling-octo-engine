@@ -1,0 +1,1352 @@
+{
+    "quitxt_messaging_system": {
+      "intake_messages": {
+        "opening": {
+          "english": {
+            "user": "START_PROGRAM",
+            "system": "Welcome to Quitxt from the UT Health Science Center! Congrats on your decision to quit smoking! See why we think you're awesome, Tap pic below",
+            "video_link": "https://youtu.be/ZWsR3G0mdJo",
+            "delay": "2 minutes"
+          },
+          "spanish": {
+            "user": "INICIAR_PROGRAMA", 
+            "system": "¡Bienvenido a Quitxt del UT Health Science Center! ¡Felicitaciones por decidir dejar de fumar! Mira porque pensamos que ¡eres genial! Clic el pic abajo",
+            "video_link": "https://youtu.be/cs6VoZXp34Y",
+            "delay": "2 minutes"
+          }
+        },
+        "terms_of_service": {
+          "english": {
+            "user": "CONTINUE",
+            "system": "We'll help you quit smoking with fun messages. By continuing, you agree with our terms of service.\n\nIf you want to leave the study, type STOP. For more info Tap pic below.",
+            "link": "quitxt.org"
+          },
+          "spanish": {
+            "user": "CONTINUAR",
+            "system": "Te ayudaremos a dejar de fumar con fun texts. Al continuar, aceptas nuestros términos de servicio.\n\nSi deseas dejar el estudio envía STOP. Para más información Clic el pic abajo",
+            "link": "https://quitxt.org/spanish"
+          }
+        },
+        "pop_quiz": {
+          "english": {
+            "user": "POP_QUIZ",
+            "system": "Pop quiz before we start, just 1 easy question!"
+          },
+          "spanish": {
+            "user": "QUIZ_INICIAL",
+            "system": "Pop quiz antes de empezar, solo 1 pregunta fácil."
+          }
+        },
+        "cigarettes_per_day": {
+          "english": {
+            "user": "CIGS_PER_DAY",
+            "system": "About how many cigarettes do you smoke on an average day?",
+            "options": ["1-5", "6-10", "11-20", "21 or more"]
+          },
+          "spanish": {
+            "user": "CIGS_POR_DIA",
+            "system": "¿Cuántos cigarrillos te fumas en promedio por día?",
+            "options": ["1-5", "6-10", "11-20", "21 o más"]
+          }
+        },
+        "nicotine_info": {
+          "english": {
+            "user": "NICOTINE_INFO",
+            "system": "If you smoke a pack of cigarettes a day or more, usually have a cigarette within 30 minutes after waking up, or feel like you are addicted to smoking, you may have nicotine 'addiction'. This means you may need to use nicotine replacement to help yourself quit smoking. Tap pic below",
+            "link": "https://quitxt.org/nicotine-replacement",
+            "delay": "2 minutes"
+          },
+          "spanish": {
+            "user": "INFO_NICOTINA",
+            "system": "Si fumas un paquete o más de cigarrillos al día, a menudo fumas durante los primeros 30min después de despertar o sientes adicción a fumar... puedes tener adicción a la nicotina y necesitar usar reemplazo de nicotina para ayudarte a dejar de fumar. Clic el pic abajo",
+            "link": "https://quitxt.org/spanish/terapia-de-reemplazo-de-nicotina",
+            "delay": "2 minutes"
+          }
+        },
+        "quit_reasons": {
+          "english": {
+            "user": "REASONS",
+            "system": "Think about your reasons to stop smoking. You may be worried about your health, doing it for your family, to save money or other. Tap pic below",
+            "link": "https://quitxt.org/reasons",
+            "delay": "2 minutes"
+          },
+          "spanish": {
+            "user": "RAZONES",
+            "system": "Piensa en tus razones para dejar de fumar. Por tu salud, por tu familia, para ahorrar dinero o por otras razones. Clic el pic abajo",
+            "link": "https://quitxt.org/spanish/razones",
+            "delay": "2 minutes"
+          }
+        },
+        "support_system": {
+          "english": {
+            "user": "SUPPORT",
+            "system": "Now, think about who will support your decision to quit smoking. For example, your padres, spouse/partner, brother or sister, or your friends. You should tell them you are quitting! Tap pic below",
+            "link": "https://quitxt.org/support",
+            "delay": "2 minutes"
+          },
+          "spanish": {
+            "user": "APOYO",
+            "system": "Ahora piensa en quién apoyará tu decisión de dejar de fumar: Por ejemplo, tus padres, esposo(a)/pareja, novio(a), hermanos(as) o tus amigos. Déjales saber tu decisión de dejar de fumar. Clic el pic abajo",
+            "link": "https://quitxt.org/spanish/apoyo",
+            "delay": "2 minutes"
+          }
+        },
+        "ready_to_quit": {
+          "english": {
+            "user": "READY_CHECK",
+            "system": "Are you ready to quit smoking tomorrow?",
+            "options": ["Yes, let's do it!", "No, not yet"]
+          },
+          "spanish": {
+            "user": "LISTO_VERIFICAR",
+            "system": "¿Estás listo para dejar de fumar mañana?",
+            "options": ["¡Si, hagámoslo!", "No, aún no."]
+          }
+        },
+        "time_preference_ready": {
+          "english": {
+            "user": "YES_READY",
+            "system": "Great! This week we'll spend 5 to 10 minutes chatting with you each morning. Select the time you want to do this. Earlier is better.",
+            "options": ["7:00 am", "7:30 am", "8:00 am", "8:30 am", "9:00 am", "9:30 am", "10:00 am"]
+          },
+          "spanish": {
+            "user": "SI_LISTO",
+            "system": "¡Estupendo! Esta semana tomaremos 5 o 10 minutos para chatear contigo cada mañana. Selecciona la hora de tu preferencia. Entre más temprano lo hagamos mejor.",
+            "options": ["7:00 am", "7:30 am", "8:00 am", "8:30 am", "9:00 am", "9:30 am", "10:00 am"]
+          }
+        },
+        "quit_date_selection": {
+          "english": {
+            "user": "NOT_READY",
+            "system": "The first step is to set a quit date on a day when you will not have much stress, maybe a weekend. It should be between 7 and 14 days from today.\n\nThink about it and select a number between 7 and 14 for your quit date.",
+            "options": ["7", "8", "9", "10", "11", "12", "13", "14"]
+          },
+          "spanish": {
+            "user": "NO_LISTO",
+            "system": "El primer paso es fijar un día para dejar de fumar cuando no tengas mucho estrés, tal vez un fin de semana. Debe ser entre 7 y 14 días a partir de hoy.\n\nPiénsalo y selecciona un número entre 7 y 14 para tu día de dejar de fumar.",
+            "options": ["7", "8", "9", "10", "11", "12", "13", "14"]
+          }
+        },
+        "quit_date_confirmation": {
+          "english": {
+            "user": "DATE_SELECTED",
+            "system": "OK your quit day is [insert date based on number of days texted]. To help you get ready, we'll send you a few helpful messages every day, beginning tomorrow morning.",
+            "delay": "no delay"
+          },
+          "spanish": {
+            "user": "FECHA_SELECCIONADA",
+            "system": "OK tu día para dejar de fumar es [insert date based on number of days selected]. Para ayudarte a preparar, te enviaremos algunos textos útiles, empezando mañana en la mañana.",
+            "delay": "no delay"
+          }
+        },
+        "time_preference_not_ready": {
+          "english": {
+            "user": "TIME_SETTING",
+            "system": "What time should we send the first text? The earlier the better!",
+            "options": ["7:00 am", "7:30 am", "8:00 am", "8:30 am", "9:00 am", "9:30 am", "10:00 am"]
+          },
+          "spanish": {
+            "user": "HORA_CONFIG",
+            "system": "¿A qué hora debemos enviarte el primer texto? ¡Entre más temprano es mejor!",
+            "options": ["7:00 am", "7:30 am", "8:00 am", "8:30 am", "9:00 am", "9:30 am", "10:00 am"]
+          }
+        },
+        "closing_message": {
+          "english": {
+            "user": "INTAKE_COMPLETE",
+            "system": "OK that's it for today. We'll be back tomorrow 😊"
+          },
+          "spanish": {
+            "user": "REGISTRO_COMPLETO",
+            "system": "OK eso es todo por hoy. Volveremos a hablar mañana 😊"
+          }
+        },
+        "exit_program": {
+          "english": {
+            "user": "STOP",
+            "system": "We are sorry you want to leave the study. A team member will reach out to you to talk about your reasons and complete the process. You can also contact the Quitxt study team at quitxt@uthscsa.edu to let us know your decision."
+          },
+          "spanish": {
+            "user": "STOP",
+            "system": "Lamentamos que quieras dejar el estudio. Un miembro del equipo de investigación se comunicará contigo para hablar sobre tus razones y completar el proceso. También puedes contactar al equipo del estudio Quitxt en quitxt@uthscsa.edu para informarnos tu decisión."
+          }
+        }
+      },
+      "pre_quit_messages": {
+        "pq_6": {
+          "motiv1": {
+            "english": {
+              "user": "DAY_PQ6_MOTIV1",
+              "system": "Reason #1 to quit smoking while you're young: You'll live longer to enjoy the future's coolest tech, like robot assistants and flying cars.",
+              "gif_link": "Insert updated gif link"
+            },
+            "spanish": {
+              "user": "DIA_PQ6_MOTIV1",
+              "system": "Razón #1 para dejar de fumar siendo joven: Vivirás más tiempo para disfrutar la tec del futuro como robots asistentes y carros voladores.",
+              "gif_link": "Insert updated gif link"
+            }
+          },
+          "motiv4": {
+            "english": {
+              "user": "DAY_PQ6_MOTIV4",
+              "system": "\"Stranger Things\" is tackling the real monster: tobacco! It kills more people than AIDS, alcohol, car accidents, murder, drugs, suicides, and fires **COMBINED**!",
+              "gif_link": "Insert updated gif link",
+              "time": "noon"
+            },
+            "spanish": {
+              "user": "DIA_PQ6_MOTIV4",
+              "system": "\"Stranger Things\" ataca al verdadero monstruo: ¡El tabaco! Porque ¡mata más personas que el SIDA, el alcohol, las drogas, los asesinatos, los suicidios, los incendios y los accidentes de carro **JUNTOS!**",
+              "gif_link": "Insert updated gif link",
+              "time": "noon"
+            }
+          }
+        },
+        "pq_5": {
+          "bd_message": {
+            "english": {
+              "user": "DAY_PQ5_BD",
+              "system": "Drinking alcohol can trigger cravings for a cigarette and makes it harder for you to quit smoking. Tap pic below",
+              "link": "https://quitxt.org/binge-drinking",
+              "time": "8am"
+            },
+            "spanish": {
+              "user": "DIA_PQ5_BD",
+              "system": "Beber alcohol puede provocar los deseos de fumar y te hace más difícil dejar el cigarrillo. Clic el pic abajo",
+              "link": "https://quitxt.org/spanish/consumo-intensivo-de-alcohol",
+              "time": "8am"
+            }
+          },
+          "cue1": {
+            "english": {
+              "user": "DAY_PQ5_CUE1",
+              "system": "Just like \"The Mandalorian\" fights to protect Grogu, you can defend your lungs from cancer and disease. Stay strong -- quit smoking and be your own hero!",
+              "gif_link": "Insert updated gif link",
+              "time": "noon"
+            },
+            "spanish": {
+              "user": "DIA_PQ5_CUE1",
+              "system": "Como El Mandalorian lucha y protege a Grogu, tú puedes proteger tus pulmones del cáncer y enfermedades. ¡Deja de fumar y sé tu propio héroe!",
+              "gif_link": "Insert updated gif link",
+              "time": "noon"
+            }
+          },
+          "motiv2": {
+            "english": {
+              "user": "DAY_PQ5_MOTIV2",
+              "system": "Reason #2 to quit smoking while you're young: Add a decade to your life and get yourself an AI-powered robot butler!\n\nWho needs to do chores when you can get things done with the touch of a button? Quit Smoking! Your future is looking bright!",
+              "gif_link": "Insert updated gif link",
+              "time": "4pm"
+            },
+            "spanish": {
+              "user": "DIA_PQ5_MOTIV2",
+              "system": "Razón #2 para dejar de fumar siendo joven: ¡Ganarás 10 años de vida y podrás disfrutar los mayordomos robot con inteligencia artificial.\n\nQuien necesita hacer las tareas caseras cuando puedes hacer todo con solo tocar un botón. ¡Deja de fumar! ¡Tu futuro se ve brillante!",
+              "gif_link": "Insert updated gif link",
+              "time": "4pm"
+            }
+          }
+        },
+        "pq_4": {
+          "getting_active": {
+            "english": {
+              "user": "DAY_PQ4_ACTIVE",
+              "system": "You'll find it easier to quit if you get more active. There are lots of ways to get active. Just take walks, play ball with friends or exercise. Tap pic below",
+              "link": "https://quitxt.org/getting-active",
+              "time": "8am"
+            },
+            "spanish": {
+              "user": "DIA_PQ4_ACTIVO",
+              "system": "Será más fácil dejar de fumar si eres más activo. Hay muchas formas de hacerlo. Solo camina o haz ejercicio. Clic el pic abajo",
+              "link": "https://quitxt.org/spanish/mantenerte-activo",
+              "time": "8am"
+            }
+          },
+          "cue3": {
+            "english": {
+              "user": "DAY_PQ4_CUE3",
+              "system": "If we've learned one thing from Google maps, it's to always follow directions. Do the same when using nicotine patches, gum or lozenges.",
+              "time": "noon"
+            },
+            "spanish": {
+              "user": "DIA_PQ4_CUE3",
+              "system": "Si hemos aprendido algo de los mapas de Google, es siempre seguir las indicaciones. Haz lo mismo cuando uses reemplazo de nicotina.",
+              "time": "noon"
+            }
+          },
+          "motiv3": {
+            "english": {
+              "user": "DAY_PQ4_MOTIV3",
+              "system": "Quitting is hard, but YOU CAN DO IT! Make your family proud and quit tobacco!",
+              "gif_link": "https://quitxt.org/sites/quitxt/files/gifs/App1-Motiv3_ImRooting4U.gif",
+              "time": "4pm"
+            },
+            "spanish": {
+              "user": "DIA_PQ4_MOTIV3",
+              "system": "Dejar de fumar es duro, pero ¡TÚ PUEDES HACERLO! Haz sentir orgullosa a tu familia y ¡deja de fumar!",
+              "gif_link": "https://quitxt.org/sites/quitxt/files/gifs/preq4_motiv3_tupuedes_esp.gif",
+              "time": "4pm"
+            }
+          }
+        },
+        "pq_3": {
+          "breathing": {
+            "english": {
+              "user": "DAY_PQ3_BREATHING",
+              "system": "There are breathing exercises that can help you stop smoking. One can help you relax. One can perk you up.\n\nTo relax: Breathe in VERY SLOWLY through your nose, fill your lungs from bottom up, then exhale VERY SLOWLY through your mouth. Do it 3 times. Practice daily.\n\nTo perk up: Take a deep breath QUICKLY and DEEPLY through your nose, then blow it QUICKLY out your mouth. Do it 3 times. Practice daily.",
+              "link": "Insert updated link",
+              "time": "8am"
+            },
+            "spanish": {
+              "user": "DIA_PQ3_RESPIRACION",
+              "system": "Hay ejercicios de respiración que pueden ayudarte a dejar de fumar. Uno puede ayudarte a relajar y otro puede darte ánimo.\n\nPara relajarte: Respira MUY LENTAMENTE por la nariz y llena tus pulmones de abajo hacia arriba. Después, MUY LENTAMENTE sopla el aire por la boca. Hazlo 3 veces. Practica diariamente.\n\nPara animarte: Respira RÁPIDA y PROFUNDAMENTE por la nariz y luego sopla el aire RÁPIDAMENTE por la boca. Hazlo 3 veces. Practica varias veces al día. Clic el pic abajo",
+              "link": "Insert updated link",
+              "time": "8am"
+            }
+          },
+          "cue4": {
+            "english": {
+              "user": "DAY_PQ3_CUE4",
+              "system": "Uncle Iroh Word of wisdom: Practice deep breathing to relax without smoking.",
+              "gif_link": "Insert updated gif link",
+              "time": "11am"
+            },
+            "spanish": {
+              "user": "DIA_PQ3_CUE4",
+              "system": "Palabras sabias del tío Iroh: Practica respiración profunda para relajarte sin necesidad de fumar.",
+              "gif_link": "Insert updated gif link",
+              "time": "11am"
+            }
+          },
+          "cue5": {
+            "english": {
+              "user": "DAY_PQ3_CUE5",
+              "system": "Because we're not all Deadpool, getting active when you quit smoking will help your body recover better AND make it easier to stay away from tobacco. You're the real hero!",
+              "gif_link": "https://quitxt.org/sites/quitxt/files/gifs/deadpool.gif",
+              "time": "2pm"
+            },
+            "spanish": {
+              "user": "DIA_PQ3_CUE5",
+              "system": "Porque no todos somos Deadpool, estar más activo ayudará a tu cuerpo a recuperarse mejor y será más fácil mantenerte alejado del tabaco.",
+              "gif_link": "https://quitxt.org/sites/quitxt/files/gifs/deadpool.gif",
+              "time": "2pm"
+            }
+          }
+        },
+        "pq_2": {
+          "nicotine": {
+            "english": {
+              "user": "DAY_PQ2_NICOTINE",
+              "system": "Did you decide to use nicotine replacement? If so, have your patch / gum / lozenge ready by tomorrow. Read the label and use as directed:",
+              "link": "https://quitxt.org/nicotine-replacement",
+              "time": "8am"
+            },
+            "spanish": {
+              "user": "DIA_PQ2_NICOTINA",
+              "system": "Si decidiste usar reemplazo de nicotina, recuerda tenerlo listo para mañana. Lee y sigue las indicaciones con cuidado:",
+              "link": "https://quitxt.org/spanish/terapia-de-reemplazo-de-nicotina",
+              "time": "8am"
+            }
+          },
+          "cue6": {
+            "english": {
+              "user": "DAY_PQ2_CUE6",
+              "system": "Get your body moving: Play your favorite song and dance or simply walk around the block. It only takes 30 minutes to help you stay away from tobacco.",
+              "gif_link": "Insert updated gif link",
+              "time": "11am"
+            },
+            "spanish": {
+              "user": "DIA_PQ2_CUE6",
+              "system": "Mueve tu cuerpo: Toca tu canción favorita y baila o simplemente sal a caminar. Sólo 30 minutos te ayudará a mantenerte alejado del tabaco.",
+              "gif_link": "Insert updated gif link",
+              "time": "11am"
+            }
+          },
+          "motiv5": {
+            "english": {
+              "user": "DAY_PQ2_MOTIV5",
+              "system": "What's worse than catching a respiratory virus? Catching a severe case with breathing complications due to smoking!",
+              "gif_link": "Insert updated gif link",
+              "time": "2pm"
+            },
+            "spanish": {
+              "user": "DIA_PQ2_MOTIV5",
+              "system": "¿Qué es peor que contraer un virus respiratorio? ¡Que por fumar tengas un caso severo con complicaciones respiratorias!",
+              "gif_link": "https://quitxt.org/sites/quitxt/files/gifs/PreQ2_Motiv5_Breathing.gif",
+              "time": "2pm"
+            }
+          }
+        },
+        "pq_1": {
+          "instead": {
+            "english": {
+              "user": "DAY_PQ1_INSTEAD",
+              "system": "Think about times or places you will want to smoke the most and what can you do instead... Go here for ideas:",
+              "link": "https://quitxt.org/instead-of-smoking",
+              "time": "8am"
+            },
+            "spanish": {
+              "user": "DIA_PQ1_EN_LUGAR",
+              "system": "Piensa cuándo y dónde es que deseas fumar más y qué puedes hacer en lugar de fumar. Clic el pic abajo para más ideas:",
+              "link": "https://goo.gl/bzPXY1",
+              "time": "8am"
+            }
+          },
+          "motiv6": {
+            "english": {
+              "user": "DAY_PQ1_MOTIV6",
+              "system": "You already deal with traffic jams, work, school, and seeing ads on YouTube and Instagram... why would you want to deal with smoking? YOU CAN BE FREE from tobacco!",
+              "gif_link": "Insert updated gif link",
+              "time": "11am"
+            },
+            "spanish": {
+              "user": "DIA_PQ1_MOTIV6",
+              "system": "Ya te aguantas el tráfico, el trabajo, la escuela y los comerciales en YouTube y en Instagram... ¿Por qué el lío de fumar? ¡LIBERATE del tabaco!",
+              "gif_link": "Insert updated gif link",
+              "time": "11am"
+            }
+          }
+        }
+      },
+      "quit_day_messages": {
+        "q1": {
+          "opening": {
+            "english": {
+              "user": "QUIT_DAY_1",
+              "system": "It's quit day! To start on the road to a smokefree life, get rid of cigarettes, butts, matches, lighters and ashtrays. Here is why you're ready:",
+              "video_link": "https://youtu.be/wTKMVi3t-48",
+              "delay": "2 minutes"
+            },
+            "spanish": {
+              "user": "DIA_DEJAR_1",
+              "system": "¡Hoy es el día! Empieza tu nueva vida sin fumar, tira los cigs, las colillas, las cerillas, los encendedores y los ceniceros. Clic el pic abajo",
+              "video_link": "https://youtu.be/9mkr_E-1kGg",
+              "delay": "2 minutes"
+            }
+          },
+          "reasons": {
+            "english": {
+              "user": "Q1_REASONS",
+              "system": "Make a list with the reasons you are quitting: your family, your health... carry it with you and read it when you feel tempted. Tap pic below",
+              "link": "https://quitxt.org/reasons",
+              "delay": "2 minutes"
+            },
+            "spanish": {
+              "user": "Q1_RAZONES",
+              "system": "Escribe las razones por las que estás dejando de fumar: Tu familia, tu salud... llévalas contigo y léelas cuando sientas antojo. Clic el pic abajo",
+              "link": "https://quitxt.org/spanish/razones",
+              "delay": "2 minutes"
+            }
+          },
+          "instead_of_smoking": {
+            "english": {
+              "user": "Q1_INSTEAD",
+              "system": "Think about the times or places you will want to smoke the most and what you can do instead... Go here for ideas",
+              "link": "https://quitxt.org/instead-of-smoking",
+              "delay": "2 minutes"
+            },
+            "spanish": {
+              "user": "Q1_EN_LUGAR",
+              "system": "Piensa cuándo y dónde es que deseas fumar más y qué puedes hacer en lugar de fumar. Clic el pic abajo para más ideas",
+              "link": "https://quitxt.org/spanish/en-lugar-de-fumar",
+              "delay": "2 minutes"
+            }
+          },
+          "nicotine_replacement": {
+            "english": {
+              "user": "Q1_NICOTINE",
+              "system": "If you decided to use nicotine replacement, it is time to do it. Be sure to read and follow the directions carefully:",
+              "link": "https://quitxt.org/nicotine-replacement"
+            },
+            "spanish": {
+              "user": "Q1_NICOTINA",
+              "system": "Si decidiste usar reemplazo de nicotina, es hora de comenzar a usarlo. Lee y sigue con cuidado las indicaciones:",
+              "link": "https://quitxt.org/spanish/terapia-de-reemplazo-de-nicotina"
+            }
+          },
+          "help_offer": {
+            "english": {
+              "user": "Q1_HELP",
+              "system": "If you are having a hard time, text HELP and we will answer.",
+              "options": ["Yes, I need help", "No, I am doing OK!"]
+            },
+            "spanish": {
+              "user": "Q1_AYUDA",
+              "system": "Si estás pasando por un mal momento envía AYUDA y te responderemos.",
+              "options": ["Si, necesito ayuda", "No ¡estoy bien!"]
+            }
+          },
+          "intermittent_messages": {
+            "1pm": {
+              "english": {
+                "user": "Q1_IM_1PM",
+                "system": "There is strength in numbers: Text your supporters and let them know you are quitting! Encouraging words can go a long way.",
+                "gif_link": "https://quitxt.org/sites/quitxt/files/gifs/q1_strength_in_numbers.gif"
+              },
+              "spanish": {
+                "user": "Q1_IM_1PM",
+                "system": "La unión hace la fuerza. Comunícate con las personas que te apoyan y déjales saber que dejaste de fumar. Las palabras de aliento son de gran ayuda.",
+                "gif_link": "https://quitxt.org/sites/quitxt/files/gifs/q1_strength_in_numbers.gif"
+              }
+            },
+            "4pm": {
+              "english": {
+                "user": "Q1_IM_4PM",
+                "system": "Miles Morales spent a lot of time preparing to become Spider-Man. Quitting smoking is no different. We can show you how to quit 1 craving at a time.",
+                "gif_link": "Insert updated gif link"
+              },
+              "spanish": {
+                "user": "Q1_IM_4PM",
+                "system": "Miles Morales practicó mucho tiempo para ser el Hombre Araña. Dejar de fumar no es diferente. Te mostraremos cómo dejar de fumar 1 antojo a la vez.",
+                "gif_link": "Insert updated gif link"
+              }
+            }
+          },
+          "checkout": {
+            "english": {
+              "user": "Q1_CHECKOUT",
+              "system": "During the day, did you smoke a tobacco cigarette, even a puff?",
+              "options": ["Yes, it was hard.", "No, I did not smoke!"],
+              "time": "8pm"
+            },
+            "spanish": {
+              "user": "Q1_REVISION",
+              "system": "Durante el día de hoy, ¿fumaste cigarrillos de tabaco, aunque fuera una fumada?",
+              "options": ["Si, fue difícil!", "No, ¡No fumé!"],
+              "time": "8pm"
+            }
+          },
+          "checkout_responses": {
+            "slip_response": {
+              "english": {
+                "user": "Yes, it was hard.",
+                "system": "That is OK. It takes practice. Treat this as a slip. Each slip is an opportunity to learn. You CAN do this!"
+              },
+              "spanish": {
+                "user": "Si, fue difícil!",
+                "system": "Es OK. Requiere práctica. Toma esto como un desliz. Cada desliz es una oportunidad de aprender. ¡Tú PUEDES lograrlo!"
+              }
+            },
+            "success_response": {
+              "english": {
+                "user": "No, I did not smoke!",
+                "system": "CONGRATULATIONS! You got the mojo! We'll text you again tomorrow...",
+                "gif_link": "https://quitxt.org/sites/quitxt/files/gifs/q1_you_got_this.gif"
+              },
+              "spanish": {
+                "user": "No, ¡No fumé!",
+                "system": "¡FELICITACIONES! ¡Tú tienes la magia! Hablamos de nuevo en la mañana...",
+                "gif_link": "https://quitxt.org/sites/quitxt/files/gifs/q1_8pm_checkout_esp.gif"
+              }
+            }
+          }
+        },
+        "q2": {
+          "breathing": {
+            "english": {
+              "user": "Q2_BREATHING",
+              "system": "Start today with breathing exercises to help you cope with the urge to smoke.\n\nRelax away the craving! Breathe in VERY SLOWLY through your nose, fill your lungs from bottom up, then exhale VERY SLOWLY through your mouth. Do it 3 times.\n\nTo perk up: Take a deep breath QUICKLY and DEEPLY through your nose, then blow it QUICKLY out your mouth. Do it 3 times. Practice daily. Tap pic below",
+              "link": "Insert updated link",
+              "delay": "2 minutes"
+            },
+            "spanish": {
+              "user": "Q2_RESPIRACION",
+              "system": "Empieza el día con ejercicios de respiración para ayudarte con los antojos de fumar.\n\nPara relajar el antojo: Respira MUY LENTAMENTE por la nariz y llena tus pulmones de abajo hacia arriba. Después, MUY LENTAMENTE sopla el aire por la boca. Hazlo 3 veces.\n\nPara animarte: Respira RÁPIDA y PROFUNDAMENTE por la nariz y luego sopla el aire RÁPIDAMENTE por la boca. Hazlo 3 veces. Practica varias veces al día. Clic el pic abajo",
+              "link": "Insert updated link",
+              "delay": "2 minutes"
+            }
+          },
+          "bd_message": {
+            "english": {
+              "user": "Q2_BD",
+              "system": "Drinking makes it harder to quit smoking... Here are some ideas on how to control drinking. Tap pic below",
+              "link": "Insert updated link"
+            },
+            "spanish": {
+              "user": "Q2_BD",
+              "system": "Tomar te hace más difícil dejar de fumar. Para ideas sobre cómo controlar la bebida Clic el pic abajo",
+              "link": "Insert updated link"
+            }
+          },
+          "intermittent_messages": {
+            "1pm": {
+              "english": {
+                "user": "Q2_IM_1PM",
+                "system": "24 hours smokefree and counting!!! Be sure to reward yourself. Each hour you're smokefree, say or do something nice for yourself.",
+                "gif_link": "https://quitxt.org/sites/quitxt/files/gifs/Q2IM1pm.gif"
+              },
+              "spanish": {
+                "user": "Q2_IM_1PM",
+                "system": "¡24 horas sin fumar y contando! Asegúrate de premiarte. Cada hora sin fumar haz algo que te agrade.",
+                "gif_link": "Insert updated gif link"
+              }
+            },
+            "4pm": {
+              "english": {
+                "user": "Q2_IM_4PM",
+                "system": "Health experts say smoking weakens the function of the lungs. Quitting smoking... Best decision ever!!",
+                "gif_link": "https://quitxt.org/sites/quitxt/files/gifs/Q2_4pm_Thumbup.gif"
+              },
+              "spanish": {
+                "user": "Q2_IM_4PM",
+                "system": "Los expertos de salud dicen que fumar debilita la función de los pulmones. Dejar de fumar...¡La mejor decisión de tu vida!"
+              }
+            },
+            "7pm": {
+              "english": {
+                "user": "Q2_IM_7PM",
+                "system": "Quitting is hard, but YOU CAN DO IT! Make yourself proud & ditch tobacco for good. We got your back!",
+                "gif_link": "https://quitxt.org/sites/quitxt/files/gifs/Q2IM7pm.gif"
+              },
+              "spanish": {
+                "user": "Q2_IM_7PM",
+                "system": "Dejar de fumar es difícil, pero ¡TÚ PUEDES LOGRARLO! Haz que te sientas orgulloso de ti mismo y abandona el tabaco. ¡Estamos contigo!",
+                "gif_link": "https://quitxt.org/sites/quitxt/files/gifs/q2_7pm_back_esp.gif"
+              }
+            }
+          }
+        },
+        "q7": {
+          "money_saved": {
+            "english": {
+              "user": "Q7_MONEY",
+              "system": "$XX. That's how much you've saved since quitting smoking. Go, you! Here's why your wallet is getting bigger:",
+              "video_link": "https://youtu.be/rSaJBPEA3RA"
+            },
+            "spanish": {
+              "user": "Q7_DINERO",
+              "system": "$XX. Esto es lo que has ahorrado desde que dejaste de fumar. ¡Bravo! Mira por qué tu billetera está más grande:",
+              "video_link": "https://youtu.be/Ygu88-BO0cY"
+            }
+          },
+          "getting_active": {
+            "english": {
+              "user": "Q7_ACTIVE",
+              "system": "You'll find it easier to quit if you start getting more active... even a short walk will help. Just go for it!! Tap pic below",
+              "link": "https://quitxt.org/getting-active",
+              "delay": "2 minutes"
+            },
+            "spanish": {
+              "user": "Q7_ACTIVO",
+              "system": "Será más fácil dejar de fumar si te mantienes más activo... incluso las caminatas cortas te ayudarán. ¡Muévete ya! Clic el pic abajo",
+              "link": "https://quitxt.org/spanish/mantenerte-activo",
+              "delay": "2 minutes"
+            }
+          },
+          "predict_plan": {
+            "english": {
+              "user": "Q7_PREDICT_PLAN",
+              "system": "To quit for good, you need to be prepared to cope with some tough situations: If you get yelled at by your boss, get stressed, and feel the need for a cigarette...\n\nTake a walk, call a friend, use breathing exercises... you'll feel even worse if you start smoking again. Tap pic below",
+              "link": "http://quitxt.org/predict-and-plan"
+            },
+            "spanish": {
+              "user": "Q7_PREDECIR_PLANEAR",
+              "system": "Para dejar de fumar debes prepararte para enfrentar situaciones difíciles: Si tu jefe te regaña, te estresas y sientes la necesidad de fumarte un cigarrillo...\n\nSal a caminar, llama a un amigo, haz ejercicios de respiración... te sentirás peor si empiezas a fumar de nuevo. Clic el pic abajo",
+              "link": "https://quitxt.org/spanish/predecir-y-planear"
+            }
+          },
+          "checkout": {
+            "english": {
+              "user": "Q7_CHECKOUT",
+              "system": "During the past 7 days, have you smoked a cigarette, even a puff?",
+              "options": ["Yes, It was hard", "No, I did not smoke!"],
+              "time": "8pm"
+            },
+            "spanish": {
+              "user": "Q7_REVISION",
+              "system": "Durante los últimos 7 días, ¿has fumado cigarrillos de tabaco aunque fuera una sola fumada?",
+              "options": ["Si, fue difícil.", "No, ¡No fumé!"],
+              "time": "8pm"
+            }
+          },
+          "slip_response": {
+            "english": {
+              "user": "Q7_SLIP",
+              "system": "That's OK. Remember, it takes practice. What caused you to start smoking again? Send one of these reasons:",
+              "options": ["Badmood", "Stress", "Smokers", "Alcohol", "Other"]
+            },
+            "spanish": {
+              "user": "Q7_DESLIZ",
+              "system": "Es OK. Recuerda, toma práctica. ¿Qué te hizo fumar de nuevo? Envía una de estas razones:",
+              "options": ["Malhumor", "Estrés", "Fumadores", "Alcohol", "Otra"]
+            }
+          }
+        },
+        "q14": {
+          "money_milestone": {
+            "english": {
+              "user": "Q14_MILESTONE",
+              "system": "Congratulations, you have saved $XX since you quit smoking. Give yourself a back-pat and see why you should keep it up:",
+              "video_link": "https://youtu.be/Sf5ge70kUQQ"
+            },
+            "spanish": {
+              "user": "Q14_LOGRO",
+              "system": "¡Felicitaciones, has ahorrado $XX desde que dejaste de fumar!!! Mira por qué debes seguir sin fumar:",
+              "video_link": "https://youtu.be/RHy-ZuTpAeQ"
+            }
+          },
+          "support": {
+            "english": {
+              "user": "Q14_SUPPORT",
+              "system": "Remember, you're not alone in this journey. Reach out to someone close to you and share your progress. Their encouragement can make a big difference! Tap pic below",
+              "link": "https://quitxt.org/support",
+              "delay": "2 minutes"
+            },
+            "spanish": {
+              "user": "Q14_APOYO",
+              "system": "Recuerda que no estás solo en esta jornada. Habla con alguien cercano y comparte tus avances. Su apoyo puede marcar la diferencia. Clic el pic abajo",
+              "link": "https://quitxt.org/spanish/apoyo",
+              "delay": "2 minutes"
+            }
+          }
+        },
+        "q21": {
+          "money_milestone": {
+            "english": {
+              "user": "Q21_MILESTONE",
+              "system": "Congratulations you have saved $XX since you quit smoking! You've got another great thing going for you now that you've quit:",
+              "video_link": "https://youtu.be/U0GG4V65Qso"
+            },
+            "spanish": {
+              "user": "Q21_LOGRO",
+              "system": "¡Felicitaciones, has ahorrado $XX desde que dejaste de fumar! Otra cosa buena más desde que dejaste el cigarrillo:",
+              "video_link": "https://youtu.be/aVpp2LQnYos"
+            }
+          }
+        },
+        "q28": {
+          "money_milestone": {
+            "english": {
+              "user": "Q28_MILESTONE",
+              "system": "Congratulations you have saved $XX since you quit smoking!!! You've made amazing strides. See how it's paying off in other ways:",
+              "video_link": "https://youtu.be/pazM-pO1Vw8"
+            },
+            "spanish": {
+              "user": "Q28_LOGRO",
+              "system": "¡Felicitaciones, has ahorrado $XX desde que dejaste de fumar!!! Has progresado tanto. Mira otros frutos a tu esfuerzo:",
+              "video_link": "https://youtu.be/XSofjGA-J5w"
+            }
+          },
+          "celebration": {
+            "english": {
+              "user": "Q28_CELEBRATE",
+              "system": "You are AWESOME! Congrats! A WHOLE MONTH SMOKEFREE! Major milestone & cause for celebration.",
+              "gif_link": "https://quitxt.org/sites/quitxt/files/gifs/q28_1pm.gif",
+              "time": "1pm"
+            },
+            "spanish": {
+              "user": "Q28_CELEBRAR",
+              "system": "TÚ ERES INCREIBLE! ¡Felicidades! ¡Un MES ENTERO SIN FUMAR! Un gran logro y motivo de celebración.",
+              "gif_link": "https://quitxt.org/sites/quitxt/files/gifs/q28_1pm.gif",
+              "time": "1pm"
+            }
+          }
+        },
+        "q30": {
+          "checkout": {
+            "english": {
+              "user": "Q30_CHECKOUT",
+              "system": "During the past 7 days, have you smoked a cigarette, even a puff?",
+              "options": ["Yes, it was hard.", "No, I did not smoke!"],
+              "time": "8pm"
+            },
+            "spanish": {
+              "user": "Q30_REVISION",
+              "system": "Durante los últimos 7 días, ¿has fumado cigarrillos de tabaco aunque fuera una sola fumada?",
+              "options": ["Si, fue difícil!", "No !No fumé!"],
+              "time": "8pm"
+            }
+          },
+          "slip_response": {
+            "english": {
+              "user": "Q30_SLIP",
+              "system": "That's OK. Remember, it takes practice. What caused you to start smoking again? Send one of these reasons:",
+              "options": ["Badmood", "Stress", "Smokers", "Alcohol", "Other"]
+            },
+            "spanish": {
+              "user": "Q30_DESLIZ",
+              "system": "Es OK. Recuerda, toma práctica. ¿Qué te hizo fumar de nuevo? Envía una de estas razones:",
+              "options": ["Malhumor", "Estrés", "Fumadores", "Alcohol", "Otra"]
+            }
+          },
+          "success_response": {
+            "english": {
+              "user": "Q30_SUCCESS",
+              "system": "CONGRATULATIONS! You rule! Another smokefree day awaits, let's talk again tomorrow",
+              "gif_link": "https://quitxt.org/sites/quitxt/files/gifs/q28_8pm.gif"
+            },
+            "spanish": {
+              "user": "Q30_EXITO",
+              "system": "¡FELICITACIONES! ¡Qué cool! Te espera otro día sin fumar, hablamos mañana...",
+              "gif_link": "https://quitxt.org/sites/quitxt/files/gifs/q28_8pm.gif"
+            }
+          }
+        },
+        "q56": {
+          "eight_week_celebration": {
+            "english": {
+              "user": "Q56_EIGHT_WEEKS",
+              "system": "CONGRATS! 8 weeks without smoking. You rock!",
+              "gif_link": "https://quitxt.org/sites/quitxt/files/gifs/q56_1pm.gif",
+              "time": "1pm"
+            },
+            "spanish": {
+              "user": "Q56_OCHO_SEMANAS",
+              "system": "¡Felicitaciones! 8 semanas sin fumar. ¡Eres genial!",
+              "gif_link": "https://quitxt.org/sites/quitxt/files/gifs/q56_1_proud_esp.gif",
+              "time": "1pm"
+            }
+          },
+          "reward_message": {
+            "english": {
+              "user": "Q56_REWARD",
+              "system": "Today is a major accomplishment! Reward yourself, spend time with family & friends who have supported you, and have a celebration!",
+              "gif_link": "https://quitxt.org/sites/quitxt/files/gifs/q56_4pm.gif",
+              "time": "4pm"
+            },
+            "spanish": {
+              "user": "Q56_PREMIO",
+              "system": "¡Hoy es un gran logro! Prémiate, pasa tiempo con familia y amigos que te han apoyado, y ¡celebra!",
+              "gif_link": "https://quitxt.org/sites/quitxt/files/gifs/q56_4pm.gif",
+              "time": "4pm"
+            }
+          }
+        },
+        "q90": {
+          "three_month_checkin": {
+            "english": {
+              "user": "Q90_CHECKIN",
+              "system": "Hi, it is Quitxt, just checking in. We would like to know how you are doing.\n\nDuring the past 7 days, have you smoked a cigarette, even a puff?",
+              "options": ["Yes, it was hard.", "No, I did not smoke!"]
+            },
+            "spanish": {
+              "user": "Q90_REVISION",
+              "system": "Hola, es Quitxt para saber cómo vas.\n\nDurante los últimos 7 días, ¿has fumado cigarrillos de tabaco aunque fuera una sola fumada?",
+              "options": ["Si, fue difícil!", "No !No fumé!"]
+            }
+          },
+          "slip_response": {
+            "english": {
+              "user": "Q90_SLIP",
+              "system": "That's OK. Sometimes it takes a few tries. Keep trying. What caused you to smoke again? Send one of these reasons:",
+              "options": ["Badmood", "Stress", "Smokers", "Alcohol", "Other"]
+            },
+            "spanish": {
+              "user": "Q90_DESLIZ",
+              "system": "Está bien. A veces se necesitan varios intentos. Continúa tratando. ¿Qué te hizo fumar? Envía una de estas razones:",
+              "options": ["Malhumor", "Estrés", "Fumadores", "Alcohol", "Otra"]
+            }
+          },
+          "success_response": {
+            "english": {
+              "user": "Q90_SUCCESS",
+              "system": "CONGRATULATIONS! 3 months without smoking! Keep staying strong & smokefree, you can do it!",
+              "gif_link": "https://quitxt.org/sites/quitxt/files/gifs/q72_checkout.gif"
+            },
+            "spanish": {
+              "user": "Q90_EXITO",
+              "system": "¡FELICITACIONES! ¡3 meses libre del tabaco! Permanece fuerte y sin fumar. ¡Tú puedes hacerlo!",
+              "gif_link": "https://quitxt.org/sites/quitxt/files/gifs/q72_checkin_congrats_esp.gif"
+            }
+          }
+        },
+        "q180": {
+          "final_checkin": {
+            "english": {
+              "user": "Q180_FINAL",
+              "system": "Hi, it is Quitxt checking in for the LAST time! It has been 6 months.\n\nDuring the past 7 days, have you smoked a cigarette, even a puff?",
+              "options": ["Yes, it was hard.", "No, I did not smoke!"]
+            },
+            "spanish": {
+              "user": "Q180_FINAL",
+              "system": "Hola, es Quitxt por última vez. Nos gustaría saber cómo estás. Han pasado 6 meses.\n\nDurante los últimos 7 días, ¿has fumado cigarrillos de tabaco aunque fuera una sola fumada?",
+              "options": ["Si, fue difícil!", "No !No fumé!"]
+            }
+          },
+          "slip_final": {
+            "english": {
+              "user": "Q180_SLIP",
+              "system": "Sometimes it takes a few tries. Don't get discouraged and try again. Think about why you slipped and plan to avoid or manage those triggers.\n\nThank you for completing the program and for being part of the Quitxt study."
+            },
+            "spanish": {
+              "user": "Q180_DESLIZ",
+              "system": "A veces se necesitan varios intentos. ¡No te desanimes. Sigue tratando! Piensa qué causó el desliz y planea cómo evitar o manejar esas situaciones.\n\n¡Gracias por completar el programa y por participar en el estudio Quitxt!"
+            }
+          },
+          "completion_success": {
+            "english": {
+              "user": "Q180_COMPLETION",
+              "system": "CONGRATULATIONS! You did it! Keep staying strong & smokefree, you deserve it!\n\nThank you for being part of the Quitxt study. Best wishes for your continued success and your new healthy life!",
+              "gif_link": "https://quitxt.org/sites/quitxt/files/gifs/q222_checkin_yeah_esp.gif"
+            },
+            "spanish": {
+              "user": "Q180_COMPLETADO",
+              "system": "¡FELICITACIONES! ¡Lo lograste! Permanece fuerte y sin fumar ¡te lo mereces!\n\nGracias por ser parte del estudio Quitxt. ¡Nuestros mejores deseos por tus continuos éxitos y tu nueva vida más saludable!",
+              "gif_link": "https://quitxt.org/sites/quitxt/files/gifs/q222_checkin_yeah_esp.gif"
+            }
+          },
+          "no_response_completion": {
+            "english": {
+              "user": "Q180_NO_RESPONSE",
+              "system": "You completed the program. Thank you for being part of the Quitxt study."
+            },
+            "spanish": {
+              "user": "Q180_SIN_RESPUESTA",
+              "system": "Haz completado el programa. ¡Gracias por participar en el estudio Quitxt!"
+            }
+          }
+        }
+      },
+      "long_term_messages": {
+        "q57_to_q98": {
+          "frequency": "3 messages per week",
+          "messages": {
+            "q57": {
+              "english": "Enjoy having a clean mouth taste and maintain it by brushing your teeth frequently, flossing and using mouthwash.",
+              "spanish": "Disfruta tener el sabor de una boca limpia cepillándote los dientes con frecuencia y usando enjuague bucal y seda dental."
+            },
+            "q60": {
+              "english": "Remind your family and friends that you still need their support to keep smokefree. Create some code words if you need that extra support.",
+              "spanish": "Recuérdales a tu familia y amigos que todavía necesitas su apoyo para mantenerte sin fumar. Crea una palabra de código si necesitas ese apoyo extra."
+            },
+            "q63": {
+              "english": "Exercise offers a powerful distraction from craving. Even walking just 30 minutes a day will help your mood and ease your stress.",
+              "spanish": "El ejercicio te distrae de los antojos. Caminar solo 30 minutos al día ayudara tu estado de ánimo y aliviara tu estrés."
+            },
+            "q65": {
+              "english": "Think about your future self: healthy, energized, and proud of how far you've come. Stay committed to that version of you!",
+              "spanish": "Visualiza la versión futura de ti mismo: saludable, con energía y orgullo de lo que has logrado. ¡Mantente firme con esa versión tuya!"
+            },
+            "q67": {
+              "english": "Remember, you're stronger than your cravings. Cravings are like waves---they rise and fall. Ride them out, and you'll come out stronger.",
+              "spanish": "Recuerda, eres más fuerte que tus antojos. Los antojos son como olas: suben y bajan. ¡Resistelos y saldrás más fuerte!"
+            },
+            "q69": {
+              "english": "Quitting isn't just about giving up smoking; it's about gaining health, freedom, and control. Stay focused on the benefits!",
+              "spanish": "Dejar de fumar no es solo renunciar a un hábito, es ganar salud, libertad y control. ¡Enfócate en los beneficios!"
+            },
+            "q72": {
+              "english": "If you are stressed, experience the calming effects of deep breathing. Inhale slowly through your nose and exhale slowly out your mouth. Do it 3 times.",
+              "spanish": "Si estás estresado, relájate con respiración profunda. Inhala lentamente por la nariz y exhala lentamente por la boca. Hazlo 3 veces."
+            },
+            "q74": {
+              "english": "Take a quick walk -- Changing your environment can distract you from cravings and give you a mental reset.",
+              "spanish": "Haz una caminata rápida -- Cambiar tu entorno puede distraerte de los antojos y ayudarte a despejar la mente."
+            },
+            "q76": {
+              "english": "Your loved ones care about your health. Keep them updated on your progress--- they'll be proud of you! We are!",
+              "spanish": "Tus seres queridos se preocupan por tu salud. Manténlos informados de tu progreso---¡se sentirán orgullosos de ti! ¡Nosotros lo estamos!"
+            },
+            "q79": {
+              "english": "Your body is still adjusting, and that's okay. If you feel restless or emotional sometimes, remind yourself that healing takes time. Be patient and kind to yourself.",
+              "spanish": "Tu cuerpo sigue ajustándose, y eso está bien. Si a veces te sientes inquieto o emocional, recuérdate que sanar lleva tiempo. Sé paciente y amable contigo mismo."
+            },
+            "q81": {
+              "english": "You are rewriting your story. Every smoke-free day is a new chapter in a healthier, happier life. Keep believing in yourself, you are capable of amazing things!",
+              "spanish": "Estás reescribiendo tu historia. Cada día sin fumar es un nuevo capítulo en una vida más saludable y feliz. ¡Cree en ti mismo, eres capaz de cosas increíbles!"
+            },
+            "q83": {
+              "english": "Reward yourself for staying smoke-free -- Celebrate milestones by treating yourself to something you enjoy, like a small gift or a favorite meal.",
+              "spanish": "Recompénsate por no fumar -- Celebra tus logros con algo que te guste, como un pequeño regalo o tu comida favorita."
+            },
+            "q86": {
+              "english": "Repeat to yourself: \"Stress happens and I CAN handle it without smoking.\"",
+              "spanish": "Repítete a ti mismo: \"El estrés ocurre y YO PUEDO controlarlo sin fumar\"."
+            },
+            "q88": {
+              "english": "Look at how far you've come! Your body is healing, your energy is increasing, and you're proving to yourself that you are stronger every day. Keep going---your future is bright!",
+              "spanish": "¡Mira lo lejos que has llegado! Tu cuerpo se está sanando, tu energía está aumentando y cada día demuestras lo fuerte que eres. ¡Sigue adelante, tu futuro es brillante!"
+            }
+          }
+        },
+        "q101_to_q180": {
+          "frequency": "3 messages per week",
+          "messages": {
+            "q101": {
+              "english": "You are investing in your future. Every breath is cleaner, your heart is stronger, and your body is thanking you. Keep moving forward---your best days are ahead!",
+              "spanish": "Estás invirtiendo en tu futuro. Cada respiración es más limpia, tu corazón es más fuerte y tu cuerpo te lo agradece. ¡Sigue avanzando, lo mejor está por venir!"
+            },
+            "q104": {
+              "english": "By now, your lungs are healing, your breathing is better, and your energy is up. Keep enjoying these benefits---you've worked hard for them!",
+              "spanish": "Tus pulmones se están sanando, tu respiración ha mejorado y tienes más energía. Sigue disfrutando de estos beneficios: ¡te los has ganado con esfuerzo!"
+            },
+            "q109": {
+              "english": "You deserve a life full of energy, health, and happiness. And that's exactly what you're creating! Celebrate your progress, and keep building the life you deserve.",
+              "spanish": "Mereces una vida llena de energía, salud y felicidad. Y eso es exactamente lo que estás creando. Celebra tu progreso y sigue construyendo la vida que te mereces."
+            },
+            "q112": {
+              "english": "You are protecting your loved ones by staying smokefree. Now they do not have to breathe your smoke.",
+              "spanish": "Estás protegiendo a tus seres queridos al mantenerte sin fumar. Ya no tienen que respirar el humo de tus cigarrillos."
+            },
+            "q115": {
+              "english": "You've worked hard to get here. Don't let a temporary craving make you forget your long-term goal. Stay focused---your future self will thank you!",
+              "spanish": "Has trabajado duro para llegar hasta aquí. No dejes que un antojo pasajero te haga olvidar tu meta a largo plazo. Mantente enfocado: ¡tu futuro yo te lo agradecerá!"
+            },
+            "q118": {
+              "english": "Remember, slip-ups can happen. What matters is getting back on track. Every day is a fresh start!",
+              "spanish": "Recuerda, los deslices pueden ocurrir. Lo que importa es volver a enfocarte. ¡Cada día es un nuevo comienzo!"
+            },
+            "q122": {
+              "english": "You're not alone in this journey. Connect with friends or family who support your decision. Let them remind you why quitting is one of the best choices you've made.",
+              "spanish": "No estás solo en esta jornada. Habla con amigos o familiares que apoyen tu decisión. Deja que te recuerden por qué dejar de fumar es una de las mejores decisiones que has tomado."
+            },
+            "q126": {
+              "english": "Remember why you started this journey. Whether it's for your health, family, or future, your progress is worth celebrating. ¡Sigue adelante!",
+              "spanish": "Recuerda por qué iniciaste este comino. Ya sea por tu salud, tu familia o tu futuro, tu progreso merece ser celebrado. ¡Sigue adelante!"
+            },
+            "q129": {
+              "english": "In our culture, we value resilience and strength. Quitting smoking takes both, and you're showing that every day. ¡Eres fuerte y capaz!",
+              "spanish": "En nuestra cultura, valoramos la resistencia y la fortaleza. Dejar de fumar requiere ambas, y tú lo estás demostrando cada día. ¡Eres fuerte y capaz!"
+            },
+            "q132": {
+              "english": "Your body, your mind, and your future are thriving. Stay committed to this journey without smoking, and embrace the healthier person you are becoming. Keep shining!",
+              "spanish": "Tu cuerpo, tu mente y tu futuro están floreciendo. Sigue comprometido con tu decisión de no fumar y disfruta de la persona saludable en la que te estás convirtiendo. ¡Sigue brillando!"
+            },
+            "q136": {
+              "english": "Your decision to quit is a gift to yourself and your loved ones. You are showing strength, determination, and self-love. Stay proud of your journey---you're doing something incredible!",
+              "spanish": "Tu decisión de dejar de fumar es un regalo para ti y para quienes te rodean. Estás demostrando fortaleza, determinación y amor propio. ¡Siéntete orgulloso de tu camino, estás logrando algo increíble!"
+            },
+            "q139": {
+              "english": "If someone offers you a cigarette, say, \"No, gracias.\" You've come too far to let one moment set you back. Own your decision---you're in control!",
+              "spanish": "Si alguien te ofrece un cigarro, di: \"No, gracias.\" Has llegado demasiado lejos para que un solo momento te haga retroceder. Toma el control: ¡tú decides!"
+            },
+            "q143": {
+              "english": "Consider the example you're setting for younger siblings, cousins, or friends. You're inspiring others with your journey. That's something to be proud of!",
+              "spanish": "Piensa en el ejemplo que estás dando a tus hermanos, primos o amigos. Tu camino está inspirando a otros. ¡Esto es algo para estar orgulloso!"
+            },
+            "q146": {
+              "english": "Avoid or limit alcohol. Urges may be stronger when you drink and alcohol may affect your willpower, so be prepared and use your coping skills.",
+              "spanish": "Evita o limita el consumo de alcohol. Los antojos pueden ser más fuertes cuando bebes y el alcohol puede afectar tu fuerza de voluntad."
+            },
+            "q150": {
+              "english": "Look how far you've come ! 5 months ago, smoking was part of your routine. Now, you're breaking free from it every day. This is amazing! Well done!",
+              "spanish": "¡Mira todo lo que has logrado! Hace 5 meses, fumar era parte de tu rutina. Ahora, cada día te liberas más de ese hábito. ¡Esto es increíble! ¡Bien hecho!"
+            },
+            "q154": {
+              "english": "Every day without smoking is a victory. On tough days, remind yourself: I've already done this for months---I can keep going!",
+              "spanish": "Cada día sin fumar es una victoria. En los días difíciles, recuérdate: Ya lo he hecho durante meses, ¡yo puedo seguir adelante!"
+            },
+            "q157": {
+              "english": "Certain places or people might trigger old habits. Plan ahead! Have a game plan for what to do when cravings hit---call a friend, chew gum, or keep your hands busy.",
+              "spanish": "Ciertos lugares o personas pueden activar viejos hábitos. ¡Prepárate! Ten un plan listo para cuando tengas antojos: llama a un amigo, mastica chicle o mantén tus manos ocupadas."
+            },
+            "q160": {
+              "english": "Be proud of yourself for taking steps toward a healthier and longer life. Almost there. You are nearing the end of the program!",
+              "spanish": "Siéntete orgulloso de ti mismo por crear una vida más saludable y más larga. Ya falta poco. ¡Te estás acercando al final del programa!",
+              "gif_link": "https://quitxt.org/sites/quitxt/files/gifs/nearing_the_end_almost_there.gif"
+            },
+            "q164": {
+              "english": "The hardest part is behind you, but staying smoke-free is a daily choice. Keep reminding yourself: I am not a smoker anymore.",
+              "spanish": "La parte más difícil ya quedó atrás, pero seguir sin fumar es una elección diaria. Recuérdate constantemente: Ya no soy fumador."
+            },
+            "q168": {
+              "english": "You are creating a new, healthier future---one where smoking doesn't control you. Stay committed, and keep believing in yourself. ¡Lo estás logrando!",
+              "spanish": "Estás creando un futuro nuevo y más saludable-- uno en el que el tabaco ya no tiene poder sobre ti. Mantente firme y sigue creyendo en ti. ¡Lo estás logrando!"
+            },
+            "q171": {
+              "english": "You are your own hero! Quitting smoking is your superpower to protect yourself from health villains like cancer and heart disease.",
+              "spanish": "¡Eres tu propio héroe! Dejar de fumar es tu superpoder y te protege de villanos como el cáncer y las enfermedades del corazón."
+            },
+            "q174": {
+              "english": "Remember to celebrate the amazing job you're doing. Be grateful for your new smokefree life!",
+              "spanish": "Recuerda celebrar el trabajo increíble que estás haciendo. ¡Agradece tu nueva vida libre del tabaco!"
+            },
+            "q177": {
+              "english": "You are proof that change is possible! Your strength and perseverance inspire others, even if you don't realize it. Keep pushing forward---you are unstoppable!",
+              "spanish": "¡Eres la prueba de que el cambio es posible! Tu fortaleza y perseverancia inspiran a otros, aunque no te des cuenta. ¡Sigue adelante, eres imparable!"
+            }
+          }
+        }
+      },
+      "slip_response_system": {
+        "initial_slip": {
+          "english": {
+            "user": "SLIP",
+            "system": "You made a good try and most ex-smokers needed a few tries before they quit for good. Treat this as a learning experience."
+          },
+          "spanish": {
+            "user": "DESLIZ",
+            "system": "Hiciste un buen intento. La mayoría de los fumadores necesitan varios antes de dejar de fumar para siempre. Tómalo como un aprendizaje."
+          }
+        },
+        "slip_reason_prompt": {
+          "english": {
+            "user": "SLIP_REASON",
+            "system": "What caused you to start smoking again? Text one of these reasons:\n\nFor badmood, text 1\nFor stress, text 2\nFor smokers, text 3\nFor alcohol, text 4\nFor other reason, text 5"
+          },
+          "spanish": {
+            "user": "RAZON_DESLIZ",
+            "system": "¿Qué te hizo fumar de nuevo? Envía una de estas razones:\n\nPor malhumor envía 1\nPor estrés envía 2\nPor fumadores, envía 3\nPor alcohol, envía 4\nPor otra razón, envía 5"
+          }
+        },
+        "slip_responses": {
+          "badmood": {
+            "english": {
+              "user": "1",
+              "system": "OK - it's normal to get in a bad mood, slip up and smoke. Next time, instead of smoking, text BADMOOD for help!"
+            },
+            "spanish": {
+              "user": "1",
+              "system": "Es normal estar de mal humor y fumar de nuevo. Tú puedes aprender a manejarlo. La próxima vez no fumes. Envía MALHUMOR para recibir ayuda."
+            }
+          },
+          "stress": {
+            "english": {
+              "user": "2",
+              "system": "Stress causes lots of ex-smokers to slip. If you are feeling stressed don't smoke and try this breathing exercise instead: https://goo.gl/SNxLk0\n\nNext time, instead of smoking, text STRESS for help!"
+            },
+            "spanish": {
+              "user": "2",
+              "system": "El estrés puede causar que tengas un desliz. Cuando sientas estrés no fumes y prueba este ejercicio de respiración https://goo.gl/jyX9P9\n\nLa próxima vez no fumes. Envía ESTRÉS para recibir ayuda."
+            },
+            "followup": {
+              "english": {
+                "system": "Another great way to handle stress is to talk to someone who is glad you quit smoking, share how you are feeling and why. Tap https://goo.gl/YAlViH",
+                "delay": "2 minutes"
+              },
+              "spanish": {
+                "system": "También puedes hablar con alguien que se alegra porque dejaste de fumar. Dile cómo te sientes y por qué. Clic https://goo.gl/lWkVWo",
+                "delay": "2 minutes"
+              }
+            }
+          },
+          "smokers": {
+            "english": {
+              "user": "3",
+              "system": "It's common for ex-smokers to slip up when they are around smokers, you need to stay away from smokers for a week or more.\n\nNext time, instead of smoking, text SMOKERS for help!"
+            },
+            "spanish": {
+              "user": "3",
+              "system": "Es común que los exfumadores tengan un desliz cuando están con fumadores. Necesitas estar alejado de los fumadores por una semana o más.\n\nLa próxima vez no fumes. Envía FUMADORES para recibir ayuda."
+            },
+            "followup": {
+              "english": {
+                "system": "If you are around friends who smoke, tell them right away that you quit and ask them NOT to offer you a cigarette! Tap https://goo.gl/4uJShf",
+                "delay": "no delay"
+              },
+              "spanish": {
+                "system": "Cuando estés con amigos que fuman, diles pronto que dejaste de fumar y pídeles que ¡NO te ofrezcan cigarrillos! clic https://goo.gl/c3Ul6m",
+                "delay": "no delay"
+              }
+            }
+          },
+          "alcohol": {
+            "english": {
+              "user": "4",
+              "system": "Drinking has lots of dangers and you know now it can make you smoke. Stop for a while or at least cut back. Tap: https://goo.gl/ut8tdk\n\nNext time, instead of smoking, text ALCOHOL for help!"
+            },
+            "spanish": {
+              "user": "4",
+              "system": "Beber es peligroso y ya sabes que te puede hacer fumar. Deja de beber por un tiempo o al menos reduce tu consumo. Clic https://goo.gl/aqi4Su\n\nLa próxima vez no fumes. Envía ALCOHOL para recibir ayuda."
+            }
+          },
+          "other": {
+            "english": {
+              "user": "5",
+              "system": "Think about what made you slip & how you can handle it better next time. Make a plan to do something else instead. Tap: https://goo.gl/vvwJFh"
+            },
+            "spanish": {
+              "user": "5",
+              "system": "Piensa en qué te hizo deslizar y cómo lo puedes manejar. Planea hacer otras cosas en lugar de fumar. Clic https://goo.gl/bzPXY1"
+            }
+          }
+        },
+        "third_slip_additional": {
+          "condition": "After 3rd or more slip",
+          "english": {
+            "system": "To avoid slipping again try using nicotine gum or lozenges - you won't want to smoke so much if you do! TAP https://goo.gl/6t7uT4"
+          },
+          "spanish": {
+            "system": "Para evitar un nuevo desliz trata de usar chicle o pastillas de nicotina. No vas a desear fumar tanto si lo haces. Clic https://goo.gl/gi6NMj"
+          },
+          "followup": {
+            "english": {
+              "system": "You can also use the nicotine patch, but just don't use the patch and gum or lozenges at the same time! TAP here: https://goo.gl/6t7uT4",
+              "delay": "no delay"
+            },
+            "spanish": {
+              "system": "También puedes usar el parche de nicotina, pero no uses el parche y el chicle o las pastillas al mismo tiempo. Clic https://goo.gl/gi6NMj",
+              "delay": "no delay"
+            }
+          }
+        }
+      },
+      "help_keywords": {
+        "english": {
+          "HELP": "General help request",
+          "BADMOOD": "Help for bad mood situations - offers coping strategies for managing emotions without smoking",
+          "STRESS": "Help for stress situations - provides breathing exercises and stress management techniques", 
+          "SMOKERS": "Help when around other smokers - advice for social situations and avoiding secondhand smoke",
+          "ALCOHOL": "Help with alcohol-related triggers - guidance on managing drinking to avoid smoking triggers"
+        },
+        "spanish": {
+          "AYUDA": "Solicitud de ayuda general",
+          "MALHUMOR": "Ayuda para situaciones de mal humor - ofrece estrategias para manejar emociones sin fumar",
+          "ESTRÉS": "Ayuda para situaciones de estrés - proporciona ejercicios de respiración y técnicas de manejo del estrés",
+          "FUMADORES": "Ayuda cuando estés con otros fumadores - consejos para situaciones sociales y evitar humo de segunda mano", 
+          "ALCOHOL": "Ayuda con factores relacionados al alcohol - orientación sobre manejo del consumo para evitar provocar fumar"
+        }
+      },
+      "motivational_content": {
+        "breathing_exercises": {
+          "english": {
+            "user": "BREATHING_HELP",
+            "system": "There are breathing exercises that can help you stop smoking. One can help you relax. One can perk you up.\n\nTo relax: Breathe in VERY SLOWLY through your nose, fill your lungs from bottom up, then exhale VERY SLOWLY through your mouth. Do it 3 times. Practice daily.\n\nTo perk up: Take a deep breath QUICKLY and DEEPLY through your nose, then blow it QUICKLY out your mouth. Do it 3 times. Practice daily.",
+            "link": "https://quitxt.org/breathing-exercises"
+          },
+          "spanish": {
+            "user": "AYUDA_RESPIRACION",
+            "system": "Hay ejercicios de respiración que pueden ayudarte a dejar de fumar. Uno puede ayudarte a relajar y otro puede darte ánimo.\n\nPara relajarte: Respira MUY LENTAMENTE por la nariz y llena tus pulmones de abajo hacia arriba. Después, MUY LENTAMENTE sopla el aire por la boca. Hazlo 3 veces. Practica diariamente.\n\nPara animarte: Respira RÁPIDA y PROFUNDAMENTE por la nariz y luego sopla el aire RÁPIDAMENTE por la boca. Hazlo 3 veces. Practica varias veces al día. Clic el pic abajo",
+            "link": "https://quitxt.org/spanish/ejercicios-de-respiracion"
+          }
+        },
+        "getting_active": {
+          "english": {
+            "user": "ACTIVITY_HELP",
+            "system": "You'll find it easier to quit if you get more active. There are lots of ways to get active. Just take walks, play ball with friends or exercise. Tap pic below",
+            "link": "https://quitxt.org/getting-active"
+          },
+          "spanish": {
+            "user": "AYUDA_ACTIVIDAD",
+            "system": "Será más fácil dejar de fumar si eres más activo. Hay muchas formas de hacerlo. Solo camina o haz ejercicio. Clic el pic abajo",
+            "link": "https://quitxt.org/spanish/mantenerte-activo"
+          }
+        },
+        "instead_of_smoking": {
+          "english": {
+            "user": "INSTEAD_HELP",
+            "system": "Think about times or places you will want to smoke the most and what can you do instead... Go here for ideas:",
+            "link": "https://quitxt.org/instead-of-smoking"
+          },
+          "spanish": {
+            "user": "AYUDA_EN_LUGAR",
+            "system": "Piensa cuándo y dónde es que deseas fumar más y qué puedes hacer en lugar de fumar. Clic el pic abajo para más ideas:",
+            "link": "https://quitxt.org/spanish/en-lugar-de-fumar"
+          }
+        },
+        "support": {
+          "english": {
+            "user": "SUPPORT_HELP",
+            "system": "You can get support from family and friends. Get in touch with them today to tell them how you're doing. Tap pic below",
+            "link": "https://quitxt.org/support"
+          },
+          "spanish": {
+            "user": "AYUDA_APOYO",
+            "system": "Puedes recibir apoyo de tu familia y amigos. Comunícate con ellos hoy y déjales saber cómo estás. Clic el pic abajo",
+            "link": "https://quitxt.org/spanish/apoyo"
+          }
+        },
+        "predict_and_plan": {
+          "english": {
+            "user": "PREDICT_PLAN_HELP",
+            "system": "Remember, to really quit for good, you'll need to be prepared to cope with some tough situations. Tap pic below for ideas",
+            "link": "https://quitxt.org/predict-and-plan"
+          },
+          "spanish": {
+            "user": "AYUDA_PREDECIR",
+            "system": "Recuerda, para dejar de fumar para siempre necesitas prepararte para enfrentar situaciones difíciles. Para ideas Clic el pic abajo",
+            "link": "https://quitxt.org/spanish/predecir-y-planear"
+          }
+        },
+        "nicotine_replacement": {
+          "english": {
+            "user": "NICOTINE_HELP",
+            "system": "Nicotine is addictive and some smokers may need to use nicotine replacement to help them quit. Tap pic below",
+            "link": "https://quitxt.org/nicotine-replacement"
+          },
+          "spanish": {
+            "user": "AYUDA_NICOTINA",
+            "system": "La nicotina es adictiva y algunos fumadores necesitan usar reemplazo de nicotina para ayudarse a dejar de fumar. Clic el pic abajo",
+            "link": "https://quitxt.org/spanish/terapia-de-reemplazo-de-nicotina"
+          }
+        },
+        "binge_drinking": {
+          "english": {
+            "user": "DRINKING_HELP",
+            "system": "Meeting with friends? See why it's smart to manage your alcohol consumption as you also quit smoking: Tap pic below",
+            "link": "https://quitxt.org/binge-drinking"
+          },
+          "spanish": {
+            "user": "AYUDA_BEBIDA",
+            "system": "¿Vas a salir con tus amigos? Mira por qué es importante aprender a controlar la bebida cuando estás dejando de fumar: Clic el pic abajo",
+            "link": "https://quitxt.org/spanish/consumo-intensivo-de-alcohol"
+          }
+        },
+        "talk_out_smoking": {
+          "english": {
+            "user": "TALKOUT_HELP",
+            "system": "You need to be ready to talk yourself out of smoking. You might tell yourself: I can have just one cigarette, that won't hurt.\n\nYou SHOULD tell yourself: If I have one, I will just want another one... and that's no good! Tap pic below",
+            "link": "http://quitxt.org/talk-yourself-out-of-smoking"
+          },
+          "spanish": {
+            "user": "AYUDA_CONVENCER",
+            "system": "Necesitas estar listo para convencerte a ti mismo de no fumar. Podrías decirte: Fumarme solo un cigarrillo no me hará daño.\n\nDebes decirte: Si me fumo uno, voy a querer otro... y eso ¡no es bueno! Clic el pic abajo",
+            "link": "https://quitxt.org/spanish/convencete-a-ti-mismo-de-no-fumar"
+          }
+        }
+      },
+      "milestone_celebrations": {
+        "week_1": {
+          "english": "7 days smokefree! Someone's showing off Don't look back now. Mark your calendar & do something special to celebrate this accomplishment!",
+          "spanish": "¡Súper 1 semana sin fumar! Alguien está presumiendo No mires hacia atrás. Marca tu calendario, haz algo especial y ¡celebra este logro!"
+        },
+        "week_2": {
+          "english": "WOW! 2 weeks smokefree! Think about how much time, energy, health, & money you have saved. Make today great!",
+          "spanish": "¡SÚPER! ¡2 semanas sin fumar! Piensa en todo el tiempo, energía, salud y dinero que has ahorrado. ¡Haz que este día sea grandioso!"
+        },
+        "week_3": {
+          "english": "Awesome! 3 weeks smoke-free. Reward yourself: go out, have fun, walk with friends, and enjoy some gum or a refreshing frozen yogurt. Keep it up!",
+          "spanish": "¡Super! 3 semanas sin fumar. ¡Prémiate! Sal y diviértete, camina con amigos y disfruta un chicle o un rico helado de yogur. ¡Vas muy bien!"
+        },
+        "month_1": {
+          "english": "You are AWESOME! Congrats! A WHOLE MONTH SMOKEFREE! Major milestone & cause for celebration.",
+          "spanish": "TÚ ERES INCREIBLE! ¡Felicidades! ¡Un MES ENTERO SIN FUMAR! Un gran logro y motivo de celebración."
+        },
+        "week_8": {
+          "english": "CONGRATS! 8 weeks without smoking. You rock!",
+          "spanish": "¡Felicitaciones! 8 semanas sin fumar. ¡Eres genial!"
+        },
+        "month_3": {
+          "english": "CONGRATULATIONS! 3 months without smoking! Keep staying strong & smokefree, you can do it!",
+          "spanish": "¡FELICITACIONES! ¡3 meses libre del tabaco! Permanece fuerte y sin fumar. ¡Tú puedes hacerlo!"
+        },
+        "month_5": {
+          "english": "Look how far you've come ! 5 months ago, smoking was part of your routine. Now, you're breaking free from it every day. This is amazing! Well done!",
+          "spanish": "¡Mira todo lo que has logrado! Hace 5 meses, fumar era parte de tu rutina. Ahora, cada día te liberas más de ese hábito. ¡Esto es increíble! ¡Bien hecho!"
+        },
+        "month_6": {
+          "english": "CONGRATULATIONS! You did it! Keep staying strong & smokefree, you deserve it!\n\nThank you for being part of the Quitxt study. Best wishes for your continued success and your new healthy life!",
+          "spanish": "¡FELICITACIONES! ¡Lo lograste! Permanece fuerte y sin fumar ¡te lo mereces!\n\nGracias por ser parte del estudio Quitxt. ¡Nuestros mejores deseos por tus continuos éxitos y tu nueva vida más saludable!"
+        }
+      },
+      "daily_intermittent_patterns": {
+        "q1_to_q7": {
+          "pattern": "3 messages per day",
+          "times": ["1pm", "4pm", "8pm checkout"]
+        },
+        "q8_onwards": {
+          "pattern": "5 messages per day on some days",
+          "times": ["11am", "1pm", "3pm", "5pm", "7pm"]
+        },
+        "q57_to_q180": {
+          "pattern": "3 messages per week",
+          "description": "Maintenance phase with reduced frequency"
+        }
+      },
+      "money_tracking": {
+        "calculation_points": ["Q7", "Q14", "Q21", "Q28"],
+        "message_template": {
+          "english": "Congratulations you have saved $XX since you quit smoking!",
+          "spanish": "¡Felicitaciones, has ahorrado $XX desde que dejaste de fumar!"
+        }
+      },
+      "program_metadata": {
+        "duration": "180 days (6 months)",
+        "languages": ["English", "Spanish"],
+        "study_name": "Quitxt Research Study",
+        "institution": "UT Health Science Center",
+        "contact_email": "quitxt@uthscsa.edu",
+        "program_type": "Research Study",
+        "target_audience": "Young Adults",
+        "delivery_method": "SMS Text Messages"
+      }
+    }
+}

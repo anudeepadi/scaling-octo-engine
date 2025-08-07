@@ -181,14 +181,14 @@ class DashMessagingService implements MessagingService {
         const Duration(seconds: 2),
         onTimeout: () {
           DebugConfig.debugPrint('FCM token loading timed out, using default');
-          return "eLjQWERyTm2Kltsqxahvw6:APA91bFqgowOQxoeOpZuf9wMsUQczuxBBZZim_yo-r_j9H_SMKqU4HLuioUUgI028IRpUG5SObBY3Fp4HiJIkTNsLkrKPEgWEo2UWVvMa81mPIVdM0WEuV0";
+          return null; // do not fall back to a hardcoded token
         },
       );
       DebugConfig.debugPrint('FCM Token: $_fcmToken');
     } catch (e) {
       DebugConfig.debugPrint('Error loading FCM token in background: $e');
-      // Use default token
-      _fcmToken = "eLjQWERyTm2Kltsqxahvw6:APA91bFqgowOQxoeOpZuf9wMsUQczuxBBZZim_yo-r_j9H_SMKqU4HLuioUUgI028IRpUG5SObBY3Fp4HiJIkTNsLkrKPEgWEo2UWVvMa81mPIVdM0WEuV0";
+      // Leave token null on error
+      _fcmToken = null;
     }
   }
 
@@ -1123,8 +1123,6 @@ class DashMessagingService implements MessagingService {
     try {
       // Try to use the token from main.py if we can't get a real FCM token
       // This is a fallback for testing purposes
-      String defaultToken = "eLjQWERyTm2Kltsqxahvw6:APA91bFqgowOQxoeOpZuf9wMsUQczuxBBZZim_yo-r_j9H_SMKqU4HLuioUUgI028IRpUG5SObBY3Fp4HiJIkTNsLkrKPEgWEo2UWVvMa81mPIVdM0WEuV0";
-      
       // Try to get the FCM token from Firebase Messaging
       final messaging = FirebaseMessaging.instance;
       final token = await messaging.getToken();
@@ -1133,13 +1131,12 @@ class DashMessagingService implements MessagingService {
         DebugConfig.debugPrint('Successfully retrieved FCM token from Firebase Messaging');
         return token;
       } else {
-        DebugConfig.debugPrint('Failed to get FCM token from Firebase Messaging, using default token');
-        return defaultToken;
+        DebugConfig.debugPrint('Failed to get FCM token from Firebase Messaging');
+        return null;
       }
     } catch (e) {
-      DebugConfig.debugPrint('Error loading FCM token: $e, using default token');
-      // Return the default token from main.py
-      return "eLjQWERyTm2Kltsqxahvw6:APA91bFqgowOQxoeOpZuf9wMsUQczuxBBZZim_yo-r_j9H_SMKqU4HLuioUUgI028IRpUG5SObBY3Fp4HiJIkTNsLkrKPEgWEo2UWVvMa81mPIVdM0WEuV0";
+      DebugConfig.debugPrint('Error loading FCM token: $e');
+      return null;
     }
   }
 

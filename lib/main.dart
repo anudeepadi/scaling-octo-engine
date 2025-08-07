@@ -111,9 +111,8 @@ void main() async {
       // Initialize Firebase App Check to fix "No AppCheckProvider installed" error
       try {
         await FirebaseAppCheck.instance.activate(
-          // For development, use debug provider
-          // For production, switch to device check (iOS) or play integrity (Android)
-          webProvider: ReCaptchaV3Provider('recaptcha-v3-site-key'),
+          // For development, use debug provider. Configure proper providers for production builds.
+          webProvider: ReCaptchaV3Provider('REPLACE_WITH_RECAPTCHA_SITE_KEY'),
           androidProvider: AndroidProvider.debug,
           appleProvider: AppleProvider.debug,
         );

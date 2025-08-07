@@ -74,7 +74,7 @@ class ChatProvider extends ChangeNotifier {
     _messages.add(message);
     
     // Always sort by timestamp to maintain chronological order
-    _messages.sort((a, b) => a.timestamp.compareTo(b.timestamp));
+    _messages.sort(_messageComparator);
     
     _updateCurrentConversationTime();
     notifyListeners();
@@ -87,7 +87,7 @@ class ChatProvider extends ChangeNotifier {
     _messages.addAll(newMessages);
     
     // Sort all messages by timestamp to ensure chronological order
-    _messages.sort((a, b) => a.timestamp.compareTo(b.timestamp));
+    _messages.sort(_messageComparator);
     
     _updateCurrentConversationTime();
     notifyListeners();
@@ -101,7 +101,7 @@ class ChatProvider extends ChangeNotifier {
     _messages.addAll(newMessages);
     
     // Sort by timestamp to ensure chronological order
-    _messages.sort((a, b) => a.timestamp.compareTo(b.timestamp));
+    _messages.sort(_messageComparator);
     
     _updateCurrentConversationTime();
     notifyListeners();
@@ -164,11 +164,27 @@ class ChatProvider extends ChangeNotifier {
       _messages[messageIndex] = updatedMessage;
       
       // Re-sort to maintain chronological order after update
-      _messages.sort((a, b) => a.timestamp.compareTo(b.timestamp));
+      _messages.sort(_messageComparator);
       
       notifyListeners();
       DebugConfig.debugPrint('ChatProvider: Updated message $messageId and re-sorted chronologically');
     }
+  }
+
+  /// Comparator that sorts by timestamp ascending, but ensures that when
+  /// timestamps are equal or very close, the user's message appears before
+  /// the server message to match conversational flow.
+  int _messageComparator(ChatMessage a, ChatMessage b) {
+    final timeCompare = a.timestamp.compareTo(b.timestamp);
+    if (timeCompare != 0) {
+      return timeCompare;
+    }
+    // If timestamps are identical, prefer user's message first
+    if (a.isMe != b.isMe) {
+      return a.isMe ? -1 : 1;
+    }
+    // Stable fallback on id to avoid reordering equal items unpredictably
+    return a.id.compareTo(b.id);
   }
 
   // Remove message by ID

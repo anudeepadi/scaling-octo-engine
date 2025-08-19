@@ -171,19 +171,31 @@ class ChatProvider extends ChangeNotifier {
     }
   }
 
-  /// Comparator that sorts by timestamp ascending, but ensures that when
-  /// timestamps are equal or very close, the user's message appears before
-  /// the server message to match conversational flow.
+  /// Comparator that sorts by timestamp ascending, ensuring chronological order.
+  /// When timestamps are equal or very close (within 5 seconds), user messages appear before
+  /// server responses to maintain natural conversational flow.
   int _messageComparator(ChatMessage a, ChatMessage b) {
     final timeCompare = a.timestamp.compareTo(b.timestamp);
+    
+    // If timestamps are significantly different (more than 5 seconds), use strict chronological order
+    final timeDiffMs = (a.timestamp.millisecondsSinceEpoch - b.timestamp.millisecondsSinceEpoch).abs();
+    if (timeDiffMs > 5000) {
+      return timeCompare;
+    }
+    
+    // For timestamps that are the same or very close (within 5 seconds),
+    // ensure conversational flow: user message → server response
+    if (a.isMe != b.isMe) {
+      // If one is user and one is server, user message comes first regardless of exact timestamp
+      return a.isMe ? -1 : 1; // User messages (-1) come before server messages (1)
+    }
+    
+    // If both are same type (both user or both server), use timestamp
     if (timeCompare != 0) {
       return timeCompare;
     }
-    // If timestamps are identical, prefer user's message first
-    if (a.isMe != b.isMe) {
-      return a.isMe ? -1 : 1;
-    }
-    // Stable fallback on id to avoid reordering equal items unpredictably
+    
+    // Final fallback on id to avoid reordering equal items unpredictably
     return a.id.compareTo(b.id);
   }
 
@@ -234,10 +246,13 @@ class ChatProvider extends ChangeNotifier {
     // Set new current conversation
     _currentConversationId = conversationId;
 
-    // Load messages for the selected conversation (already in chronological order)
+    // Load messages for the selected conversation and ensure chronological order
     final selectedConversation = _conversations.firstWhere((conv) => conv.id == conversationId);
     _messages.clear();
     _messages.addAll(selectedConversation.messages);
+    
+    // Sort to ensure chronological order (messages might have been stored unsorted)
+    _messages.sort(_messageComparator);
 
     DebugConfig.debugPrint('ChatProvider: Switched conversation - loaded ${_messages.length} messages in chronological order');
 
@@ -390,6 +405,117 @@ class ChatProvider extends ChangeNotifier {
     addMessage(message);
   }
 
+  // Debug all message ordering issues (comprehensive test)
+  void debugAllMessageOrdering() {
+    DebugConfig.debugPrint('🔍 COMPREHENSIVE MESSAGE ORDERING DEBUG');
+    DebugConfig.debugPrint('=======================================');
+    
+    debugTimestampIssues();
+    DebugConfig.debugPrint('');
+    testChronologicalOrdering();
+    DebugConfig.debugPrint('');
+    verifyMessageOrder();
+    
+    DebugConfig.debugPrint('🔍 COMPREHENSIVE DEBUG COMPLETED');
+  }
+
+  // Test chronological ordering with sample messages
+  void testChronologicalOrdering() {
+    DebugConfig.debugPrint('ChatProvider: Testing chronological ordering...');
+    
+    // Clear existing messages for test
+    final originalMessages = List<ChatMessage>.from(_messages);
+    _messages.clear();
+    
+    // Create test messages with specific timestamps
+    final baseTime = DateTime.now().subtract(const Duration(minutes: 5));
+    
+    final userMessage1 = ChatMessage(
+      id: 'test-user-1',
+      content: 'Hello, I need help',
+      timestamp: baseTime,
+      isMe: true,
+      type: MessageType.text,
+    );
+    
+    final serverResponse1 = ChatMessage(
+      id: 'test-server-1',
+      content: 'Hi! How can I assist you?',
+      timestamp: baseTime.add(const Duration(seconds: 1)),
+      isMe: false,
+      type: MessageType.text,
+    );
+    
+    final userMessage2 = ChatMessage(
+      id: 'test-user-2',
+      content: 'I have a question',
+      timestamp: baseTime.add(const Duration(seconds: 2)),
+      isMe: true,
+      type: MessageType.text,
+    );
+    
+    final serverResponse2 = ChatMessage(
+      id: 'test-server-2',
+      content: 'What would you like to know?',
+      timestamp: baseTime.add(const Duration(seconds: 3)),
+      isMe: false,
+      type: MessageType.text,
+    );
+    
+    // Add messages in random order
+    addMessage(serverResponse2);
+    addMessage(userMessage1);
+    addMessage(serverResponse1);
+    addMessage(userMessage2);
+    
+    DebugConfig.debugPrint('ChatProvider: Added test messages in random order');
+    verifyMessageOrder();
+    
+    // Restore original messages
+    _messages.clear();
+    _messages.addAll(originalMessages);
+    _messages.sort(_messageComparator);
+    
+    DebugConfig.debugPrint('ChatProvider: Test completed, messages restored');
+    notifyListeners();
+  }
+
+  // Debug specific timestamp and ordering issues
+  void debugTimestampIssues() {
+    DebugConfig.debugPrint('🐛 DEBUGGING TIMESTAMP ISSUES:');
+    DebugConfig.debugPrint('===============================');
+    
+    for (int i = 0; i < _messages.length; i++) {
+      final message = _messages[i];
+      final timeStr = message.timestamp.toIso8601String();
+      final millis = message.timestamp.millisecondsSinceEpoch;
+      final userType = message.isMe ? "USER" : "SERVER";
+      final preview = message.content.isEmpty ? "[${message.type}]" : message.content.substring(0, message.content.length > 30 ? 30 : message.content.length);
+      
+      DebugConfig.debugPrint('  $i: $userType - $timeStr ($millis) - "$preview"');
+      
+      if (i > 0) {
+        final prevMessage = _messages[i - 1];
+        final timeDiff = message.timestamp.difference(prevMessage.timestamp).inMilliseconds;
+        
+        if (timeDiff < 0) {
+          DebugConfig.debugPrint('    ⚠️  ORDERING VIOLATION! This message is ${-timeDiff}ms BEFORE previous message');
+        } else if (timeDiff == 0) {
+          if (prevMessage.isMe && !message.isMe) {
+            DebugConfig.debugPrint('    ✅ Correct same-timestamp ordering: User → Server');
+          } else if (!prevMessage.isMe && message.isMe) {
+            DebugConfig.debugPrint('    ❌ WRONG same-timestamp ordering: Server → User (should be User → Server)');
+          } else {
+            DebugConfig.debugPrint('    ⚠️  Same timestamp, same sender type');
+          }
+        } else {
+          DebugConfig.debugPrint('    ✓ Correct chronological order (+${timeDiff}ms)');
+        }
+      }
+    }
+    DebugConfig.debugPrint('🐛 TIMESTAMP DEBUG COMPLETED');
+  }
+
   // Debug method to verify message ordering
   void verifyMessageOrder() {
     DebugConfig.debugPrint('ChatProvider: Verifying message order (should be chronological):');
@@ -397,15 +523,25 @@ class ChatProvider extends ChangeNotifier {
       final message = _messages[i];
       final timeStr = message.timestamp.toIso8601String();
       final preview = message.content.isEmpty ? "[${message.type}]" : message.content.substring(0, message.content.length > 30 ? 30 : message.content.length);
-      DebugConfig.debugPrint('  $i: $timeStr - "$preview" (isMe: ${message.isMe})');
+      final userType = message.isMe ? "USER" : "SERVER";
+      DebugConfig.debugPrint('  $i: $timeStr - "$preview" ($userType)');
       
       if (i > 0) {
         final prevMessage = _messages[i - 1];
+        final timeDiff = message.timestamp.difference(prevMessage.timestamp);
+        
         if (message.timestamp.isBefore(prevMessage.timestamp)) {
           DebugConfig.debugPrint('  ⚠️ WARNING: Message $i is earlier than message ${i-1} - ordering violated!');
+        } else if (timeDiff.inMilliseconds == 0) {
+          // Same timestamp - check if user message comes before server message
+          if (prevMessage.isMe && !message.isMe) {
+            DebugConfig.debugPrint('  ✅ Correct: User message followed by server response (same timestamp)');
+          } else if (!prevMessage.isMe && message.isMe) {
+            DebugConfig.debugPrint('  ⚠️ Potential issue: Server message followed by user message (same timestamp)');
+          }
         }
       }
     }
-    DebugConfig.debugPrint('ChatProvider: ✅ Message order verification completed');
+    DebugConfig.debugPrint('ChatProvider: ✅ Message order verification completed (${_messages.length} messages)');
   }
 }

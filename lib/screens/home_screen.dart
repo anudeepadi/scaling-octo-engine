@@ -13,6 +13,7 @@ import '../widgets/quick_reply_widget.dart';
 import '../utils/app_localizations.dart';
 import '../theme/app_theme.dart';
 import 'profile_screen.dart';
+import 'about_screen.dart';
 import '../utils/debug_config.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -395,6 +396,31 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                       onTap: () {
                         Navigator.pop(context);
                         // Already on chat screen, so just close drawer
+                      },
+                    ),
+                    
+                    // About item
+                    ListTile(
+                      leading: const Icon(
+                        Icons.info_outline,
+                        color: Colors.white,
+                        size: 24,
+                      ),
+                      title: const Text(
+                        'About',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 16,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                      onTap: () {
+                        Navigator.pop(context);
+                        
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (context) => const AboutScreen()),
+                        );
                       },
                     ),
                     

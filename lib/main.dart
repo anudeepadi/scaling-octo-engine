@@ -110,9 +110,12 @@ void main() async {
       
       // Initialize Firebase App Check to fix "No AppCheckProvider installed" error
       try {
+        final recaptchaSiteKey = dotenv.env['RECAPTCHA_SITE_KEY'] ?? '6Ld_OqArAAAAAH0vSUdLv_LaiDmFl67BLpJi0Xyg';
+        developer.log('Using reCAPTCHA site key: ${recaptchaSiteKey.substring(0, 10)}...', name: 'App');
+        
         await FirebaseAppCheck.instance.activate(
-          // For development, use debug provider. Configure proper providers for production builds.
-          webProvider: ReCaptchaV3Provider('REPLACE_WITH_RECAPTCHA_SITE_KEY'),
+          // Use reCAPTCHA site key from environment variables
+          webProvider: ReCaptchaV3Provider(recaptchaSiteKey),
           androidProvider: AndroidProvider.debug,
           appleProvider: AppleProvider.debug,
         );

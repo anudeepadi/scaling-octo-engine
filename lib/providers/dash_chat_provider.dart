@@ -556,5 +556,17 @@ class DashChatProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  // Debug comprehensive message ordering (expose ChatProvider debug methods)
+  void debugComprehensiveMessageOrdering() {
+    if (_chatProvider == null) {
+      DebugConfig.debugPrint('[DashChatProvider] ChatProvider not available, cannot debug message ordering');
+      return;
+    }
+    
+    DebugConfig.debugPrint('[DashChatProvider] 🔍 Starting comprehensive message ordering debug...');
+    _chatProvider!.debugAllMessageOrdering();
+    DebugConfig.debugPrint('[DashChatProvider] ✅ Comprehensive message ordering debug completed');
+  }
+
 
 }

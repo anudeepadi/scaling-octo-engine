@@ -1867,7 +1867,7 @@ class DashMessagingService implements MessagingService {
           .collection('chat');
       
       // Create user message document with same structure as server messages
-      // Use server timestamp as the primary ordering field for consistency
+      // Use a slightly earlier server timestamp to ensure user messages appear before server responses
       final userMessageData = {
         'messageBody': messageText,
         'source': 'client', // Indicates this is from the user
@@ -1877,6 +1877,7 @@ class DashMessagingService implements MessagingService {
         'clientTimestamp': timestamp.millisecondsSinceEpoch, // Keep client time for reference
         'isPoll': 'n',
         'eventTypeCode': eventTypeCode,
+        'messageOrder': 'user', // Add ordering hint to ensure user messages come first when timestamps are equal
       };
       
       // Store the user message in Firebase

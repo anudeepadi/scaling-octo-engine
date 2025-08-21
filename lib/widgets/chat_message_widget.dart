@@ -379,6 +379,166 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
             ),
         ],
       );
+    } else if (firstUrl != null && match != null && widget.message.linkPreview != null) {
+      // Web page preview with thumbnail
+      final linkPreview = widget.message.linkPreview!;
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Display text before the URL if any
+          if (match.start > 0)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 4.0),
+              child: Text(
+                widget.message.content.substring(0, match.start).trimRight(),
+                style: TextStyle(
+                  color: widget.message.isMe ? Colors.white : Colors.black,
+                ),
+              ),
+            ),
+          // Web page preview card
+          GestureDetector(
+            onTap: () => _launchURL(firstUrl),
+            child: Container(
+              width: double.infinity,
+              decoration: BoxDecoration(
+                color: widget.message.isMe 
+                    ? Colors.white.withValues(alpha: 0.1) 
+                    : Colors.grey.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(
+                  color: widget.message.isMe 
+                      ? Colors.white.withValues(alpha: 0.3) 
+                      : Colors.grey.withValues(alpha: 0.3),
+                  width: 1,
+                ),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Thumbnail image
+                  if (linkPreview.imageUrl != null)
+                    ClipRRect(
+                      borderRadius: const BorderRadius.only(
+                        topLeft: Radius.circular(8),
+                        topRight: Radius.circular(8),
+                      ),
+                      child: Image.network(
+                        linkPreview.imageUrl!,
+                        height: 120,
+                        width: double.infinity,
+                        fit: BoxFit.cover,
+                        loadingBuilder: (context, child, loadingProgress) {
+                          if (loadingProgress == null) return child;
+                          return Container(
+                            height: 120,
+                            width: double.infinity,
+                            color: Colors.grey[300],
+                            child: Center(
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                value: loadingProgress.expectedTotalBytes != null
+                                    ? loadingProgress.cumulativeBytesLoaded /
+                                        loadingProgress.expectedTotalBytes!
+                                    : null,
+                              ),
+                            ),
+                          );
+                        },
+                        errorBuilder: (context, error, stackTrace) {
+                          return Container(
+                            height: 120,
+                            width: double.infinity,
+                            color: Colors.grey[300],
+                            child: const Center(
+                              child: Icon(
+                                Icons.image_not_supported,
+                                size: 40,
+                                color: Colors.grey,
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                  // Content section
+                  Padding(
+                    padding: const EdgeInsets.all(12),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // Title
+                        Text(
+                          linkPreview.title,
+                          style: TextStyle(
+                            color: widget.message.isMe ? Colors.white : Colors.black,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                          ),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        const SizedBox(height: 4),
+                        // Description
+                        if (linkPreview.description.isNotEmpty)
+                          Text(
+                            linkPreview.description,
+                            style: TextStyle(
+                              color: widget.message.isMe 
+                                  ? Colors.white.withValues(alpha: 0.8) 
+                                  : Colors.grey[600],
+                              fontSize: 12,
+                            ),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        const SizedBox(height: 6),
+                        // URL with icon
+                        Row(
+                          children: [
+                            Icon(
+                              Icons.link,
+                              size: 12,
+                              color: widget.message.isMe 
+                                  ? Colors.white.withValues(alpha: 0.7) 
+                                  : Colors.grey[500],
+                            ),
+                            const SizedBox(width: 4),
+                            Expanded(
+                              child: Text(
+                                linkPreview.siteName ?? Uri.parse(firstUrl).host,
+                                style: TextStyle(
+                                  color: widget.message.isMe 
+                                      ? Colors.white.withValues(alpha: 0.7) 
+                                      : Colors.grey[500],
+                                  fontSize: 11,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          // Display text after the URL if any
+          if (match.end < widget.message.content.length)
+            Padding(
+              padding: const EdgeInsets.only(top: 4.0),
+              child: Text(
+                widget.message.content.substring(match.end).trimLeft(),
+                style: TextStyle(
+                  color: widget.message.isMe ? Colors.white : Colors.black,
+                ),
+              ),
+            ),
+        ],
+      );
     } else {
       // Default text with linkify
       return Linkify(

@@ -1,7 +1,10 @@
 import 'package:flutter/foundation.dart';
 import '../models/chat_message.dart';
 import '../models/quick_reply.dart';
+import '../models/link_preview.dart';
+import '../services/link_preview_service.dart';
 import '../utils/debug_config.dart';
+import '../utils/link_preview_test.dart';
 import 'package:uuid/uuid.dart';
 import 'dart:async';
 
@@ -79,6 +82,9 @@ class ChatProvider extends ChangeNotifier {
     _updateCurrentConversationTime();
     notifyListeners();
     
+    // Check for links and fetch preview asynchronously for ALL messages
+    _processLinksInMessage(message);
+    
     DebugConfig.debugPrint('ChatProvider: Added message "${message.content.isEmpty ? "[${message.type}]" : message.content.substring(0, message.content.length > 30 ? 30 : message.content.length)}" - Total: ${_messages.length}');
   }
 
@@ -91,6 +97,11 @@ class ChatProvider extends ChangeNotifier {
     
     _updateCurrentConversationTime();
     notifyListeners();
+    
+    // Process link previews for new messages asynchronously
+    for (final message in newMessages) {
+      _processLinksInMessage(message);
+    }
     
     DebugConfig.debugPrint('ChatProvider: Added ${newMessages.length} messages in chronological order - Total: ${_messages.length}');
   }
@@ -105,6 +116,11 @@ class ChatProvider extends ChangeNotifier {
     
     _updateCurrentConversationTime();
     notifyListeners();
+    
+    // Process link previews for new messages asynchronously
+    for (final message in newMessages) {
+      _processLinksInMessage(message);
+    }
     
     DebugConfig.debugPrint('ChatProvider: Set ${newMessages.length} messages in chronological order');
   }
@@ -127,6 +143,78 @@ class ChatProvider extends ChangeNotifier {
     );
     
     addMessage(message);
+    // Note: Link processing is now handled in addMessage()
+  }
+  
+  // Helper method to detect URLs in message content
+  bool _containsUrl(String content) {
+    final urlRegex = RegExp(
+      r'https?://(?:[a-zA-Z]|[0-9]|[$-_@.&+]|[!*\(\),]|(?:%[0-9a-fA-F][0-9a-fA-F]))+',
+      caseSensitive: false,
+    );
+    return urlRegex.hasMatch(content);
+  }
+  
+  // Helper method to extract first URL from content
+  String? _extractFirstUrl(String content) {
+    final urlRegex = RegExp(
+      r'https?://(?:[a-zA-Z]|[0-9]|[$-_@.&+]|[!*\(\),]|(?:%[0-9a-fA-F][0-9a-fA-F]))+',
+      caseSensitive: false,
+    );
+    final match = urlRegex.firstMatch(content);
+    return match?.group(0);
+  }
+  
+  // Helper method to check if URL is YouTube
+  bool _isYouTubeUrl(String url) {
+    final uri = Uri.tryParse(url);
+    if (uri == null) return false;
+    return uri.host.contains('youtube.com') || uri.host.contains('youtu.be');
+  }
+  
+  // Helper method to check if URL points to an image
+  bool _isImageUrl(String url) {
+    final lowerUrl = url.toLowerCase();
+    return lowerUrl.endsWith('.jpg') ||
+           lowerUrl.endsWith('.jpeg') ||
+           lowerUrl.endsWith('.png') ||
+           lowerUrl.endsWith('.webp') ||
+           lowerUrl.endsWith('.gif');
+  }
+  
+  // Process links in message and fetch previews
+  Future<void> _processLinksInMessage(ChatMessage message) async {
+    if (!_containsUrl(message.content)) return;
+    
+    final url = _extractFirstUrl(message.content);
+    if (url == null) return;
+    
+    // Skip YouTube URLs and image URLs as they're handled differently
+    if (_isYouTubeUrl(url) || _isImageUrl(url)) return;
+    
+    DebugConfig.debugPrint('ChatProvider: Processing link preview for: $url');
+    
+    // Process link preview asynchronously without blocking the UI
+    _fetchLinkPreviewAsync(message, url);
+  }
+  
+  // Async method to fetch link preview without blocking
+  Future<void> _fetchLinkPreviewAsync(ChatMessage message, String url) async {
+    try {
+      final linkPreview = await LinkPreviewService.fetchLinkPreview(url);
+      if (linkPreview != null) {
+        DebugConfig.debugPrint('ChatProvider: Got link preview for $url - Title: ${linkPreview.title}');
+        
+        // Update the message with link preview
+        final updatedMessage = message.copyWith(
+          linkPreview: linkPreview,
+          type: MessageType.linkPreview,
+        );
+        updateMessage(message.id, updatedMessage);
+      }
+    } catch (e) {
+      DebugConfig.debugPrint('ChatProvider: Error processing link preview for $url: $e');
+    }
   }
 
   // Send a quick reply message (creates user message with current timestamp)
@@ -543,5 +631,94 @@ class ChatProvider extends ChangeNotifier {
       }
     }
     DebugConfig.debugPrint('ChatProvider: ✅ Message order verification completed (${_messages.length} messages)');
+  }
+  
+  // Test link preview functionality
+  Future<void> testLinkPreview() async {
+    final testUrl = 'https://www.github.com';
+    DebugConfig.debugPrint('ChatProvider: Testing link preview for $testUrl');
+    
+    try {
+      final preview = await LinkPreviewService.fetchLinkPreview(testUrl);
+      if (preview != null) {
+        DebugConfig.debugPrint('ChatProvider: ✅ Link preview test successful');
+        DebugConfig.debugPrint('  Title: ${preview.title}');
+        DebugConfig.debugPrint('  Description: ${preview.description}');
+        DebugConfig.debugPrint('  Image: ${preview.imageUrl}');
+        DebugConfig.debugPrint('  Site: ${preview.siteName}');
+      } else {
+        DebugConfig.debugPrint('ChatProvider: ❌ Link preview test failed - no preview returned');
+      }
+    } catch (e) {
+      DebugConfig.debugPrint('ChatProvider: ❌ Link preview test error: $e');
+    }
+  }
+  
+  // Force process link previews for all existing messages (useful for debugging)
+  Future<void> reprocessAllLinkPreviews() async {
+    DebugConfig.debugPrint('ChatProvider: Reprocessing link previews for ${_messages.length} messages');
+    
+    for (final message in _messages) {
+      if (_containsUrl(message.content) && message.linkPreview == null) {
+        DebugConfig.debugPrint('ChatProvider: Processing links in message: "${message.content}"');
+        await _processLinksInMessage(message);
+      }
+    }
+    
+    DebugConfig.debugPrint('ChatProvider: Finished reprocessing link previews');
+  }
+  
+  // Comprehensive debug method for link preview issues
+  Future<void> debugLinkPreviews() async {
+    DebugConfig.debugPrint('');
+    DebugConfig.debugPrint('🔍=================================');
+    DebugConfig.debugPrint('🔍 LINK PREVIEW DEBUG REPORT');
+    DebugConfig.debugPrint('🔍=================================');
+    
+    // 1. Check messages with URLs
+    final messagesWithUrls = _messages.where((msg) => _containsUrl(msg.content)).toList();
+    DebugConfig.debugPrint('📊 Found ${messagesWithUrls.length} messages with URLs out of ${_messages.length} total messages');
+    
+    for (int i = 0; i < messagesWithUrls.length; i++) {
+      final message = messagesWithUrls[i];
+      final url = _extractFirstUrl(message.content);
+      DebugConfig.debugPrint('');
+      DebugConfig.debugPrint('📎 Message ${i+1}: "${message.content.length > 50 ? '${message.content.substring(0, 50)}...' : message.content}"');
+      DebugConfig.debugPrint('   URL: $url');
+      DebugConfig.debugPrint('   Type: ${message.type}');
+      DebugConfig.debugPrint('   Has Preview: ${message.linkPreview != null}');
+      if (message.linkPreview != null) {
+        DebugConfig.debugPrint('   Preview Title: ${message.linkPreview!.title}');
+      }
+    }
+    
+    // 2. Test LinkPreviewService with QuitTXT URLs
+    DebugConfig.debugPrint('');
+    DebugConfig.debugPrint('🧪 Testing LinkPreviewService...');
+    await LinkPreviewTest.testQuitxtUrls();
+    
+    // 3. Test basic URLs
+    DebugConfig.debugPrint('');
+    DebugConfig.debugPrint('🧪 Testing basic URLs...');
+    await LinkPreviewTest.testBasicUrls();
+    
+    DebugConfig.debugPrint('');
+    DebugConfig.debugPrint('🔍=================================');
+    DebugConfig.debugPrint('🔍 END LINK PREVIEW DEBUG REPORT');
+    DebugConfig.debugPrint('🔍=================================');
+  }
+  
+  // Create a test message with link to verify functionality
+  Future<void> addTestMessageWithLink(String testUrl) async {
+    final testMessage = 'Testing link preview: $testUrl';
+    DebugConfig.debugPrint('ChatProvider: Adding test message with URL: $testUrl');
+    addTextMessage(testMessage, isMe: true);
+  }
+  
+  // Helper method to manually trigger link processing for a specific message
+  Future<void> processLinksForMessage(String messageId) async {
+    final message = _messages.firstWhere((msg) => msg.id == messageId, orElse: () => throw Exception('Message not found'));
+    DebugConfig.debugPrint('ChatProvider: Manually processing links for message: $messageId');
+    await _processLinksInMessage(message);
   }
 }

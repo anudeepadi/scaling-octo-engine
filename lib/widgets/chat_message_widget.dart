@@ -562,31 +562,179 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
     // NOTE: Quick reply buttons are now handled by the screen's ListView logic
     // ChatMessageWidget only renders the message content bubble
 
-    // Build content bubble
-    Widget contentBubble = Container(
-      constraints: BoxConstraints(
-        maxWidth: MediaQuery.of(context).size.width * 0.75,
+    return Padding(
+      padding: EdgeInsets.only(
+        left: widget.message.isMe ? 60 : 0,
+        right: widget.message.isMe ? 0 : 60,
+        bottom: 8,
       ),
-      margin: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
-      padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
-      decoration: BoxDecoration(
-        color: widget.message.isMe
-            ? AppTheme.quitxtTeal
-            : Colors.grey[300],
-        borderRadius: BorderRadius.circular(12),
+      child: Row(
+        mainAxisAlignment:
+            widget.message.isMe ? MainAxisAlignment.end : MainAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.end,
+        children: [
+          if (!widget.message.isMe) _buildAvatar(),
+          if (!widget.message.isMe) const SizedBox(width: 8),
+          Flexible(
+            child: Container(
+              constraints: BoxConstraints(
+                maxWidth: MediaQuery.of(context).size.width * 0.75,
+              ),
+              child: Column(
+                crossAxisAlignment: widget.message.isMe
+                    ? CrossAxisAlignment.end
+                    : CrossAxisAlignment.start,
+                children: [
+                  _buildModernMessageBubble(),
+                  const SizedBox(height: 2),
+                  _buildMessageInfo(),
+                ],
+              ),
+            ),
+          ),
+          if (widget.message.isMe) const SizedBox(width: 8),
+          if (widget.message.isMe) _buildAvatar(),
+        ],
       ),
-      child: _buildContent(),
     );
+  }
 
-    return Align(
-      alignment: widget.message.isMe ? Alignment.centerRight : Alignment.centerLeft,
-      child: Column(
-         mainAxisSize: MainAxisSize.min,
-         crossAxisAlignment: widget.message.isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
-         children: [
-            contentBubble,
-         ],
+  Widget _buildAvatar() {
+    return Container(
+      width: 32,
+      height: 32,
+      decoration: BoxDecoration(
+        gradient: widget.message.isMe
+            ? LinearGradient(
+                colors: [AppTheme.quitxtTeal, AppTheme.quitxtPurple],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              )
+            : LinearGradient(
+                colors: [Colors.grey[400]!, Colors.grey[500]!],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Icon(
+        widget.message.isMe ? Icons.person : Icons.support_agent,
+        color: Colors.white,
+        size: 16,
       ),
     );
+  }
+
+  Widget _buildModernMessageBubble() {
+    return GestureDetector(
+      onTap: widget.onReplyTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        decoration: BoxDecoration(
+          gradient: widget.message.isMe
+              ? LinearGradient(
+                  colors: [AppTheme.quitxtTeal, AppTheme.quitxtPurple],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                )
+              : null,
+          color: widget.message.isMe ? null : Colors.grey[100],
+          borderRadius: BorderRadius.only(
+            topLeft: const Radius.circular(20),
+            topRight: const Radius.circular(20),
+            bottomLeft: Radius.circular(widget.message.isMe ? 20 : 4),
+            bottomRight: Radius.circular(widget.message.isMe ? 4 : 20),
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: widget.message.isMe
+                  ? AppTheme.quitxtTeal.withValues(alpha: 0.2)
+                  : Colors.black.withValues(alpha: 0.05),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: _buildContent(),
+      ),
+    );
+  }
+
+  Widget _buildMessageInfo() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 4),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            _formatTime(widget.message.timestamp),
+            style: TextStyle(
+              color: Colors.grey[600],
+              fontSize: 11,
+              fontWeight: FontWeight.w400,
+            ),
+          ),
+          if (widget.message.isMe) ...[
+            const SizedBox(width: 4),
+            Icon(
+              _getStatusIcon(),
+              size: 12,
+              color: _getStatusColor(),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  String _formatTime(DateTime timestamp) {
+    final now = DateTime.now();
+    final difference = now.difference(timestamp);
+
+    if (difference.inDays > 0) {
+      return '${difference.inDays}d ago';
+    } else if (difference.inHours > 0) {
+      return '${difference.inHours}h ago';
+    } else if (difference.inMinutes > 0) {
+      return '${difference.inMinutes}m ago';
+    } else {
+      return 'now';
+    }
+  }
+
+  IconData _getStatusIcon() {
+    switch (widget.message.status) {
+      case MessageStatus.sending:
+        return Icons.access_time;
+      case MessageStatus.sent:
+        return Icons.check;
+      case MessageStatus.delivered:
+        return Icons.done_all;
+      case MessageStatus.read:
+        return Icons.done_all;
+      case MessageStatus.failed:
+      case MessageStatus.error:
+        return Icons.error_outline;
+      default:
+        return Icons.check;
+    }
+  }
+
+  Color _getStatusColor() {
+    switch (widget.message.status) {
+      case MessageStatus.sending:
+        return Colors.grey;
+      case MessageStatus.sent:
+        return Colors.grey[600]!;
+      case MessageStatus.delivered:
+        return AppTheme.quitxtTeal;
+      case MessageStatus.read:
+        return AppTheme.quitxtTeal;
+      case MessageStatus.failed:
+      case MessageStatus.error:
+        return Colors.red;
+      default:
+        return Colors.grey[600]!;
+    }
   }
 }

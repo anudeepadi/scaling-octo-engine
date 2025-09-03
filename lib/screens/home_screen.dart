@@ -480,57 +480,146 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
   Widget _buildMessageInput() {
     return Container(
-      padding: const EdgeInsets.all(16.0),
-      color: Colors.white,
-      child: Row(
-        children: [
-          Expanded(
-            child: Container(
-              decoration: BoxDecoration(
-                color: Colors.grey[100],
-                borderRadius: BorderRadius.circular(25),
-                border: Border.all(color: Colors.grey[300]!),
-              ),
-              child: TextField(
-                controller: _messageController,
-                decoration: const InputDecoration(
-                  hintText: 'Type a message...',
-                  border: InputBorder.none,
-                  contentPadding: EdgeInsets.symmetric(
-                    horizontal: 20,
-                    vertical: 12,
-                  ),
-                ),
-                textCapitalization: TextCapitalization.sentences,
-                keyboardType: TextInputType.multiline,
-                maxLines: null,
-                onSubmitted: _handleSubmitted,
-              ),
-            ),
-          ),
-          const SizedBox(width: 12),
-          Container(
-            decoration: BoxDecoration(
-              color: AppTheme.quitxtPurple,
-              borderRadius: BorderRadius.circular(25),
-            ),
-            child: MaterialButton(
-              onPressed: _isComposing
-                  ? () => _handleSubmitted(_messageController.text)
-                  : null,
-              minWidth: 80,
-              height: 45,
-              child: const Text(
-                'SEND',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.08),
+            blurRadius: 20,
+            offset: const Offset(0, -4),
           ),
         ],
+      ),
+      child: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Row(
+            children: [
+              // Attachment button
+              Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  color: Colors.grey[100],
+                  borderRadius: BorderRadius.circular(22),
+                ),
+                child: Material(
+                  color: Colors.transparent,
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(22),
+                    onTap: () {
+                      // TODO: Show attachment options
+                    },
+                    child: Icon(
+                      Icons.add,
+                      color: Colors.grey[600],
+                      size: 20,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              
+              // Text input field
+              Expanded(
+                child: Container(
+                  constraints: const BoxConstraints(
+                    minHeight: 44,
+                    maxHeight: 120,
+                  ),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF8F9FA),
+                    borderRadius: BorderRadius.circular(22),
+                    border: Border.all(
+                      color: Colors.grey.withValues(alpha: 0.2),
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: TextField(
+                          controller: _messageController,
+                          decoration: InputDecoration(
+                            hintText: 'Type a message...',
+                            border: InputBorder.none,
+                            hintStyle: TextStyle(
+                              color: Colors.grey[500],
+                              fontSize: 16,
+                              fontWeight: FontWeight.w400,
+                            ),
+                          ),
+                          style: const TextStyle(
+                            fontSize: 16,
+                            color: Colors.black87,
+                            fontWeight: FontWeight.w400,
+                          ),
+                          textCapitalization: TextCapitalization.sentences,
+                          keyboardType: TextInputType.multiline,
+                          maxLines: null,
+                          minLines: 1,
+                          onSubmitted: _handleSubmitted,
+                        ),
+                      ),
+                      // Emoji button
+                      IconButton(
+                        icon: Icon(
+                          Icons.emoji_emotions_outlined,
+                          color: Colors.grey[600],
+                          size: 20,
+                        ),
+                        onPressed: () {
+                          // TODO: Show emoji picker
+                        },
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              
+              // Send button
+              Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  gradient: _isComposing
+                      ? LinearGradient(
+                          colors: [AppTheme.quitxtTeal, AppTheme.quitxtPurple],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                        )
+                      : null,
+                  color: _isComposing ? null : Colors.grey[300],
+                  borderRadius: BorderRadius.circular(22),
+                  boxShadow: _isComposing
+                      ? [
+                          BoxShadow(
+                            color: AppTheme.quitxtTeal.withValues(alpha: 0.4),
+                            blurRadius: 12,
+                            offset: const Offset(0, 4),
+                          ),
+                        ]
+                      : [],
+                ),
+                child: Material(
+                  color: Colors.transparent,
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(22),
+                    onTap: _isComposing 
+                        ? () => _handleSubmitted(_messageController.text)
+                        : null,
+                    child: Icon(
+                      Icons.send_rounded,
+                      color: _isComposing ? Colors.white : Colors.grey[600],
+                      size: 20,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -540,19 +629,64 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     return Scaffold(
       key: _scaffoldKey,
       appBar: AppBar(
-        title: Text(AppLocalizations.of(context).translate('app_title')),
-        backgroundColor: AppTheme.quitxtTeal,
-        foregroundColor: Colors.white,
         elevation: 0,
+        scrolledUnderElevation: 1,
+        backgroundColor: Colors.white,
+        foregroundColor: Colors.black87,
+        title: Row(
+          children: [
+            Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [AppTheme.quitxtTeal, AppTheme.quitxtPurple],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: const Icon(
+                Icons.support_agent,
+                color: Colors.white,
+                size: 20,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    AppLocalizations.of(context).translate('app_title'),
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.black87,
+                    ),
+                  ),
+                  Text(
+                    'Here to help you quit smoking',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.grey[600],
+                      fontWeight: FontWeight.w400,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
         leading: IconButton(
-          icon: const Icon(Icons.menu),
+          icon: Icon(Icons.menu, color: Colors.grey[700]),
           onPressed: () {
             _scaffoldKey.currentState?.openDrawer();
           },
         ),
         actions: [
           IconButton(
-            icon: const Icon(Icons.person),
+            icon: Icon(Icons.person_outline, color: Colors.grey[700]),
             onPressed: () {
               Navigator.push(
                 context,
@@ -567,7 +701,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         children: [
           Expanded(
             child: Container(
-              color: Colors.grey[100],
+              color: const Color(0xFFF8F9FA),
               child: Consumer<DashChatProvider>(
                 builder: (context, dashChatProvider, child) {
                   WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -581,25 +715,61 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Icon(
-                            Icons.chat_bubble_outline,
-                            size: 64,
-                            color: Colors.grey[400],
+                          Container(
+                            width: 120,
+                            height: 120,
+                            decoration: BoxDecoration(
+                              gradient: LinearGradient(
+                                colors: [
+                                  AppTheme.quitxtTeal.withValues(alpha: 0.1),
+                                  AppTheme.quitxtPurple.withValues(alpha: 0.1),
+                                ],
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight,
+                              ),
+                              borderRadius: BorderRadius.circular(60),
+                            ),
+                            child: Icon(
+                              Icons.psychology,
+                              size: 60,
+                              color: AppTheme.quitxtTeal,
+                            ),
                           ),
-                          const SizedBox(height: 16),
-                          Text(
-                            'Welcome to QuitTXT',
+                          const SizedBox(height: 24),
+                          const Text(
+                            'Welcome to QuitTXT! 👋',
                             style: TextStyle(
-                              fontSize: 18,
-                              color: Colors.grey[600],
+                              fontSize: 24,
+                              fontWeight: FontWeight.w700,
+                              color: Colors.black87,
                             ),
                           ),
                           const SizedBox(height: 8),
                           Text(
-                            'Your conversation will appear here',
+                            'Your personal smoking cessation assistant',
                             style: TextStyle(
-                              fontSize: 14,
-                              color: Colors.grey[500],
+                              fontSize: 16,
+                              color: Colors.grey[600],
+                              fontWeight: FontWeight.w400,
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                            decoration: BoxDecoration(
+                              color: AppTheme.quitxtTeal.withValues(alpha: 0.1),
+                              borderRadius: BorderRadius.circular(20),
+                              border: Border.all(
+                                color: AppTheme.quitxtTeal.withValues(alpha: 0.2),
+                              ),
+                            ),
+                            child: Text(
+                              'Start your journey to a smoke-free life',
+                              style: TextStyle(
+                                fontSize: 14,
+                                color: AppTheme.quitxtTeal,
+                                fontWeight: FontWeight.w500,
+                              ),
                             ),
                           ),
                         ],

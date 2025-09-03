@@ -3,6 +3,7 @@ import '../models/chat_message.dart';
 import '../models/quick_reply.dart';
 import '../models/link_preview.dart';
 import '../services/link_preview_service.dart';
+import '../services/emoji_converter_service.dart';
 import '../utils/debug_config.dart';
 import '../utils/link_preview_test.dart';
 import 'package:uuid/uuid.dart';
@@ -707,7 +708,9 @@ class ChatProvider extends ChangeNotifier {
     DebugConfig.debugPrint('🔍 END LINK PREVIEW DEBUG REPORT');
     DebugConfig.debugPrint('🔍=================================');
   }
+
   
+
   // Create a test message with link to verify functionality
   Future<void> addTestMessageWithLink(String testUrl) async {
     final testMessage = 'Testing link preview: $testUrl';

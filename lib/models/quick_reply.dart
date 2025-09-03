@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../services/emoji_converter_service.dart';
 
 class QuickReply {
   final String text;
@@ -13,7 +14,7 @@ class QuickReply {
 
   factory QuickReply.fromJson(Map<String, dynamic> json) {
     return QuickReply(
-      text: json['text'] as String,
+      text: EmojiConverterService.convertTextToEmoji(json['text'] as String),
       value: json['value'] as String,
     );
   }

@@ -4,6 +4,7 @@ import '../models/chat_message.dart';
 import '../models/quick_reply.dart';
 import '../services/dash_messaging_service.dart';
 import '../services/firebase_messaging_service.dart';
+import '../services/emoji_converter_service.dart';
 import '../utils/debug_config.dart';
 import 'chat_provider.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -45,6 +46,9 @@ class DashChatProvider extends ChangeNotifier {
   void setChatProvider(ChatProvider chatProvider) {
     _chatProvider = chatProvider;
     DebugConfig.debugPrint('DashChatProvider: Linked with ChatProvider.');
+    
+    // Remove any existing emoji test messages from previous sessions
+    _removeExistingEmojiTestMessages();
     
     // If user is already logged in when linked, setup listeners
     if (_currentUser != null) {
@@ -499,6 +503,23 @@ class DashChatProvider extends ChangeNotifier {
       DebugConfig.debugPrint('[DashChatProvider] ✅ Messages refreshed successfully');
     } catch (e) {
       DebugConfig.debugPrint('[DashChatProvider] ❌ Error refreshing messages: $e');
+    }
+  }
+
+
+  // Remove existing emoji test messages (private method for cleanup)
+  void _removeExistingEmojiTestMessages() {
+    if (_chatProvider == null) return;
+    
+    final emojiTestMessages = _chatProvider!.messages
+        .where((msg) => msg.id.startsWith('emoji_test_'))
+        .toList();
+    
+    if (emojiTestMessages.isNotEmpty) {
+      for (final msg in emojiTestMessages) {
+        _chatProvider!.removeMessage(msg.id);
+      }
+      DebugConfig.debugPrint('[DashChatProvider] Cleaned up ${emojiTestMessages.length} old emoji test messages');
     }
   }
 

@@ -1,6 +1,7 @@
 import 'quick_reply.dart';
 import 'link_preview.dart';
 import '../utils/debug_config.dart';
+import '../services/emoji_converter_service.dart';
 
 enum MessageType {
   text,
@@ -117,8 +118,9 @@ class ChatMessage {
       timestamp = DateTime.now();
     }
     
-    // Get message content
-    String content = data['messageBody'] ?? '';
+    // Get message content and convert text emoticons to emoji
+    String rawContent = data['messageBody'] ?? '';
+    String content = EmojiConverterService.convertTextToEmoji(rawContent);
     
     // Determine if message is from the user
     bool isMe = data['source'] == 'client';
@@ -137,10 +139,16 @@ class ChatMessage {
       if (answers is String && answers != 'None' && answers.isNotEmpty) {
         // Parse comma-separated answers string
         final answerList = answers.split(',').map((e) => e.trim()).where((e) => e.isNotEmpty).toList();
-        suggestedReplies = answerList.map((item) => QuickReply(text: item, value: item)).toList();
+        suggestedReplies = answerList.map((item) => QuickReply(
+          text: EmojiConverterService.convertTextToEmoji(item), 
+          value: item
+        )).toList();
       } else if (answers is List) {
         suggestedReplies = List<String>.from(answers)
-            .map((item) => QuickReply(text: item, value: item))
+            .map((item) => QuickReply(
+              text: EmojiConverterService.convertTextToEmoji(item), 
+              value: item
+            ))
             .toList();
       }
     }
@@ -165,7 +173,7 @@ class ChatMessage {
   factory ChatMessage.fromJson(Map<String, dynamic> json) {
     return ChatMessage(
       id: json['id'] as String,
-      content: json['content'] as String,
+      content: EmojiConverterService.convertTextToEmoji(json['content'] as String),
       timestamp: DateTime.parse(json['timestamp'] as String),
       isMe: json['isMe'] as bool,
       type: MessageType.values.firstWhere(

@@ -88,6 +88,37 @@ class _QuickReplyWidgetState extends State<QuickReplyWidget> {
     widget.onReplySelected(reply);
   }
 
+  List<QuickReply> _getSortedQuickReplies() {
+    // Create a copy of the list to avoid modifying the original
+    List<QuickReply> sortedReplies = List.from(widget.quickReplies);
+    
+    // Sort by extracting numeric values, handling ranges like "1-5", "6-10", etc.
+    sortedReplies.sort((a, b) {
+      int getNumericValue(String text) {
+        // Handle ranges like "1-5", "6-10", "11-20"
+        if (text.contains('-')) {
+          String firstNumber = text.split('-')[0].trim();
+          return int.tryParse(firstNumber) ?? 0;
+        }
+        
+        // Handle "21 or more" type strings
+        if (text.toLowerCase().contains('or more')) {
+          String numberPart = text.replaceAll(RegExp(r'[^0-9]'), '');
+          return int.tryParse(numberPart) ?? 999;
+        }
+        
+        // Extract any number from the string
+        RegExp numRegex = RegExp(r'\d+');
+        Match? match = numRegex.firstMatch(text);
+        return match != null ? int.parse(match.group(0)!) : 0;
+      }
+      
+      return getNumericValue(a.text).compareTo(getNumericValue(b.text));
+    });
+    
+    return sortedReplies;
+  }
+
   @override
   Widget build(BuildContext context) {
     if (widget.quickReplies.isEmpty) {
@@ -101,7 +132,7 @@ class _QuickReplyWidgetState extends State<QuickReplyWidget> {
         children: [
           // Header
           Padding(
-            padding: const EdgeInsets.only(bottom: 12, left: 4),
+            padding: const EdgeInsets.only(bottom: 16, left: 4),
             child: Row(
               children: [
                 Container(
@@ -109,37 +140,39 @@ class _QuickReplyWidgetState extends State<QuickReplyWidget> {
                   height: 20,
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
-                      colors: [AppTheme.quitxtTeal, AppTheme.quitxtPurple],
+                      colors: AppTheme.wellnessGradient,
                       begin: Alignment.topCenter,
                       end: Alignment.bottomCenter,
                     ),
                     borderRadius: BorderRadius.circular(2),
                   ),
                 ),
-                const SizedBox(width: 8),
+                const SizedBox(width: 12),
                 Text(
                   'Quick Replies',
                   style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.grey[700],
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                    color: AppTheme.textPrimary,
+                    letterSpacing: -0.25,
                   ),
                 ),
               ],
             ),
           ),
           
-          // Quick reply buttons in a wrap layout
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: widget.quickReplies.map((reply) {
+          // Quick reply buttons in vertical layout, sorted ascending
+          Column(
+            children: _getSortedQuickReplies().map((reply) {
               final bool isSelected = widget.messageId != null && 
                   _quickReplyService.isQuickReplySelected(widget.messageId!, reply.value);
               final bool isDisabled = widget.messageId != null && 
                   _quickReplyService.isOptionDisabled(widget.messageId!, reply.value);
               
-              return _buildModernQuickReply(reply, isSelected, isDisabled);
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: _buildModernQuickReply(reply, isSelected, isDisabled),
+              );
             }).toList(),
           ),
         ],
@@ -148,85 +181,79 @@ class _QuickReplyWidgetState extends State<QuickReplyWidget> {
   }
 
   Widget _buildModernQuickReply(QuickReply reply, bool isSelected, bool isDisabled) {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        borderRadius: BorderRadius.circular(20),
-        onTap: (isDisabled || isSelected) ? null : () {
-          HapticFeedback.lightImpact();
-          _handleQuickReplyTap(reply);
-        },
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-          decoration: BoxDecoration(
-            gradient: isSelected 
-                ? LinearGradient(
-                    colors: [AppTheme.quitxtTeal, AppTheme.quitxtPurple],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  )
-                : LinearGradient(
-                    colors: [
-                      AppTheme.quitxtTeal.withValues(alpha: 0.1),
-                      AppTheme.quitxtPurple.withValues(alpha: 0.1),
-                    ],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(
-              color: isSelected 
-                  ? Colors.transparent
-                  : AppTheme.quitxtTeal.withValues(alpha: 0.3),
-              width: 1,
-            ),
-            boxShadow: isSelected 
-                ? [
-                    BoxShadow(
-                      color: AppTheme.quitxtTeal.withValues(alpha: 0.3),
-                      blurRadius: 8,
-                      offset: const Offset(0, 2),
-                    ),
-                  ]
-                : [
-                    BoxShadow(
-                      color: AppTheme.quitxtTeal.withValues(alpha: 0.1),
-                      blurRadius: 6,
-                      offset: const Offset(0, 2),
-                    ),
-                  ],
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              if (isSelected) ...[
-                Icon(
-                  Icons.check_circle,
-                  size: 16,
-                  color: Colors.white,
-                ),
-                const SizedBox(width: 6),
-              ] else if (reply.icon != null) ...[
-                Icon(
-                  reply.icon,
-                  size: 16,
-                  color: AppTheme.quitxtTeal,
-                ),
-                const SizedBox(width: 6),
-              ],
-              Flexible(
-                child: Text(
-                  reply.text,
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w500,
-                    color: isSelected ? Colors.white : AppTheme.quitxtTeal,
-                  ),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                ),
+    return SizedBox(
+      width: double.infinity, // Full width for vertical layout
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(12),
+          onTap: (isDisabled || isSelected) ? null : () {
+            HapticFeedback.lightImpact();
+            _handleQuickReplyTap(reply);
+          },
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+            decoration: BoxDecoration(
+              gradient: isSelected 
+                  ? LinearGradient(
+                      colors: AppTheme.wellnessGradient,
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    )
+                  : null,
+              color: isSelected ? null : AppTheme.surfaceWhite,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: isSelected 
+                    ? Colors.transparent
+                    : AppTheme.borderLight,
+                width: 1,
               ),
-            ],
+              boxShadow: isSelected 
+                  ? [
+                      BoxShadow(
+                        color: AppTheme.wellnessGreen.withValues(alpha: 0.3),
+                        blurRadius: 8,
+                        offset: const Offset(0, 2),
+                      ),
+                    ]
+                  : [
+                      BoxShadow(
+                        color: AppTheme.shadowSubtle,
+                        blurRadius: 4,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Expanded(
+                  child: Text(
+                    reply.text,
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                      color: isSelected ? Colors.white : AppTheme.textPrimary,
+                      letterSpacing: -0.25,
+                    ),
+                    textAlign: TextAlign.left,
+                  ),
+                ),
+                if (isSelected) 
+                  Icon(
+                    Icons.check_circle_rounded,
+                    size: 20,
+                    color: Colors.white,
+                  )
+                else
+                  Icon(
+                    Icons.circle_outlined,
+                    size: 20,
+                    color: AppTheme.textTertiary,
+                  ),
+              ],
+            ),
           ),
         ),
       ),

@@ -38,7 +38,7 @@ class LinkPreviewDebugWidget extends StatelessWidget {
               ),
               ElevatedButton(
                 onPressed: () => _testQuitxtLink(context),
-                child: const Text('Test QuitTXT Link'),
+                child: const Text('Test Quitxt Link'),
               ),
               ElevatedButton(
                 onPressed: () => _testGithubLink(context),
@@ -67,14 +67,15 @@ class LinkPreviewDebugWidget extends StatelessWidget {
 
   Future<void> _testQuitxtLink(BuildContext context) async {
     final chatProvider = Provider.of<ChatProvider>(context, listen: false);
-    DebugConfig.debugPrint('🧪 Adding test message with QuitTXT link...');
+    DebugConfig.debugPrint('🧪 Adding test message with Quitxt link...');
     await chatProvider.addTestMessageWithLink('https://quitxt.org/reasons');
   }
 
   Future<void> _testGithubLink(BuildContext context) async {
     final chatProvider = Provider.of<ChatProvider>(context, listen: false);
     DebugConfig.debugPrint('🧪 Adding test message with GitHub link...');
-    await chatProvider.addTestMessageWithLink('https://github.com/flutter/flutter');
+    await chatProvider
+        .addTestMessageWithLink('https://github.com/flutter/flutter');
   }
 }
 
@@ -91,25 +92,28 @@ Widget addDebugButtonsToScreen(Widget originalChild) {
 // Helper function to debug link previews from anywhere in the app
 Future<void> debugLinkPreviewsGlobally(BuildContext context) async {
   final chatProvider = Provider.of<ChatProvider>(context, listen: false);
-  
+
   DebugConfig.debugPrint('');
   DebugConfig.debugPrint('🚀=================================');
   DebugConfig.debugPrint('🚀 GLOBAL LINK PREVIEW DEBUG');
   DebugConfig.debugPrint('🚀=================================');
-  
+
   // 1. Check current message count
-  DebugConfig.debugPrint('📊 Current message count: ${chatProvider.messages.length}');
-  
+  DebugConfig.debugPrint(
+      '📊 Current message count: ${chatProvider.messages.length}');
+
   // 2. Count messages with URLs
-  final messagesWithUrls = chatProvider.messages.where((msg) => 
-    RegExp(r'https?://').hasMatch(msg.content)).toList();
+  final messagesWithUrls = chatProvider.messages
+      .where((msg) => RegExp(r'https?://').hasMatch(msg.content))
+      .toList();
   DebugConfig.debugPrint('📊 Messages with URLs: ${messagesWithUrls.length}');
-  
+
   // 3. Count messages with previews
-  final messagesWithPreviews = chatProvider.messages.where((msg) => 
-    msg.linkPreview != null).toList();
-  DebugConfig.debugPrint('📊 Messages with previews: ${messagesWithPreviews.length}');
-  
+  final messagesWithPreviews =
+      chatProvider.messages.where((msg) => msg.linkPreview != null).toList();
+  DebugConfig.debugPrint(
+      '📊 Messages with previews: ${messagesWithPreviews.length}');
+
   // 4. List some examples
   DebugConfig.debugPrint('');
   DebugConfig.debugPrint('📋 Sample messages with URLs:');
@@ -117,15 +121,16 @@ Future<void> debugLinkPreviewsGlobally(BuildContext context) async {
     final msg = messagesWithUrls[i];
     final urlMatch = RegExp(r'https?://[^\s]+').firstMatch(msg.content);
     final url = urlMatch?.group(0) ?? 'No URL found';
-    DebugConfig.debugPrint('  ${i+1}. ${msg.content.substring(0, msg.content.length > 50 ? 50 : msg.content.length)}...');
+    DebugConfig.debugPrint(
+        '  ${i + 1}. ${msg.content.substring(0, msg.content.length > 50 ? 50 : msg.content.length)}...');
     DebugConfig.debugPrint('     URL: $url');
     DebugConfig.debugPrint('     Has Preview: ${msg.linkPreview != null}');
     DebugConfig.debugPrint('     Type: ${msg.type}');
   }
-  
+
   // 5. Run comprehensive debug
   await chatProvider.debugLinkPreviews();
-  
+
   DebugConfig.debugPrint('🚀=================================');
   DebugConfig.debugPrint('🚀 END GLOBAL DEBUG');
   DebugConfig.debugPrint('🚀=================================');

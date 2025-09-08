@@ -6,9 +6,9 @@
 // tree, read text, and verify that the values of widget properties are correct.
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
-import 'package:quitxt_app/providers/auth_provider.dart';
 import 'package:quitxt_app/providers/chat_provider.dart';
 import 'package:quitxt_app/providers/channel_provider.dart';
 import 'package:quitxt_app/providers/system_chat_provider.dart';
@@ -35,9 +35,9 @@ class MockAuthProvider extends ChangeNotifier {
   Future<bool> signIn(String email, String password) async {
     _isLoading = true;
     notifyListeners();
-    
+
     await Future.delayed(const Duration(milliseconds: 100));
-    
+
     _isAuthenticated = true;
     _isLoading = false;
     notifyListeners();
@@ -47,9 +47,9 @@ class MockAuthProvider extends ChangeNotifier {
   Future<bool> signUp(String email, String password, String username) async {
     _isLoading = true;
     notifyListeners();
-    
+
     await Future.delayed(const Duration(milliseconds: 100));
-    
+
     _isAuthenticated = true;
     _isLoading = false;
     notifyListeners();
@@ -59,9 +59,9 @@ class MockAuthProvider extends ChangeNotifier {
   Future<void> signOut() async {
     _isLoading = true;
     notifyListeners();
-    
+
     await Future.delayed(const Duration(milliseconds: 100));
-    
+
     _isAuthenticated = false;
     _isLoading = false;
     notifyListeners();
@@ -88,7 +88,7 @@ class TestApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => LanguageProvider()),
       ],
       child: MaterialApp(
-        title: 'QuitTxT Test',
+        title: 'Quitxt Test',
         theme: AppTheme.lightTheme,
         home: const Scaffold(
           body: Center(
@@ -101,6 +101,26 @@ class TestApp extends StatelessWidget {
 }
 
 void main() {
+  setUpAll(() {
+    // Mock Firebase to prevent initialization issues
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(
+      const MethodChannel('plugins.flutter.io/firebase_core'),
+      (methodCall) async {
+        return <String, dynamic>{'name': '[DEFAULT]'};
+      },
+    );
+
+    // Mock Firebase Auth
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(
+      const MethodChannel('plugins.flutter.io/firebase_auth'),
+      (methodCall) async {
+        return null;
+      },
+    );
+  });
+
   group('App Tests', () {
     testWidgets('App smoke test', (WidgetTester tester) async {
       // Build our test app and trigger a frame.
@@ -111,14 +131,8 @@ void main() {
       expect(find.byType(TestApp), findsOneWidget);
     });
 
-    testWidgets('AuthProvider test', (WidgetTester tester) async {
-      await tester.pumpWidget(const TestApp());
-
-      // Get the MockAuthProvider using the correct context from the MaterialApp
-      final authProvider = Provider.of<MockAuthProvider>(
-        tester.element(find.byType(MaterialApp)),
-        listen: false,
-      );
+    test('MockAuthProvider functionality', () async {
+      final authProvider = MockAuthProvider();
 
       // Test initial state
       expect(authProvider.isAuthenticated, false);

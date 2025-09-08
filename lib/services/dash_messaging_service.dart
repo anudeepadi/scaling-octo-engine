@@ -1,33 +1,32 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io' show Platform;
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:uuid/uuid.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/chat_message.dart';
 import '../models/quick_reply.dart';
-import '../models/link_preview.dart';
 import '../utils/debug_config.dart';
 import '../utils/platform_utils.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
-import 'package:flutter/foundation.dart';
-import '../constants/app_constants.dart';
 import 'service_manager.dart';
 
 class DashMessagingService implements MessagingService {
-  static final DashMessagingService _instance = DashMessagingService._internal();
+  static final DashMessagingService _instance =
+      DashMessagingService._internal();
   factory DashMessagingService() => _instance;
   DashMessagingService._internal() {
     // Enable Firestore offline persistence for better performance
     _enableFirestorePersistence();
   }
-  
+
   // Enable Firestore offline persistence
   void _enableFirestorePersistence() async {
     try {
       final firestore = FirebaseFirestore.instance;
-      
+
       // INSTANT OPTIMIZATION: Configure Firestore for maximum performance
       firestore.settings = const Settings(
         persistenceEnabled: true,
@@ -35,16 +34,16 @@ class DashMessagingService implements MessagingService {
         host: null, // Use default host for best performance
         sslEnabled: true,
       );
-      
+
       // Enable network for real-time updates
       await firestore.enableNetwork();
-      
+
       // Warm up the connection
       firestore.collection('messages').doc('_warmup').get().catchError((_) {
         // Return a valid DocumentSnapshot or rethrow the error
         return firestore.collection('messages').doc('_warmup').get();
       });
-      
+
       DebugConfig.debugPrint('⚡ Firestore optimized for instant performance');
     } catch (e) {
       DebugConfig.debugPrint('Error enabling Firestore persistence: $e');
@@ -54,24 +53,26 @@ class DashMessagingService implements MessagingService {
   // Server host URL - initialize with correct server URL from main.py
   String _hostUrl = "https://dashmessaging-com.ngrok.io/scheduler/mobile-app";
   String get hostUrl => _hostUrl;
-  
+
   // User information
   String? _userId;
   String? _fcmToken;
   final _uuid = Uuid();
-  
+
   // Stream controller for receiving messages
-  StreamController<ChatMessage> _messageStreamController = StreamController<ChatMessage>.broadcast();
+  StreamController<ChatMessage> _messageStreamController =
+      StreamController<ChatMessage>.broadcast();
+  @override
   Stream<ChatMessage> get messageStream => _messageStreamController.stream;
-  
+
   // Flag to track initialization state
   bool _isInitialized = false;
   @override
   bool get isInitialized => _isInitialized;
-  
+
   // Add flag to track if stream is closed
   bool _isStreamClosed = false;
-  
+
   // Track last response message to prevent duplicates
   DateTime? _lastResponseTime;
   String? _lastMessageText;
@@ -85,34 +86,34 @@ class DashMessagingService implements MessagingService {
 
   // Add cache management
   final Map<String, ChatMessage> _messageCache = {};
-  
+
   // Add performance monitoring
   final Stopwatch _performanceStopwatch = Stopwatch();
-  
+
   // Debug flag for message alignment logging
   static const bool _debugMessageAlignment = true; // Set to false in production
-  
+
   void _startPerformanceTimer(String operation) {
     _performanceStopwatch.reset();
     _performanceStopwatch.start();
     DebugConfig.performancePrint('Starting performance timer for: $operation');
   }
-  
+
   void _stopPerformanceTimer(String operation) {
     _performanceStopwatch.stop();
     final elapsedMs = _performanceStopwatch.elapsedMilliseconds;
     DebugConfig.performancePrint('$operation completed in ${elapsedMs}ms');
   }
-  
+
   void _addToCache(ChatMessage message) {
     _messageCache[message.id] = message;
   }
-  
+
   // ignore: unused_element
   bool _isMessageCached(String messageId) {
     return _messageCache.containsKey(messageId);
   }
-  
+
   void clearCache() {
     _messageCache.clear();
     DebugConfig.debugPrint('Message cache cleared');
@@ -121,50 +122,52 @@ class DashMessagingService implements MessagingService {
   @override
   Future<void> initialize(String userId, String? fcmToken) async {
     if (_isInitialized && _userId == userId) {
-      DebugConfig.debugPrint('DashMessagingService already initialized for user: $userId');
+      DebugConfig.debugPrint(
+          'DashMessagingService already initialized for user: $userId');
       return;
     }
-    
-    DebugConfig.infoPrint('⚡ INSTANT initializing DashMessagingService for user: $userId');
+
+    DebugConfig.infoPrint(
+        '⚡ INSTANT initializing DashMessagingService for user: $userId');
     _userId = userId;
     _fcmToken = fcmToken;
-    
+
     // Apply platform-specific URL transformations
     _hostUrl = PlatformUtils.transformLocalHostUrl(_hostUrl);
     DebugConfig.infoPrint('Using platform-specific server URL: $_hostUrl');
-    
+
     // Clear cache when switching users
     if (_messageCache.isNotEmpty) {
       clearCache();
     }
-    
+
     // Reinitialize stream controller if it's closed
     _reinitializeStreamController();
-    
+
     // Stop any existing listeners
     stopRealtimeMessageListener();
-    
+
     // Reset timestamp tracking
     DebugConfig.debugPrint('Reset timestamps during initialization');
     _lastFirestoreMessageTime = 0;
     _lowestLoadedTimestamp = 0;
-    
+
     try {
       // INSTANT OPTIMIZATION: Start listener FIRST for immediate updates
       startRealtimeMessageListener();
-      
+
       // Then load existing messages and FCM token in parallel
       final futures = <Future>[];
-      
+
       futures.add(loadExistingMessages());
       futures.add(_loadFcmTokenInBackground());
-      
+
       // Non-critical background tasks
       Future.delayed(Duration.zero, () => _testConnectionInBackground());
-      
+
       // Wait only for critical tasks
       await Future.wait(futures);
-      
+
       _isInitialized = true;
       DebugConfig.infoPrint('⚡ DashMessagingService initialized instantly');
     } catch (e) {
@@ -173,7 +176,7 @@ class DashMessagingService implements MessagingService {
       rethrow;
     }
   }
-  
+
   // Load FCM token in background without blocking initialization
   Future<void> _loadFcmTokenInBackground() async {
     try {
@@ -201,49 +204,56 @@ class DashMessagingService implements MessagingService {
       DebugConfig.debugPrint('Using host URL: $hostUrl');
       DebugConfig.debugPrint('FCM Token: $_fcmToken');
       DebugConfig.debugPrint('Testing connection to server: $hostUrl');
-      
+
       final stopwatch = Stopwatch()..start();
-      
+
       try {
         // Platform-specific headers to improve connection reliability
         final headers = {
           'Content-Type': 'application/json',
           'Accept': 'application/json',
-          'User-Agent': Platform.isIOS ? 'QuitTXT-iOS/1.0' : 'QuitTXT-Android/1.0',
+          'User-Agent':
+              Platform.isIOS ? 'Quitxt-iOS/1.0' : 'Quitxt-Android/1.0',
           'Connection': 'keep-alive', // Important for iOS connection stability
         };
-        
+
         // Platform-specific timeout
-        final connectionTimeout = Platform.isIOS 
-            ? const Duration(seconds: 15)  // Longer timeout for iOS
+        final connectionTimeout = Platform.isIOS
+            ? const Duration(seconds: 15) // Longer timeout for iOS
             : const Duration(seconds: 10); // Standard timeout for Android
-        
-        DebugConfig.debugPrint('Using ${Platform.isIOS ? "iOS" : "Android"}-optimized connection settings');
-        
-        final response = await http.get(
-          Uri.parse(hostUrl),
-          headers: headers,
-        ).timeout(connectionTimeout);
-        
+
+        DebugConfig.debugPrint(
+            'Using ${Platform.isIOS ? "iOS" : "Android"}-optimized connection settings');
+
+        final response = await http
+            .get(
+              Uri.parse(hostUrl),
+              headers: headers,
+            )
+            .timeout(connectionTimeout);
+
         final elapsed = stopwatch.elapsedMilliseconds;
         DebugConfig.debugPrint('Connection test completed in ${elapsed}ms');
-        DebugConfig.debugPrint('Server connection test response: ${response.statusCode}');
-        
+        DebugConfig.debugPrint(
+            'Server connection test response: ${response.statusCode}');
+
         if (response.statusCode == 200) {
           DebugConfig.debugPrint('✅ Successfully connected to server');
-          DebugConfig.debugPrint('Response size: ${response.body.length} bytes');
+          DebugConfig.debugPrint(
+              'Response size: ${response.body.length} bytes');
           if (response.body.length < 1000) {
             DebugConfig.debugPrint('Response body: ${response.body}');
           }
         } else {
-          DebugConfig.debugPrint('⚠️ Server responded with status: ${response.statusCode}');
+          DebugConfig.debugPrint(
+              '⚠️ Server responded with status: ${response.statusCode}');
           DebugConfig.debugPrint('Response body: ${response.body}');
         }
       } catch (e) {
         final elapsed = stopwatch.elapsedMilliseconds;
         DebugConfig.debugPrint('❌ Connection test failed after ${elapsed}ms');
         DebugConfig.debugPrint('Connection error: $e');
-        
+
         // Try an alternate test with a standard timeout
         DebugConfig.debugPrint('Attempting alternate connection test...');
         try {
@@ -251,38 +261,48 @@ class DashMessagingService implements MessagingService {
           if (Platform.isIOS) {
             try {
               final altUrl = _hostUrl.replaceFirst('https://', 'http://');
-              DebugConfig.debugPrint('iOS: Trying alternate URL scheme: $altUrl');
-              
+              DebugConfig.debugPrint(
+                  'iOS: Trying alternate URL scheme: $altUrl');
+
               final altResponse = await http.get(
                 Uri.parse(altUrl),
                 headers: {'Content-Type': 'application/json'},
               ).timeout(const Duration(seconds: 5));
-              
-              DebugConfig.debugPrint('iOS alternate URL test: ${altResponse.statusCode}');
-              if (altResponse.statusCode >= 200 && altResponse.statusCode < 300) {
-                DebugConfig.debugPrint('✅ iOS alternate URL connection successful');
+
+              DebugConfig.debugPrint(
+                  'iOS alternate URL test: ${altResponse.statusCode}');
+              if (altResponse.statusCode >= 200 &&
+                  altResponse.statusCode < 300) {
+                DebugConfig.debugPrint(
+                    '✅ iOS alternate URL connection successful');
                 // If this works, update the URL to use this scheme
                 _hostUrl = altUrl;
                 DebugConfig.debugPrint('Updated host URL to: $_hostUrl');
               }
             } catch (altError) {
-              DebugConfig.debugPrint('iOS alternate URL test failed: $altError');
+              DebugConfig.debugPrint(
+                  'iOS alternate URL test failed: $altError');
             }
           }
-          
+
           // Standard connectivity test
-          final pingResponse = await http.get(
-            Uri.parse('https://www.google.com'),
-          ).timeout(const Duration(seconds: 5));
-          
-          DebugConfig.debugPrint('Internet connectivity test: ${pingResponse.statusCode}');
+          final pingResponse = await http
+              .get(
+                Uri.parse('https://www.google.com'),
+              )
+              .timeout(const Duration(seconds: 5));
+
+          DebugConfig.debugPrint(
+              'Internet connectivity test: ${pingResponse.statusCode}');
           if (pingResponse.statusCode >= 200 && pingResponse.statusCode < 300) {
             DebugConfig.debugPrint('✅ Internet connection is working');
-            DebugConfig.debugPrint('⚠️ Issue appears specific to the app server');
-            
+            DebugConfig.debugPrint(
+                '⚠️ Issue appears specific to the app server');
+
             // iOS-specific: Try a different network configuration
             if (Platform.isIOS) {
-              DebugConfig.debugPrint('iOS: Attempting connection with cellular data...');
+              DebugConfig.debugPrint(
+                  'iOS: Attempting connection with cellular data...');
               try {
                 // This doesn't actually force cellular, but it logs the attempt for debugging
                 await http.get(
@@ -292,24 +312,29 @@ class DashMessagingService implements MessagingService {
                     'X-Cellular-Fallback': 'true',
                   },
                 ).timeout(const Duration(seconds: 8));
-                DebugConfig.debugPrint('iOS cellular data connection attempt completed');
+                DebugConfig.debugPrint(
+                    'iOS cellular data connection attempt completed');
               } catch (cellularError) {
-                DebugConfig.debugPrint('iOS cellular connection attempt failed: $cellularError');
+                DebugConfig.debugPrint(
+                    'iOS cellular connection attempt failed: $cellularError');
               }
             }
           } else {
-            DebugConfig.debugPrint('⚠️ Internet connectivity test returned non-success code: ${pingResponse.statusCode}');
+            DebugConfig.debugPrint(
+                '⚠️ Internet connectivity test returned non-success code: ${pingResponse.statusCode}');
           }
         } catch (pingError) {
-          DebugConfig.debugPrint('❌ Internet connectivity test failed: $pingError');
+          DebugConfig.debugPrint(
+              '❌ Internet connectivity test failed: $pingError');
           DebugConfig.debugPrint('⚠️ Device may have limited connectivity');
-          
+
           if (Platform.isIOS) {
-            DebugConfig.debugPrint('iOS: Network appears to be restricted. Check VPN or firewall settings.');
+            DebugConfig.debugPrint(
+                'iOS: Network appears to be restricted. Check VPN or firewall settings.');
           }
         }
       }
-      
+
       DebugConfig.debugPrint('===================================');
     } catch (e) {
       DebugConfig.debugPrint('Error in connection test: $e');
@@ -323,8 +348,10 @@ class DashMessagingService implements MessagingService {
       // Always use the correct ngrok URL from main.py with full path
       _hostUrl = "https://dashmessaging-com.ngrok.io/scheduler/mobile-app";
       DebugConfig.debugPrint('Using server URL: $_hostUrl');
-      FirebaseMessaging.instance.getToken().then((token) => print('ACTUAL FCM TOKEN: $token'));
-      
+      FirebaseMessaging.instance
+          .getToken()
+          .then((token) => debugPrint('ACTUAL FCM TOKEN: $token'));
+
       // Store this URL in shared preferences for future use
       try {
         final prefs = await SharedPreferences.getInstance();
@@ -332,66 +359,76 @@ class DashMessagingService implements MessagingService {
       } catch (e) {
         DebugConfig.debugPrint('Error saving host URL to preferences: $e');
       }
-      
+
       return;
     } catch (e) {
       DebugConfig.debugPrint('Error loading host URL: $e');
     }
   }
-  
+
   // Load existing messages from Firestore
   Future<void> loadExistingMessages() async {
     _startPerformanceTimer('Initial message loading');
-    
+
     if (_userId == null) {
       DebugConfig.debugPrint('Cannot load messages, user ID is null');
       return;
     }
-    
+
     try {
       DebugConfig.debugPrint('⚡ INSTANT loading messages for user: $_userId');
-      
-      // CHRONOLOGICAL LOADING: Load messages in chronological order  
+
+      // CHRONOLOGICAL LOADING: Load messages in chronological order
       final chatRef = FirebaseFirestore.instance
           .collection('messages')
           .doc(_userId)
           .collection('chat')
           .orderBy('createdAt', descending: false);
-          
+
       // Platform-specific optimization: Use different limit based on platform
-      final queryLimit = Platform.isIOS ? 15 : 30; // Reduce limit for iOS to improve performance
+      final queryLimit = Platform.isIOS
+          ? 15
+          : 30; // Reduce limit for iOS to improve performance
       final limitedQuery = chatRef.limitToLast(queryLimit);
-      
-      DebugConfig.debugPrint('Using platform-optimized query limit: $queryLimit');
-      
+
+      DebugConfig.debugPrint(
+          'Using platform-optimized query limit: $queryLimit');
+
       // Try cache first for INSTANT display
       Future<QuerySnapshot>? cacheQuery;
       Future<QuerySnapshot>? serverQuery;
-      
+
       // Start both queries in parallel
       cacheQuery = limitedQuery.get(const GetOptions(source: Source.cache));
-      
+
       // Platform-specific optimization: Use longer timeout for iOS server queries
-      final serverTimeout = Platform.isIOS ? const Duration(seconds: 8) : const Duration(seconds: 5);
-      serverQuery = limitedQuery.get(const GetOptions(source: Source.server))
+      final serverTimeout = Platform.isIOS
+          ? const Duration(seconds: 8)
+          : const Duration(seconds: 5);
+      serverQuery = limitedQuery
+          .get(const GetOptions(source: Source.server))
           .timeout(serverTimeout, onTimeout: () {
-            DebugConfig.debugPrint('⚠️ Server query timed out after ${serverTimeout.inSeconds}s');
-            throw TimeoutException('Server timeout');
-          });
-      
+        DebugConfig.debugPrint(
+            '⚠️ Server query timed out after ${serverTimeout.inSeconds}s');
+        throw TimeoutException('Server timeout');
+      });
+
       // Process cache results INSTANTLY if available
       bool cacheProcessed = false;
       try {
         // Platform-specific optimization: Use different cache timeout for iOS
-        final cacheTimeout = Platform.isIOS ? const Duration(milliseconds: 200) : const Duration(milliseconds: 100);
+        final cacheTimeout = Platform.isIOS
+            ? const Duration(milliseconds: 200)
+            : const Duration(milliseconds: 100);
         final cacheSnapshot = await cacheQuery.timeout(
           cacheTimeout,
           onTimeout: () => throw TimeoutException('Cache timeout'),
         );
-        
+
         if (cacheSnapshot.docs.isNotEmpty) {
-          DebugConfig.debugPrint('⚡ INSTANT cache hit: ${cacheSnapshot.docs.length} messages');
-          
+          DebugConfig.debugPrint(
+              '⚡ INSTANT cache hit: ${cacheSnapshot.docs.length} messages');
+
           // Platform-specific optimization: For iOS, process cache in batches to reduce UI freezing
           if (Platform.isIOS && cacheSnapshot.docs.length > 10) {
             await _processSnapshotInBatches(cacheSnapshot);
@@ -403,14 +440,16 @@ class DashMessagingService implements MessagingService {
       } catch (e) {
         DebugConfig.debugPrint('Cache miss or timeout - loading from server');
       }
-      
+
       // Always process server results for updates
       try {
         final serverSnapshot = await serverQuery;
-        DebugConfig.debugPrint('Server loaded: ${serverSnapshot.docs.length} messages');
-        
+        DebugConfig.debugPrint(
+            'Server loaded: ${serverSnapshot.docs.length} messages');
+
         // Only process if cache wasn't successful or if there are new messages
-        if (!cacheProcessed || serverSnapshot.docs.length > _messageCache.length) {
+        if (!cacheProcessed ||
+            serverSnapshot.docs.length > _messageCache.length) {
           // Platform-specific optimization: For iOS, process server results in batches
           if (Platform.isIOS && serverSnapshot.docs.length > 10) {
             await _processSnapshotInBatches(serverSnapshot);
@@ -425,74 +464,79 @@ class DashMessagingService implements MessagingService {
           return;
         }
       }
-      
+
       _stopPerformanceTimer('Initial message loading (instant)');
     } catch (e) {
       DebugConfig.debugPrint('Error loading existing messages: $e');
       _stopPerformanceTimer('Initial message loading (error)');
     }
   }
-  
+
   // Process snapshot in batches to avoid UI freezing on iOS
   Future<void> _processSnapshotInBatches(QuerySnapshot snapshot) async {
     if (snapshot.docs.isEmpty) return;
-    
+
     final processedIds = <String>{};
     final messages = <ChatMessage>[];
     int lowestTimestamp = DateTime.now().millisecondsSinceEpoch;
-    
+
     // Process documents in smaller batches
     const batchSize = 5;
     for (int i = 0; i < snapshot.docs.length; i += batchSize) {
-      final end = (i + batchSize < snapshot.docs.length) ? i + batchSize : snapshot.docs.length;
+      final end = (i + batchSize < snapshot.docs.length)
+          ? i + batchSize
+          : snapshot.docs.length;
       final batch = snapshot.docs.sublist(i, end);
-      
+
       // Process this batch
       for (var doc in batch) {
         try {
           final data = doc.data() as Map<String, dynamic>?;
           if (data == null) continue;
-          
+
           final messageId = data['serverMessageId'] ?? doc.id;
-          
+
           // Skip if already processed
-          if (processedIds.contains(messageId) || _messageCache.containsKey(messageId)) {
+          if (processedIds.contains(messageId) ||
+              _messageCache.containsKey(messageId)) {
             continue;
           }
           processedIds.add(messageId);
-          
+
           // Extract content
           final content = data['messageBody']?.toString() ?? '';
           if (content.isEmpty) continue;
-          
+
           // Fast timestamp extraction
           final timestamp = _extractTimestampFast(data);
-          lowestTimestamp = timestamp.millisecondsSinceEpoch < lowestTimestamp 
-              ? timestamp.millisecondsSinceEpoch 
+          lowestTimestamp = timestamp.millisecondsSinceEpoch < lowestTimestamp
+              ? timestamp.millisecondsSinceEpoch
               : lowestTimestamp;
-          
+
           // Quick user check - prioritize source field for reliability
           final source = data['source']?.toString() ?? '';
           final senderId = data['senderId'] ?? data['userId'] ?? '';
-          final isMe = source == 'client' || (source.isEmpty && senderId == _userId);
-          
+          final isMe =
+              source == 'client' || (source.isEmpty && senderId == _userId);
+
           // Simplified alignment check for batched processing
           if (_debugMessageAlignment && content.isNotEmpty) {
-            DebugConfig.debugPrint('📍 BATCH Message alignment check: "${content.substring(0, content.length > 20 ? 20 : content.length)}..." -> isMe: $isMe');
+            DebugConfig.debugPrint(
+                '📍 BATCH Message alignment check: "${content.substring(0, content.length > 20 ? 20 : content.length)}..." -> isMe: $isMe');
           }
-          
+
           // Simplified quick reply detection for batched processing
           final isPoll = data['isPoll'];
-          final hasQuickReplyData = isMessagePoll(isPoll) || 
-                                   data['questionsAnswers'] != null || 
-                                   data['answers'] != null || 
-                                   data['buttons'] != null || 
-                                   data['suggestedReplies'] != null;
-          
+          final hasQuickReplyData = isMessagePoll(isPoll) ||
+              data['questionsAnswers'] != null ||
+              data['answers'] != null ||
+              data['buttons'] != null ||
+              data['suggestedReplies'] != null;
+
           if (hasQuickReplyData) {
             // Create message with quick replies (simplified for batch processing)
             final quickReplies = _extractAllQuickReplies(data);
-            
+
             if (quickReplies.isNotEmpty) {
               final message = ChatMessage(
                 id: messageId,
@@ -502,7 +546,7 @@ class DashMessagingService implements MessagingService {
                 type: MessageType.quickReply,
                 suggestedReplies: quickReplies,
               );
-              
+
               _messageCache[messageId] = message;
               messages.add(message);
             } else {
@@ -514,7 +558,7 @@ class DashMessagingService implements MessagingService {
                 isMe: isMe,
                 type: MessageType.text,
               );
-              
+
               _messageCache[messageId] = message;
               messages.add(message);
             }
@@ -527,46 +571,48 @@ class DashMessagingService implements MessagingService {
               isMe: isMe,
               type: MessageType.text,
             );
-            
+
             _messageCache[messageId] = message;
             messages.add(message);
           }
-          
         } catch (e) {
           DebugConfig.debugPrint('Error processing doc in batch: $e');
         }
       }
-      
+
       // Allow UI to update between batches
       await Future.delayed(const Duration(milliseconds: 10));
     }
-    
+
     // Sort messages by timestamp to ensure perfect chronological order
     messages.sort((a, b) => a.timestamp.compareTo(b.timestamp));
-    
+
     // Add messages to stream in chronological order
     for (var message in messages) {
       _safeAddToStream(message);
     }
-    
+
     _lowestLoadedTimestamp = lowestTimestamp;
-    DebugConfig.debugPrint('⚡ Processed ${processedIds.length} messages in batches');
+    DebugConfig.debugPrint(
+        '⚡ Processed ${processedIds.length} messages in batches');
   }
-  
+
   // Helper method to extract all quick replies from message data
   List<QuickReply> _extractAllQuickReplies(Map<String, dynamic> data) {
     final quickReplies = <QuickReply>[];
-    
+
     try {
       // 1. questionsAnswers (Map format)
-      final questionsAnswers = data['questionsAnswers'] as Map<String, dynamic>?;
+      final questionsAnswers =
+          data['questionsAnswers'] as Map<String, dynamic>?;
       if (questionsAnswers != null && questionsAnswers.isNotEmpty) {
         for (final entry in questionsAnswers.entries) {
-          quickReplies.add(QuickReply(text: entry.key, value: entry.value.toString()));
+          quickReplies
+              .add(QuickReply(text: entry.key, value: entry.value.toString()));
         }
         return quickReplies;
       }
-      
+
       // 2. answers (List or String format)
       final answers = data['answers'];
       if (answers is List && answers.isNotEmpty) {
@@ -574,15 +620,20 @@ class DashMessagingService implements MessagingService {
           quickReplies.add(QuickReply(text: a.toString(), value: a.toString()));
         }
         return quickReplies;
-      } 
+      }
       if (answers is String && answers != 'None' && answers.isNotEmpty) {
-        final answerList = answers.split(',').map((e) => e.trim()).where((e) => e.isNotEmpty).take(4).toList();
+        final answerList = answers
+            .split(',')
+            .map((e) => e.trim())
+            .where((e) => e.isNotEmpty)
+            .take(4)
+            .toList();
         for (final a in answerList) {
           quickReplies.add(QuickReply(text: a, value: a));
         }
         return quickReplies;
       }
-      
+
       // 3. buttons (from push notifications)
       final buttons = data['buttons'] as List<dynamic>?;
       if (buttons != null && buttons.isNotEmpty) {
@@ -594,7 +645,7 @@ class DashMessagingService implements MessagingService {
         }
         return quickReplies;
       }
-      
+
       // 4. suggestedReplies
       final suggestedReplies = data['suggestedReplies'] as List<dynamic>?;
       if (suggestedReplies != null && suggestedReplies.isNotEmpty) {
@@ -607,22 +658,23 @@ class DashMessagingService implements MessagingService {
         }
         return quickReplies;
       }
-      
+
       // 5. Check legacy field names
       final oldAnswers = data['options'] ?? data['choices'] ?? data['replies'];
       if (oldAnswers is List && oldAnswers.isNotEmpty) {
         for (var option in oldAnswers.take(4)) {
-          quickReplies.add(QuickReply(text: option.toString(), value: option.toString()));
+          quickReplies.add(
+              QuickReply(text: option.toString(), value: option.toString()));
         }
         return quickReplies;
       }
     } catch (e) {
       DebugConfig.debugPrint('Error extracting quick replies: $e');
     }
-    
+
     return quickReplies;
   }
-  
+
   // Helper method to extract timestamp from Firestore data
   // ignore: unused_element
   DateTime _extractTimestamp(Map<String, dynamic> data) {
@@ -640,24 +692,25 @@ class DashMessagingService implements MessagingService {
     }
     return DateTime.now();
   }
-  
+
   // Helper method to determine message type
   // ignore: unused_element
   MessageType _determineMessageType(Map<String, dynamic> data) {
     final isPoll = data['isPoll'] ?? false;
     final hasQuickReplies = data['questionsAnswers'] != null;
-    
+
     if (isPoll || hasQuickReplies) {
       return MessageType.quickReply;
     }
     return MessageType.text;
   }
-  
+
   // Helper method to extract quick replies from message data
   // ignore: unused_element
   List<QuickReply>? _extractQuickReplies(Map<String, dynamic> data) {
     try {
-      final questionsAnswers = data['questionsAnswers'] as Map<String, dynamic>?;
+      final questionsAnswers =
+          data['questionsAnswers'] as Map<String, dynamic>?;
       if (questionsAnswers != null && questionsAnswers.isNotEmpty) {
         return questionsAnswers.entries
             .map((entry) => QuickReply(
@@ -673,41 +726,46 @@ class DashMessagingService implements MessagingService {
   }
 
   @override
-  Future<void> sendMessage(String message, {Map<String, dynamic>? metadata}) async {
+  Future<void> sendMessage(String message,
+      {Map<String, dynamic>? metadata}) async {
     if (message.trim().isEmpty) {
       DebugConfig.debugPrint('Cannot send empty message');
       return;
     }
-    
+
     // Prevent rapid duplicate messages (debouncing)
     final now = DateTime.now();
     if (_lastMessageText == message && _lastResponseTime != null) {
       final timeSinceLastSend = now.difference(_lastResponseTime!);
       if (timeSinceLastSend.inSeconds < 3) {
-        DebugConfig.debugPrint('Preventing duplicate message within 3 seconds: $message');
+        DebugConfig.debugPrint(
+            'Preventing duplicate message within 3 seconds: $message');
         return;
       }
     }
-    
+
     // Generate unique message ID and track timing
     final messageId = _uuid.v4();
-    final requestStartTime = now.millisecondsSinceEpoch ~/ 1000; // Convert to seconds for server
-    
+    final requestStartTime =
+        now.millisecondsSinceEpoch ~/ 1000; // Convert to seconds for server
+
     // Update tracking variables
     _lastMessageText = message;
     _lastResponseTime = now;
-    
+
     // REMOVED: Don't add user message to stream immediately to prevent timestamp conflicts
     // User messages will appear when they come back through Firebase real-time listener
     // with proper server timestamps ensuring correct chronological ordering
-    
+
     // CONVERSATION HISTORY: Store user message in Firebase for complete conversation history
     await _storeUserMessageInFirebase(messageId, message, now, 1);
-    
-    DebugConfig.debugPrint('🕐 User message stored in Firebase, will appear through real-time listener with correct server timestamp');
-    
-    DebugConfig.debugPrint('Sending message to server: {messageId: $messageId, userId: $_userId, messageText: $message, eventTypeCode: 1}');
-    
+
+    DebugConfig.debugPrint(
+        '🕐 User message stored in Firebase, will appear through real-time listener with correct server timestamp');
+
+    DebugConfig.debugPrint(
+        'Sending message to server: {messageId: $messageId, userId: $_userId, messageText: $message, eventTypeCode: 1}');
+
     try {
       final requestBody = jsonEncode({
         'messageId': messageId,
@@ -717,57 +775,65 @@ class DashMessagingService implements MessagingService {
         'messageTime': requestStartTime,
         'eventTypeCode': 1,
       });
-      
+
       // Pretty print JSON for better readability in console
-      final prettyRequestJson = const JsonEncoder.withIndent('  ').convert(jsonDecode(requestBody));
+      final prettyRequestJson =
+          const JsonEncoder.withIndent('  ').convert(jsonDecode(requestBody));
       DebugConfig.debugPrint('📤 REQUEST JSON:');
-      DebugConfig.debugPrint('$prettyRequestJson');
-      
+      DebugConfig.debugPrint(prettyRequestJson);
+
       DebugConfig.debugPrint('Using endpoint: $_hostUrl');
-      
+
       // Send to server with optimized timeout
-      final response = await http.post(
+      final response = await http
+          .post(
         Uri.parse(_hostUrl),
         headers: {
           'Content-Type': 'application/json',
           'Accept': 'application/json',
-          'User-Agent': 'QuitTXT-Mobile/1.0',
+          'User-Agent': 'Quitxt-Mobile/1.0',
         },
         body: requestBody,
-      ).timeout(
+      )
+          .timeout(
         const Duration(seconds: 8), // Reduced from 10 to 8 seconds
         onTimeout: () {
-          DebugConfig.debugPrint('⚠️ Server request timeout for message: $message');
+          DebugConfig.debugPrint(
+              '⚠️ Server request timeout for message: $message');
           // Don't throw - let Firebase handle the response
           return http.Response('', 408); // Request timeout
         },
       );
-      
-      DebugConfig.debugPrint('Send message response status: ${response.statusCode}');
-      
+
+      DebugConfig.debugPrint(
+          'Send message response status: ${response.statusCode}');
+
       // Pretty print response JSON for better readability if it's valid JSON
       if (response.body.isNotEmpty) {
         try {
           final responseJson = jsonDecode(response.body);
-          final prettyResponseJson = const JsonEncoder.withIndent('  ').convert(responseJson);
+          final prettyResponseJson =
+              const JsonEncoder.withIndent('  ').convert(responseJson);
           DebugConfig.debugPrint('📥 RESPONSE JSON:');
-          DebugConfig.debugPrint('$prettyResponseJson');
+          DebugConfig.debugPrint(prettyResponseJson);
         } catch (e) {
           // Not valid JSON, just print the raw body
           DebugConfig.debugPrint('Response body: ${response.body}');
         }
       }
-      
+
       if (response.statusCode == 200) {
         DebugConfig.debugPrint('Message sent successfully to server');
         // Server will send response via Firebase, no need to process here
         return;
       } else if (response.statusCode == 408) {
         // Timeout - message might still be delivered via Firebase
-        DebugConfig.debugPrint('Server timeout, but message may still be delivered');
+        DebugConfig.debugPrint(
+            'Server timeout, but message may still be delivered');
         return;
       } else {
-        DebugConfig.debugPrint('Failed to send message. Status: ${response.statusCode}');
+        DebugConfig.debugPrint(
+            'Failed to send message. Status: ${response.statusCode}');
         DebugConfig.debugPrint('Response body: ${response.body}');
         // Remove the message from stream if server rejected it
         // Note: In a real app, you might want to show an error state instead
@@ -779,22 +845,23 @@ class DashMessagingService implements MessagingService {
       return; // Return true to avoid confusing the user
     }
   }
-  
+
   // Start real-time message listener
   void startRealtimeMessageListener() {
     if (_userId == null) {
       DebugConfig.debugPrint('Cannot start realtime listener, user ID is null');
       return;
     }
-    
+
     // Stop any existing listener
     stopRealtimeMessageListener();
-    
+
     _startPerformanceTimer('Realtime listener setup');
-    
+
     try {
-      DebugConfig.debugPrint('Setting up INSTANT realtime listener for user: $_userId');
-      
+      DebugConfig.debugPrint(
+          'Setting up INSTANT realtime listener for user: $_userId');
+
       // CHRONOLOGICAL ORDERING: Get messages in ascending order for proper chronological display
       final chatRef = FirebaseFirestore.instance
           .collection('messages')
@@ -802,131 +869,162 @@ class DashMessagingService implements MessagingService {
           .collection('chat')
           .orderBy('createdAt', descending: false)
           .limitToLast(100); // Get last 100 messages in chronological order
-      
+
       // Enable network synchronization for instant updates
       FirebaseFirestore.instance.enableNetwork();
-      
-      _firestoreSubscription = chatRef.snapshots(
-        includeMetadataChanges: true  // Include metadata for instant local writes
-      ).listen(
+
+      _firestoreSubscription = chatRef
+          .snapshots(
+              includeMetadataChanges:
+                  true // Include metadata for instant local writes
+              )
+          .listen(
         (snapshot) {
           // Process changes and ensure chronological ordering
           final docChanges = snapshot.docChanges;
           if (docChanges.isEmpty) return;
-          
-          DebugConfig.debugPrint('⚡ INSTANT update: ${docChanges.length} changes');
-          
+
+          DebugConfig.debugPrint(
+              '⚡ INSTANT update: ${docChanges.length} changes');
+
           // Collect new messages and sort them chronologically
           final newMessages = <ChatMessage>[];
-          
+
           for (var change in docChanges) {
             // Process all change types for instant updates
-            if (change.type == DocumentChangeType.added || 
-                (change.type == DocumentChangeType.modified && !change.doc.metadata.hasPendingWrites)) {
-              
+            if (change.type == DocumentChangeType.added ||
+                (change.type == DocumentChangeType.modified &&
+                    !change.doc.metadata.hasPendingWrites)) {
               final doc = change.doc;
               final data = doc.data();
               if (data == null) continue;
-              
+
               final messageId = data['serverMessageId'] ?? doc.id;
-              
+
               // Ultra-fast cache check
               if (_messageCache.containsKey(messageId)) continue;
-              
+
               // Extract core data immediately
               final messageBody = data['messageBody']?.toString() ?? '';
               if (messageBody.isEmpty) continue;
-              
+
               // Debug: Print full message data for messages that might have quick replies
-              if (messageBody.toLowerCase().contains('cigarette') || messageBody.toLowerCase().contains('ready') || messageBody.toLowerCase().contains('quiz')) {
-                DebugConfig.debugPrint('🔍 REALTIME POTENTIAL QUICK REPLY MESSAGE:');
+              if (messageBody.toLowerCase().contains('cigarette') ||
+                  messageBody.toLowerCase().contains('ready') ||
+                  messageBody.toLowerCase().contains('quiz')) {
+                DebugConfig.debugPrint(
+                    '🔍 REALTIME POTENTIAL QUICK REPLY MESSAGE:');
                 DebugConfig.debugPrint('🔍 Content: $messageBody');
-                DebugConfig.debugPrint('🔍 Full data keys: ${data.keys.toList()}');
+                DebugConfig.debugPrint(
+                    '🔍 Full data keys: ${data.keys.toList()}');
                 DebugConfig.debugPrint('🔍 Full data: $data');
               }
-              
+
               // Instant timestamp - use now if not available
               final messageTimestamp = _extractTimestampFast(data);
-              
-                      // Quick user check - prioritize source field for reliability
-        final source = data['source']?.toString() ?? '';
-        final senderId = data['senderId'] ?? data['userId'] ?? '';
-        // FIXED: Prioritize source field since it's more reliable than senderId comparison
-        final isMe = source == 'client' || (source.isEmpty && senderId == _userId);
-        
-        // DEBUG: Log message alignment for troubleshooting
-        if (_debugMessageAlignment && messageBody.isNotEmpty) {
-          DebugConfig.debugPrint('📍 REALTIME Message alignment check: "${messageBody.substring(0, messageBody.length > 30 ? 30 : messageBody.length)}..." -> isMe: $isMe (source: "$source", senderId: "$senderId", _userId: "$_userId")');
-        }
-              
+
+              // Quick user check - prioritize source field for reliability
+              final source = data['source']?.toString() ?? '';
+              final senderId = data['senderId'] ?? data['userId'] ?? '';
+              // FIXED: Prioritize source field since it's more reliable than senderId comparison
+              final isMe =
+                  source == 'client' || (source.isEmpty && senderId == _userId);
+
+              // DEBUG: Log message alignment for troubleshooting
+              if (_debugMessageAlignment && messageBody.isNotEmpty) {
+                DebugConfig.debugPrint(
+                    '📍 REALTIME Message alignment check: "${messageBody.substring(0, messageBody.length > 30 ? 30 : messageBody.length)}..." -> isMe: $isMe (source: "$source", senderId: "$senderId", _userId: "$_userId")');
+              }
+
               // Enhanced poll detection - check ALL possible quick reply fields (same as unified logic)
               final isPoll = data['isPoll'];
-              final questionsAnswers = data['questionsAnswers'] as Map<String, dynamic>?;
+              final questionsAnswers =
+                  data['questionsAnswers'] as Map<String, dynamic>?;
               final answers = data['answers'];
               final buttons = data['buttons'] as List<dynamic>?;
-              final suggestedReplies = data['suggestedReplies'] as List<dynamic>?;
-              
+              final suggestedReplies =
+                  data['suggestedReplies'] as List<dynamic>?;
+
               // Comprehensive logging for debugging (same as unified logic)
-              if (messageBody.toLowerCase().contains('cigarette') || messageBody.toLowerCase().contains('ready') || 
-                  messageBody.toLowerCase().contains('quiz') || messageBody.toLowerCase().contains('smoke')) {
-                DebugConfig.debugPrint('🔍 REALTIME: Analyzing potential poll message:');
+              if (messageBody.toLowerCase().contains('cigarette') ||
+                  messageBody.toLowerCase().contains('ready') ||
+                  messageBody.toLowerCase().contains('quiz') ||
+                  messageBody.toLowerCase().contains('smoke')) {
+                DebugConfig.debugPrint(
+                    '🔍 REALTIME: Analyzing potential poll message:');
                 DebugConfig.debugPrint('🔍 Content: $messageBody');
                 DebugConfig.debugPrint('🔍 isPoll: $isPoll');
-                DebugConfig.debugPrint('🔍 questionsAnswers: $questionsAnswers');
+                DebugConfig.debugPrint(
+                    '🔍 questionsAnswers: $questionsAnswers');
                 DebugConfig.debugPrint('🔍 answers: $answers');
                 DebugConfig.debugPrint('🔍 buttons: $buttons');
-                DebugConfig.debugPrint('🔍 suggestedReplies: $suggestedReplies');
+                DebugConfig.debugPrint(
+                    '🔍 suggestedReplies: $suggestedReplies');
                 DebugConfig.debugPrint('🔍 All keys: ${data.keys.toList()}');
               }
-              
-              final hasQuickReplyData = isMessagePoll(isPoll) || 
-                                       questionsAnswers != null || 
-                                       answers != null || 
-                                       buttons != null || 
-                                       suggestedReplies != null;
-              
+
+              final hasQuickReplyData = isMessagePoll(isPoll) ||
+                  questionsAnswers != null ||
+                  answers != null ||
+                  buttons != null ||
+                  suggestedReplies != null;
+
               if (hasQuickReplyData) {
                 // Create a single message with content AND quick replies
                 List<QuickReply> quickReplies = [];
-                
+
                 // Process quick replies from ALL possible sources (same as unified logic)
-                
+
                 // 1. questionsAnswers (Map format)
                 if (questionsAnswers != null && questionsAnswers.isNotEmpty) {
                   for (final entry in questionsAnswers.entries) {
-                    quickReplies.add(QuickReply(text: entry.key, value: entry.value.toString()));
+                    quickReplies.add(QuickReply(
+                        text: entry.key, value: entry.value.toString()));
                   }
-                  DebugConfig.debugPrint('🔧 REALTIME: Added ${questionsAnswers.length} quick replies from questionsAnswers');
+                  DebugConfig.debugPrint(
+                      '🔧 REALTIME: Added ${questionsAnswers.length} quick replies from questionsAnswers');
                 }
-                
+
                 // 2. answers (List or String format)
                 else if (answers is List && answers.isNotEmpty) {
                   for (var a in answers.take(4)) {
-                    quickReplies.add(QuickReply(text: a.toString(), value: a.toString()));
+                    quickReplies.add(
+                        QuickReply(text: a.toString(), value: a.toString()));
                   }
-                  DebugConfig.debugPrint('🔧 REALTIME: Added ${answers.length} quick replies from answers (List)');
-                } 
-                else if (answers is String && answers != 'None' && answers.isNotEmpty) {
-                  final answerList = answers.split(',').map((e) => e.trim()).where((e) => e.isNotEmpty).take(4).toList();
+                  DebugConfig.debugPrint(
+                      '🔧 REALTIME: Added ${answers.length} quick replies from answers (List)');
+                } else if (answers is String &&
+                    answers != 'None' &&
+                    answers.isNotEmpty) {
+                  final answerList = answers
+                      .split(',')
+                      .map((e) => e.trim())
+                      .where((e) => e.isNotEmpty)
+                      .take(4)
+                      .toList();
                   for (final a in answerList) {
                     quickReplies.add(QuickReply(text: a, value: a));
                   }
-                  DebugConfig.debugPrint('🔧 REALTIME: Added ${answerList.length} quick replies from answers (String)');
+                  DebugConfig.debugPrint(
+                      '🔧 REALTIME: Added ${answerList.length} quick replies from answers (String)');
                 }
-                
+
                 // 3. buttons (from push notifications)
                 else if (buttons != null && buttons.isNotEmpty) {
                   for (var button in buttons.take(4)) {
-                    final title = button['title']?.toString() ?? button.toString();
+                    final title =
+                        button['title']?.toString() ?? button.toString();
                     if (title.isNotEmpty) {
                       quickReplies.add(QuickReply(text: title, value: title));
                     }
                   }
-                  DebugConfig.debugPrint('🔧 REALTIME: Added ${buttons.length} quick replies from buttons');
+                  DebugConfig.debugPrint(
+                      '🔧 REALTIME: Added ${buttons.length} quick replies from buttons');
                 }
-                
+
                 // 4. suggestedReplies (already processed)
-                else if (suggestedReplies != null && suggestedReplies.isNotEmpty) {
+                else if (suggestedReplies != null &&
+                    suggestedReplies.isNotEmpty) {
                   for (var reply in suggestedReplies.take(4)) {
                     final text = reply['text']?.toString() ?? reply.toString();
                     final value = reply['value']?.toString() ?? text;
@@ -934,20 +1032,24 @@ class DashMessagingService implements MessagingService {
                       quickReplies.add(QuickReply(text: text, value: value));
                     }
                   }
-                  DebugConfig.debugPrint('🔧 REALTIME: Added ${suggestedReplies.length} quick replies from suggestedReplies');
+                  DebugConfig.debugPrint(
+                      '🔧 REALTIME: Added ${suggestedReplies.length} quick replies from suggestedReplies');
                 }
-                
+
                 // 5. Check for legacy field names that might exist
-                final oldAnswers = data['options'] ?? data['choices'] ?? data['replies'];
+                final oldAnswers =
+                    data['options'] ?? data['choices'] ?? data['replies'];
                 if (quickReplies.isEmpty && oldAnswers != null) {
                   if (oldAnswers is List) {
                     for (var option in oldAnswers.take(4)) {
-                      quickReplies.add(QuickReply(text: option.toString(), value: option.toString()));
+                      quickReplies.add(QuickReply(
+                          text: option.toString(), value: option.toString()));
                     }
-                    DebugConfig.debugPrint('🔧 REALTIME: Added ${oldAnswers.length} quick replies from legacy options/choices/replies');
+                    DebugConfig.debugPrint(
+                        '🔧 REALTIME: Added ${oldAnswers.length} quick replies from legacy options/choices/replies');
                   }
                 }
-                
+
                 if (quickReplies.isNotEmpty) {
                   // Create a single message with both content and quick replies
                   final message = ChatMessage(
@@ -958,12 +1060,14 @@ class DashMessagingService implements MessagingService {
                     type: MessageType.quickReply, // Mark as quick reply type
                     suggestedReplies: quickReplies,
                   );
-                  
+
                   _messageCache[messageId] = message;
                   newMessages.add(message);
-                  DebugConfig.debugPrint('🔧 ✅ REALTIME: Created single poll message with content and ${quickReplies.length} options: ${quickReplies.map((r) => r.text).join(", ")}');
+                  DebugConfig.debugPrint(
+                      '🔧 ✅ REALTIME: Created single poll message with content and ${quickReplies.length} options: ${quickReplies.map((r) => r.text).join(", ")}');
                 } else {
-                  DebugConfig.debugPrint('🔧 ⚠️ REALTIME: Poll detected but no valid quick replies created for: $messageBody');
+                  DebugConfig.debugPrint(
+                      '🔧 ⚠️ REALTIME: Poll detected but no valid quick replies created for: $messageBody');
                   // Fallback to regular text message if no quick replies could be created
                   final message = ChatMessage(
                     id: messageId,
@@ -972,7 +1076,7 @@ class DashMessagingService implements MessagingService {
                     isMe: isMe,
                     type: MessageType.text,
                   );
-                  
+
                   _messageCache[messageId] = message;
                   newMessages.add(message);
                 }
@@ -985,16 +1089,16 @@ class DashMessagingService implements MessagingService {
                   isMe: isMe,
                   type: MessageType.text,
                 );
-                
+
                 _messageCache[messageId] = message;
                 newMessages.add(message);
               }
             }
           }
-          
+
           // Sort messages by timestamp (chronological order)
           newMessages.sort((a, b) => a.timestamp.compareTo(b.timestamp));
-          
+
           // Add messages to stream in chronological order
           for (var message in newMessages) {
             _safeAddToStream(message);
@@ -1008,7 +1112,7 @@ class DashMessagingService implements MessagingService {
           });
         },
       );
-      
+
       _stopPerformanceTimer('Realtime listener setup');
       DebugConfig.debugPrint('⚡ INSTANT realtime listener active');
     } catch (e) {
@@ -1016,7 +1120,7 @@ class DashMessagingService implements MessagingService {
       _stopPerformanceTimer('Realtime listener setup (error)');
     }
   }
-  
+
   // Ultra-fast timestamp extraction
   // ignore: unused_element
   DateTime _extractTimestampFast(Map<String, dynamic> data) {
@@ -1026,7 +1130,7 @@ class DashMessagingService implements MessagingService {
       if (createdAt is Timestamp) {
         return createdAt.toDate();
       }
-      
+
       // Try backup fields for older messages
       if (createdAt is int) {
         // Handle both seconds and milliseconds
@@ -1036,63 +1140,81 @@ class DashMessagingService implements MessagingService {
           return DateTime.fromMillisecondsSinceEpoch(createdAt * 1000);
         }
       }
-      
+
       // Try client timestamp as fallback
       final clientTimestamp = data['clientTimestamp'];
       if (clientTimestamp is int) {
         return DateTime.fromMillisecondsSinceEpoch(clientTimestamp);
       }
-      
     } catch (_) {}
     return DateTime.now(); // Instant fallback
   }
-  
+
   // Create quick reply message without directly adding to stream
   // ignore: unused_element
-  ChatMessage? _createQuickReplyMessage(Map<String, dynamic> data, String messageId, DateTime messageTimestamp) {
+  ChatMessage? _createQuickReplyMessage(
+      Map<String, dynamic> data, String messageId, DateTime messageTimestamp) {
     try {
       final isPoll = data['isPoll'];
-      final questionsAnswers = data['questionsAnswers'] as Map<String, dynamic>?;
+      final questionsAnswers =
+          data['questionsAnswers'] as Map<String, dynamic>?;
       final answers = data['answers'];
-      
-      DebugConfig.debugPrint('🔧 Creating quick reply for message $messageId: isPoll=$isPoll, questionsAnswers=$questionsAnswers, answers=$answers');
-      DebugConfig.debugPrint('🔧 All fields in message data: ${data.keys.toList()}');
-      
+
+      DebugConfig.debugPrint(
+          '🔧 Creating quick reply for message $messageId: isPoll=$isPoll, questionsAnswers=$questionsAnswers, answers=$answers');
+      DebugConfig.debugPrint(
+          '🔧 All fields in message data: ${data.keys.toList()}');
+
       // Check if this message has quick reply data
-      final hasQuickReplyData = isMessagePoll(isPoll) || questionsAnswers != null || answers != null;
+      final hasQuickReplyData =
+          isMessagePoll(isPoll) || questionsAnswers != null || answers != null;
       if (!hasQuickReplyData) {
-        DebugConfig.debugPrint('🔧 No quick reply data found for message $messageId');
+        DebugConfig.debugPrint(
+            '🔧 No quick reply data found for message $messageId');
         return null;
       }
-      
+
       final quickReplyId = '${messageId}_qr';
       if (_messageCache.containsKey(quickReplyId)) return null;
-      
+
       List<QuickReply> quickReplies = [];
-      
+
       // Fast processing - handle both questionsAnswers and answers formats
       if (questionsAnswers != null && questionsAnswers.isNotEmpty) {
         for (final entry in questionsAnswers.entries) {
-          quickReplies.add(QuickReply(text: entry.key, value: entry.value.toString()));
+          quickReplies
+              .add(QuickReply(text: entry.key, value: entry.value.toString()));
         }
-        DebugConfig.debugPrint('🔧 Added ${questionsAnswers.length} quick replies from questionsAnswers');
+        DebugConfig.debugPrint(
+            '🔧 Added ${questionsAnswers.length} quick replies from questionsAnswers');
       } else if (answers != null) {
         if (answers is List) {
           for (var a in answers.take(4)) {
-            quickReplies.add(QuickReply(text: a.toString(), value: a.toString()));
+            quickReplies
+                .add(QuickReply(text: a.toString(), value: a.toString()));
           }
-          DebugConfig.debugPrint('🔧 Added ${answers.length} quick replies from answers (List)');
-        } else if (answers is String && answers != 'None' && answers.isNotEmpty) {
-          final answerList = answers.split(',').map((e) => e.trim()).where((e) => e.isNotEmpty).take(4).toList();
+          DebugConfig.debugPrint(
+              '🔧 Added ${answers.length} quick replies from answers (List)');
+        } else if (answers is String &&
+            answers != 'None' &&
+            answers.isNotEmpty) {
+          final answerList = answers
+              .split(',')
+              .map((e) => e.trim())
+              .where((e) => e.isNotEmpty)
+              .take(4)
+              .toList();
           for (final a in answerList) {
             quickReplies.add(QuickReply(text: a, value: a));
           }
-          DebugConfig.debugPrint('🔧 Added ${answerList.length} quick replies from answers (String)');
+          DebugConfig.debugPrint(
+              '🔧 Added ${answerList.length} quick replies from answers (String)');
         }
       }
-      
+
       if (quickReplies.isNotEmpty) {
-        DebugConfig.debugPrint('🔧 ✅ Created quick reply message with ${quickReplies.length} options: ${quickReplies.map((r) => r.text).join(", ")}');
+        DebugConfig.debugPrint(
+            '🔧 ✅ Created quick reply message with ${quickReplies.length} options: ${quickReplies.map((r) => r.text).join(", ")}');
         return ChatMessage(
           id: quickReplyId,
           content: '',
@@ -1102,8 +1224,9 @@ class DashMessagingService implements MessagingService {
           suggestedReplies: quickReplies,
         );
       }
-      
-      DebugConfig.debugPrint('🔧 ❌ No quick replies created for message $messageId');
+
+      DebugConfig.debugPrint(
+          '🔧 ❌ No quick replies created for message $messageId');
       return null;
     } catch (e) {
       DebugConfig.debugPrint('Quick reply processing error: $e');
@@ -1126,12 +1249,14 @@ class DashMessagingService implements MessagingService {
       // Try to get the FCM token from Firebase Messaging
       final messaging = FirebaseMessaging.instance;
       final token = await messaging.getToken();
-      
+
       if (token != null && token.isNotEmpty) {
-        DebugConfig.debugPrint('Successfully retrieved FCM token from Firebase Messaging');
+        DebugConfig.debugPrint(
+            'Successfully retrieved FCM token from Firebase Messaging');
         return token;
       } else {
-        DebugConfig.debugPrint('Failed to get FCM token from Firebase Messaging');
+        DebugConfig.debugPrint(
+            'Failed to get FCM token from Firebase Messaging');
         return null;
       }
     } catch (e) {
@@ -1143,23 +1268,24 @@ class DashMessagingService implements MessagingService {
   // Update host URL and save to shared preferences
   Future<void> updateHostUrl(String newUrl) async {
     if (newUrl.isEmpty) return;
-    
+
     try {
       // Check if the URL is valid
       final uri = Uri.parse(newUrl);
       if (!uri.isAbsolute) {
-        throw Exception('URL must be absolute (start with http:// or https://)');
+        throw Exception(
+            'URL must be absolute (start with http:// or https://)');
       }
-      
+
       // Update the URL
       _hostUrl = newUrl;
-      
+
       // Save to shared preferences for persistence
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString('hostUrl', newUrl);
-      
+
       DebugConfig.debugPrint('Host URL updated to: $_hostUrl');
-      
+
       // Test if the new URL is working
       if (_userId != null) {
         try {
@@ -1167,8 +1293,9 @@ class DashMessagingService implements MessagingService {
             Uri.parse('$_hostUrl/info'),
             headers: {'Content-Type': 'application/json'},
           ).timeout(const Duration(seconds: 5));
-          
-          DebugConfig.debugPrint('Connection test response with new URL: ${testResponse.statusCode}');
+
+          DebugConfig.debugPrint(
+              'Connection test response with new URL: ${testResponse.statusCode}');
         } catch (e) {
           DebugConfig.debugPrint('Error testing new URL: $e');
           // We don't throw here since the URL might be valid but endpoint not available
@@ -1184,7 +1311,7 @@ class DashMessagingService implements MessagingService {
   void handlePushNotification(Map<String, dynamic> data) {
     try {
       DebugConfig.debugPrint('Received push notification: $data');
-      
+
       // Parse data into QuitxtServerIncomingDto format
       final recipientId = data['recipientId'] as String?;
       final serverMessageId = data['serverMessageId'] as String?;
@@ -1192,27 +1319,29 @@ class DashMessagingService implements MessagingService {
       final timestamp = data['timestamp'] as int?;
       final isPoll = data['isPoll'] as bool? ?? false;
       final buttons = data['buttons'] as List<dynamic>?;
-      
+
       // Handle missing required fields
-      if (recipientId == null || serverMessageId == null || messageBody == null) {
+      if (recipientId == null ||
+          serverMessageId == null ||
+          messageBody == null) {
         DebugConfig.debugPrint('Missing required fields in push notification');
         return;
       }
-      
+
       // Create message object
       final ChatMessage message = ChatMessage(
         id: serverMessageId,
         content: messageBody,
-        timestamp: timestamp != null 
-            ? DateTime.fromMillisecondsSinceEpoch(timestamp * 1000) 
+        timestamp: timestamp != null
+            ? DateTime.fromMillisecondsSinceEpoch(timestamp * 1000)
             : DateTime.now(),
         isMe: false,
         type: MessageType.text,
       );
-      
+
       // Add the main message first
       _safeAddToStream(message);
-      
+
       // Add buttons as quick replies if available
       if (isPoll && buttons != null && buttons.isNotEmpty) {
         final quickReplies = <QuickReply>[];
@@ -1222,7 +1351,7 @@ class DashMessagingService implements MessagingService {
             quickReplies.add(QuickReply(text: title, value: title));
           }
         }
-        
+
         if (quickReplies.isNotEmpty) {
           // Add a separate message with quick replies
           final quickReplyMessage = ChatMessage(
@@ -1237,16 +1366,18 @@ class DashMessagingService implements MessagingService {
           return;
         }
       }
-      
+
       // Fallback for older 'questionsAnswers' format
       else if (isPoll && data.containsKey('questionsAnswers')) {
-        final questionsAnswers = data['questionsAnswers'] as Map<String, dynamic>?;
+        final questionsAnswers =
+            data['questionsAnswers'] as Map<String, dynamic>?;
         if (questionsAnswers != null) {
           final quickReplies = <QuickReply>[];
           for (final entry in questionsAnswers.entries) {
-            quickReplies.add(QuickReply(text: entry.value.toString(), value: entry.key));
+            quickReplies.add(
+                QuickReply(text: entry.value.toString(), value: entry.key));
           }
-          
+
           if (quickReplies.isNotEmpty) {
             // Add a separate message with quick replies
             final quickReplyMessage = ChatMessage(
@@ -1265,41 +1396,47 @@ class DashMessagingService implements MessagingService {
       DebugConfig.debugPrint('Error handling push notification: $e');
     }
   }
-  
+
   // Mock method to simulate server response (for testing without server)
   Future<void> simulateServerResponse(String userMessage) async {
     // Skip all mock responses to keep chat completely clean
-    DebugConfig.debugPrint('Mock server responses disabled - no responses will be generated');
+    DebugConfig.debugPrint(
+        'Mock server responses disabled - no responses will be generated');
     DebugConfig.debugPrint('Message received but not processed: $userMessage');
     return;
   }
-  
+
   // Send all test messages in sequence (useful for testing)
   Future<void> sendTestMessages() async {
-    DebugConfig.debugPrint("Test messages disabled - no test messages will be sent");
+    DebugConfig.debugPrint(
+        "Test messages disabled - no test messages will be sent");
     return;
   }
-  
+
   // Process sample test data
   Future<void> processSampleTestData() async {
-    DebugConfig.debugPrint("Sample test data processing disabled - no sample messages will be sent");
+    DebugConfig.debugPrint(
+        "Sample test data processing disabled - no sample messages will be sent");
     return;
   }
-  
+
   // Process server responses
   Future<void> processServerResponses() async {
-    DebugConfig.debugPrint("Predefined server responses disabled - no predefined messages will be sent");
+    DebugConfig.debugPrint(
+        "Predefined server responses disabled - no predefined messages will be sent");
     return;
   }
-  
+
   // Send a quick reply to the server
   Future<void> sendQuickReply(String value, String text) async {
     DebugConfig.debugPrint('Sending quick reply: value="$value", text="$text"');
-    return sendMessage(text, metadata: {'eventTypeCode': 2, 'quickReplyValue': value});
+    return sendMessage(text,
+        metadata: {'eventTypeCode': 2, 'quickReplyValue': value});
   }
-  
+
   // Process predefined server responses from JSON input
-  Future<void> processPredefinedResponses(Map<String, dynamic> jsonInput) async {
+  Future<void> processPredefinedResponses(
+      Map<String, dynamic> jsonInput) async {
     try {
       final List<dynamic> serverResponses = jsonInput['serverResponses'];
       if (serverResponses.isEmpty) {
@@ -1311,19 +1448,19 @@ class DashMessagingService implements MessagingService {
       for (var i = 0; i < serverResponses.length; i++) {
         final response = serverResponses[i];
         await Future.delayed(Duration(milliseconds: 800));
-        
+
         final messageId = response['serverMessageId'] ?? _uuid.v4();
         final messageBody = response['messageBody'] ?? '';
         final isPoll = response['isPoll'] ?? false;
         Map<String, dynamic>? questionsAnswers = response['questionsAnswers'];
-        
+
         if (isPoll && questionsAnswers != null) {
           // Create quick replies for poll questions
           final List<QuickReply> quickReplies = [];
           for (final entry in questionsAnswers.entries) {
             quickReplies.add(QuickReply(text: entry.key, value: entry.value));
           }
-          
+
           // Add poll message with quick replies
           final message = ChatMessage(
             id: messageId,
@@ -1333,7 +1470,7 @@ class DashMessagingService implements MessagingService {
             type: MessageType.quickReply,
             suggestedReplies: quickReplies,
           );
-          
+
           _safeAddToStream(message);
         } else {
           // Add regular text message
@@ -1344,7 +1481,7 @@ class DashMessagingService implements MessagingService {
             isMe: false,
             type: MessageType.text,
           );
-          
+
           _safeAddToStream(message);
         }
       }
@@ -1352,7 +1489,7 @@ class DashMessagingService implements MessagingService {
       DebugConfig.debugPrint('Error processing predefined responses: $e');
     }
   }
-  
+
   // Process responses from custom JSON input
   Future<bool> processCustomJsonInput(String jsonInput) async {
     try {
@@ -1365,14 +1502,14 @@ class DashMessagingService implements MessagingService {
       return false;
     }
   }
-  
+
   // Process interactive responses for specific user inputs
   Future<bool> processInteractiveResponses(String userInput) async {
     // Return false to bypass all prebuilt responses and always use the server
     DebugConfig.debugPrint('Bypassing prebuilt responses for: $userInput');
     return false;
   }
-  
+
   // Dispose resources
   void dispose() {
     _isStreamClosed = true;
@@ -1401,23 +1538,25 @@ class DashMessagingService implements MessagingService {
 
   /// Takes a raw JSON text message from the server and processes it into a ChatMessage.
   /// This handles processing of response messages received from the server.
-  /// 
+  ///
   /// [serverResponseJson] should be a JSON string containing the server response data.
-  /// 
+  ///
   /// Returns a ChatMessage object ready to be added to the chat stream.
-  Future<ChatMessage> processServerResponseJson(String serverResponseJson) async {
+  Future<ChatMessage> processServerResponseJson(
+      String serverResponseJson) async {
     try {
       // Parse the JSON string
       final Map<String, dynamic> responseData = jsonDecode(serverResponseJson);
-      
+
       // Extract required fields
       final String messageId = responseData['serverMessageId'] ?? _uuid.v4();
       final String messageBody = responseData['messageBody'] ?? '';
       final bool isPoll = responseData['isPoll'] ?? false;
-      final timestamp = responseData['timestamp'] != null 
-          ? DateTime.fromMillisecondsSinceEpoch((responseData['timestamp'] as int) * 1000)
+      final timestamp = responseData['timestamp'] != null
+          ? DateTime.fromMillisecondsSinceEpoch(
+              (responseData['timestamp'] as int) * 1000)
           : DateTime.now();
-      
+
       // Create the main message
       ChatMessage message = ChatMessage(
         id: messageId,
@@ -1426,23 +1565,23 @@ class DashMessagingService implements MessagingService {
         isMe: false,
         type: MessageType.text,
       );
-      
+
       // If it's a poll message, add quick replies
       if (isPoll && responseData.containsKey('questionsAnswers')) {
-        final questionsAnswers = responseData['questionsAnswers'] as Map<String, dynamic>?;
+        final questionsAnswers =
+            responseData['questionsAnswers'] as Map<String, dynamic>?;
         if (questionsAnswers != null && questionsAnswers.isNotEmpty) {
           final List<QuickReply> quickReplies = [];
           for (final entry in questionsAnswers.entries) {
-            quickReplies.add(QuickReply(text: entry.key, value: entry.value.toString()));
+            quickReplies.add(
+                QuickReply(text: entry.key, value: entry.value.toString()));
           }
-          
+
           // Create a new message with quick replies using copyWith
-          message = message.copyWith(
-            suggestedReplies: quickReplies
-          );
+          message = message.copyWith(suggestedReplies: quickReplies);
         }
       }
-      
+
       return message;
     } catch (e) {
       DebugConfig.debugPrint('Error processing server response JSON: $e');
@@ -1460,27 +1599,30 @@ class DashMessagingService implements MessagingService {
   // Test connection to the server using the exact URL
   Future<bool> testConnection() async {
     if (!_isInitialized) {
-      DebugConfig.debugPrint('DashMessagingService not initialized, cannot test connection');
+      DebugConfig.debugPrint(
+          'DashMessagingService not initialized, cannot test connection');
       return false;
     }
-    
+
     // Double check that we're using the correct URL
     if (!_hostUrl.contains("/scheduler/mobile-app")) {
-      DebugConfig.debugPrint('Correcting server URL to include path for connection test');
+      DebugConfig.debugPrint(
+          'Correcting server URL to include path for connection test');
       _hostUrl = "https://dashmessaging-com.ngrok.io/scheduler/mobile-app";
     }
-    
+
     try {
       DebugConfig.debugPrint('Testing connection to server: $_hostUrl');
-      
+
       // Try to connect to the server
       final response = await http.get(
         Uri.parse(_hostUrl),
         headers: {'Content-Type': 'application/json'},
       ).timeout(const Duration(seconds: 5));
-      
-      DebugConfig.debugPrint('Server connection test response: ${response.statusCode}');
-      
+
+      DebugConfig.debugPrint(
+          'Server connection test response: ${response.statusCode}');
+
       // Any response means we can reach the server
       return response.statusCode >= 200;
     } catch (e) {
@@ -1488,38 +1630,39 @@ class DashMessagingService implements MessagingService {
       return false;
     }
   }
-  
+
   // Helper method to determine if a message is a poll/has quick replies
   bool isMessagePoll(dynamic isPollValue) {
     if (isPollValue == null) return false;
-    
+
     // Convert various formats to a boolean
     if (isPollValue is bool) {
       return isPollValue;
     } else if (isPollValue is String) {
-      return isPollValue.toLowerCase() == 'y' || 
-             isPollValue.toLowerCase() == 'yes' || 
-             isPollValue.toLowerCase() == 'true';
+      return isPollValue.toLowerCase() == 'y' ||
+          isPollValue.toLowerCase() == 'yes' ||
+          isPollValue.toLowerCase() == 'true';
     } else if (isPollValue is int) {
       return isPollValue > 0;
     }
-    
+
     return false;
   }
 
   // Load older messages for pagination
   Future<List<ChatMessage>> loadOlderMessages({int limit = 10}) async {
     _startPerformanceTimer('Loading older messages (pagination)');
-    
+
     if (_userId == null) {
       DebugConfig.debugPrint('Cannot load older messages, user ID is null');
       _stopPerformanceTimer('Loading older messages (pagination - no user)');
       return [];
     }
-    
+
     try {
-      DebugConfig.debugPrint('Loading $limit older messages from Firestore for user: $_userId');
-      
+      DebugConfig.debugPrint(
+          'Loading $limit older messages from Firestore for user: $_userId');
+
       // Get reference to the user's chat collection
       var query = FirebaseFirestore.instance
           .collection('messages')
@@ -1527,43 +1670,46 @@ class DashMessagingService implements MessagingService {
           .collection('chat')
           .orderBy('createdAt', descending: true)
           .limit(limit);
-      
+
       // Add pagination using the lowest timestamp we've seen
       if (_lowestLoadedTimestamp > 0) {
         query = query.where('createdAt', isLessThan: _lowestLoadedTimestamp);
-        DebugConfig.debugPrint('Loading messages older than timestamp: $_lowestLoadedTimestamp');
+        DebugConfig.debugPrint(
+            'Loading messages older than timestamp: $_lowestLoadedTimestamp');
       }
-      
+
       final snapshot = await query.get();
-      
+
       if (snapshot.docs.isEmpty) {
         DebugConfig.debugPrint('No older messages found');
-        _stopPerformanceTimer('Loading older messages (pagination - no messages)');
+        _stopPerformanceTimer(
+            'Loading older messages (pagination - no messages)');
         return [];
       }
-      
+
       DebugConfig.debugPrint('Found ${snapshot.docs.length} older messages');
-      
+
       final messages = <ChatMessage>[];
       final processedMessageIds = <String>{};
-      
+
       for (var doc in snapshot.docs.reversed) {
         try {
           final data = doc.data() as Map<String, dynamic>?;
           if (data == null) continue;
           final messageId = data['serverMessageId'] ?? doc.id;
-          
+
           // Skip if already processed or cached
-          if (processedMessageIds.contains(messageId) || _messageCache.containsKey(messageId)) {
+          if (processedMessageIds.contains(messageId) ||
+              _messageCache.containsKey(messageId)) {
             continue;
           }
           processedMessageIds.add(messageId);
-          
+
           // Skip empty messages
           if ((data['messageBody'] ?? '').toString().isEmpty) {
             continue;
           }
-          
+
           // Update lowest timestamp for next pagination
           try {
             var createdAt = data['createdAt'];
@@ -1574,20 +1720,23 @@ class DashMessagingService implements MessagingService {
               } else if (createdAt is int) {
                 timeValue = createdAt;
               }
-              
-              if (timeValue > 0 && (_lowestLoadedTimestamp == 0 || timeValue < _lowestLoadedTimestamp)) {
+
+              if (timeValue > 0 &&
+                  (_lowestLoadedTimestamp == 0 ||
+                      timeValue < _lowestLoadedTimestamp)) {
                 _lowestLoadedTimestamp = timeValue;
               }
             }
           } catch (e) {
             DebugConfig.debugPrint('Error updating pagination timestamp: $e');
           }
-          
+
           // Use unified processing logic for historical messages
           final timestamp = _extractTimestampFast(data);
           final isMe = (data['source']?.toString() ?? '') == 'client';
-          
-          final message = _processUnifiedMessage(data, messageId, timestamp, isMe);
+
+          final message =
+              _processUnifiedMessage(data, messageId, timestamp, isMe);
           if (message != null) {
             _addToCache(message);
             messages.add(message);
@@ -1596,7 +1745,7 @@ class DashMessagingService implements MessagingService {
           DebugConfig.debugPrint('Error processing older message: $e');
         }
       }
-      
+
       DebugConfig.debugPrint('Processed ${messages.length} older messages');
       _stopPerformanceTimer('Loading older messages (pagination)');
       return messages;
@@ -1610,15 +1759,16 @@ class DashMessagingService implements MessagingService {
   // Load more messages on demand (for pagination or when user scrolls up)
   Future<void> loadMoreMessages({int additionalCount = 10}) async {
     _startPerformanceTimer('Loading additional messages');
-    
+
     if (_userId == null) {
       DebugConfig.debugPrint('Cannot load more messages, user ID is null');
       return;
     }
-    
+
     try {
-      DebugConfig.debugPrint('Loading $additionalCount additional messages from Firestore');
-      
+      DebugConfig.debugPrint(
+          'Loading $additionalCount additional messages from Firestore');
+
       // Query for older messages using pagination
       var query = FirebaseFirestore.instance
           .collection('messages')
@@ -1626,48 +1776,50 @@ class DashMessagingService implements MessagingService {
           .collection('chat')
           .orderBy('createdAt', descending: true)
           .limit(additionalCount);
-      
+
       // Skip the messages we already have
       if (_lastFirestoreMessageTime > 0) {
         query = query.where('createdAt', isLessThan: _lastFirestoreMessageTime);
       }
-      
+
       final snapshot = await query.get().timeout(
         const Duration(seconds: 3),
         onTimeout: () {
           DebugConfig.debugPrint('Additional messages query timeout');
-          throw TimeoutException('Additional messages query timeout', const Duration(seconds: 3));
+          throw TimeoutException(
+              'Additional messages query timeout', const Duration(seconds: 3));
         },
       );
-      
+
       if (snapshot.docs.isEmpty) {
         DebugConfig.debugPrint('No additional messages found');
         _stopPerformanceTimer('Loading additional messages (no messages)');
         return;
       }
-      
-      DebugConfig.debugPrint('Found ${snapshot.docs.length} additional messages');
-      
+
+      DebugConfig.debugPrint(
+          'Found ${snapshot.docs.length} additional messages');
+
       // Process additional messages efficiently
       final messages = <ChatMessage>[];
       int oldestTimestamp = _lastFirestoreMessageTime;
-      
+
       for (var doc in snapshot.docs.reversed) {
         try {
           final data = doc.data() as Map<String, dynamic>?;
           if (data == null) continue;
           final messageId = data['serverMessageId'] ?? doc.id;
-          
+
           // Skip if already cached
           if (_messageCache.containsKey(messageId)) {
             continue;
           }
-          
+
           final messageBody = (data['messageBody'] ?? '').toString();
           if (messageBody.isEmpty) {
             continue;
           }
-          
+
           // Track oldest timestamp
           try {
             var createdAt = data['createdAt'];
@@ -1678,20 +1830,22 @@ class DashMessagingService implements MessagingService {
               } else if (createdAt is int) {
                 timeValue = createdAt;
               }
-              
-              if (timeValue > 0 && (oldestTimestamp == 0 || timeValue < oldestTimestamp)) {
+
+              if (timeValue > 0 &&
+                  (oldestTimestamp == 0 || timeValue < oldestTimestamp)) {
                 oldestTimestamp = timeValue;
               }
             }
           } catch (e) {
             // Continue silently
           }
-          
+
           // Use unified processing logic for additional messages
           final timestamp = _extractTimestampFast(data);
           final isMe = (data['source']?.toString() ?? '') == 'client';
-          
-          final message = _processUnifiedMessage(data, messageId, timestamp, isMe);
+
+          final message =
+              _processUnifiedMessage(data, messageId, timestamp, isMe);
           if (message != null) {
             _addToCache(message);
             messages.add(message);
@@ -1700,13 +1854,14 @@ class DashMessagingService implements MessagingService {
           // Continue silently
         }
       }
-      
+
       // Add messages to stream
       for (var message in messages) {
         _safeAddToStream(message);
       }
-      
-      DebugConfig.debugPrint('Added ${messages.length} additional messages to stream');
+
+      DebugConfig.debugPrint(
+          'Added ${messages.length} additional messages to stream');
       _stopPerformanceTimer('Loading additional messages');
     } catch (e) {
       DebugConfig.debugPrint('Error loading additional messages: $e');
@@ -1723,19 +1878,22 @@ class DashMessagingService implements MessagingService {
         DebugConfig.debugPrint('Error adding message to stream: $e');
       }
     } else {
-      DebugConfig.debugPrint('Stream is closed, cannot add message: ${message.id}');
+      DebugConfig.debugPrint(
+          'Stream is closed, cannot add message: ${message.id}');
     }
   }
 
   // Test stream controller functionality
   void testStreamController() {
     DebugConfig.debugPrint('Testing stream controller...');
-    DebugConfig.debugPrint('Stream controller closed: ${_messageStreamController.isClosed}');
-    DebugConfig.debugPrint('Stream has listener: ${_messageStreamController.hasListener}');
+    DebugConfig.debugPrint(
+        'Stream controller closed: ${_messageStreamController.isClosed}');
+    DebugConfig.debugPrint(
+        'Stream has listener: ${_messageStreamController.hasListener}');
     DebugConfig.debugPrint('Is stream closed flag: $_isStreamClosed');
     DebugConfig.debugPrint('Service initialized: $_isInitialized');
     DebugConfig.debugPrint('User ID: $_userId');
-    
+
     // Test adding a message to the stream
     try {
       final testMessage = ChatMessage(
@@ -1753,25 +1911,26 @@ class DashMessagingService implements MessagingService {
   }
 
   // Helper method for ultra-fast message processing
-  Future<ChatMessage?> _processMessageDocOptimized(QueryDocumentSnapshot doc, Set<String> processedMessageIds) async {
+  Future<ChatMessage?> _processMessageDocOptimized(
+      QueryDocumentSnapshot doc, Set<String> processedMessageIds) async {
     try {
       final data = doc.data() as Map<String, dynamic>?;
       if (data == null) return null;
-      
+
       final messageId = data['serverMessageId'] ?? doc.id;
-      
+
       // Skip if already processed
       if (processedMessageIds.contains(messageId)) {
         return null;
       }
       processedMessageIds.add(messageId);
-      
+
       final messageBody = (data['messageBody']?.toString() ?? '');
       // Skip empty messages
       if (messageBody.isEmpty) {
         return null;
       }
-      
+
       // Create minimal ChatMessage for ultra-fast processing
       final messageTimestamp = _extractTimestampFast(data);
       return ChatMessage(
@@ -1790,7 +1949,7 @@ class DashMessagingService implements MessagingService {
   // ignore: unused_element
   void _scheduleBackgroundMessageLoad() {
     if (_userId == null) return;
-    
+
     // Schedule background loading after a short delay
     Timer(const Duration(milliseconds: 300), () {
       _loadAdditionalMessagesInBackground();
@@ -1800,33 +1959,34 @@ class DashMessagingService implements MessagingService {
   // Load more messages in background without blocking UI
   Future<void> _loadAdditionalMessagesInBackground() async {
     if (_userId == null) return;
-    
+
     try {
       DebugConfig.debugPrint('Loading additional messages in background...');
-      
+
       // Load additional messages in chronological order
       final chatRef = FirebaseFirestore.instance
           .collection('messages')
           .doc(_userId!)
           .collection('chat')
           .orderBy('createdAt', descending: false)
-          .limit(18)  // Load 18 additional messages
+          .limit(18) // Load 18 additional messages
           .startAfter([_lastFirestoreMessageTime]);
-      
+
       QuerySnapshot<Map<String, dynamic>>? snapshot;
       try {
         snapshot = await chatRef.get().timeout(
-          const Duration(seconds: 3),
-        );
+              const Duration(seconds: 3),
+            );
       } catch (e) {
-        DebugConfig.debugPrint('Background loading timeout or error - continuing with current messages: $e');
+        DebugConfig.debugPrint(
+            'Background loading timeout or error - continuing with current messages: $e');
         return;
       }
-      
+
       if (snapshot.docs.isNotEmpty) {
         final additionalMessages = <ChatMessage>[];
         final processedIds = <String>{};
-        
+
         // Process in chronological order (already sorted)
         for (var doc in snapshot.docs) {
           final message = await _processMessageDocOptimized(doc, processedIds);
@@ -1835,17 +1995,18 @@ class DashMessagingService implements MessagingService {
             _addToCache(message);
           }
         }
-        
+
         // Sort by timestamp to ensure perfect chronological order
         additionalMessages.sort((a, b) => a.timestamp.compareTo(b.timestamp));
-        
+
         // Add background messages in chronological order with subtle delays
         for (int i = 0; i < additionalMessages.length; i++) {
           await Future.delayed(const Duration(milliseconds: 50));
           _safeAddToStream(additionalMessages[i]);
         }
-        
-        DebugConfig.debugPrint('Background loaded ${additionalMessages.length} additional messages in chronological order');
+
+        DebugConfig.debugPrint(
+            'Background loaded ${additionalMessages.length} additional messages in chronological order');
       }
     } catch (e) {
       DebugConfig.debugPrint('Background message loading failed: $e');
@@ -1853,7 +2014,8 @@ class DashMessagingService implements MessagingService {
   }
 
   // Store user message in Firebase for conversation history
-  Future<void> _storeUserMessageInFirebase(String messageId, String messageText, DateTime timestamp, int eventTypeCode) async {
+  Future<void> _storeUserMessageInFirebase(String messageId, String messageText,
+      DateTime timestamp, int eventTypeCode) async {
     if (_userId == null) {
       DebugConfig.debugPrint('Cannot store user message: user ID is null');
       return;
@@ -1865,7 +2027,7 @@ class DashMessagingService implements MessagingService {
           .collection('messages')
           .doc(_userId!)
           .collection('chat');
-      
+
       // Create user message document with same structure as server messages
       // Use a slightly earlier server timestamp to ensure user messages appear before server responses
       final userMessageData = {
@@ -1873,27 +2035,32 @@ class DashMessagingService implements MessagingService {
         'source': 'client', // Indicates this is from the user
         'senderId': _userId,
         'serverMessageId': messageId,
-        'createdAt': FieldValue.serverTimestamp(), // Use server timestamp for consistent ordering
-        'clientTimestamp': timestamp.millisecondsSinceEpoch, // Keep client time for reference
+        'createdAt': FieldValue
+            .serverTimestamp(), // Use server timestamp for consistent ordering
+        'clientTimestamp':
+            timestamp.millisecondsSinceEpoch, // Keep client time for reference
         'isPoll': 'n',
         'eventTypeCode': eventTypeCode,
-        'messageOrder': 'user', // Add ordering hint to ensure user messages come first when timestamps are equal
+        'messageOrder':
+            'user', // Add ordering hint to ensure user messages come first when timestamps are equal
       };
-      
+
       // Store the user message in Firebase
       await userMessagesRef.doc(messageId).set(userMessageData);
-      
-             DebugConfig.debugPrint('✓ User message stored in Firebase: $messageId');
-     } catch (e) {
-       DebugConfig.debugPrint('Error storing user message in Firebase: $e');
-       // Don't throw the error - this shouldn't prevent sending the message
-     }
-   }
+
+      DebugConfig.debugPrint('✓ User message stored in Firebase: $messageId');
+    } catch (e) {
+      DebugConfig.debugPrint('Error storing user message in Firebase: $e');
+      // Don't throw the error - this shouldn't prevent sending the message
+    }
+  }
 
   // Get conversation history from Firebase (for debugging/verification)
-  Future<List<Map<String, dynamic>>> getConversationHistory({int limit = 20}) async {
+  Future<List<Map<String, dynamic>>> getConversationHistory(
+      {int limit = 20}) async {
     if (_userId == null) {
-      DebugConfig.debugPrint('Cannot get conversation history: user ID is null');
+      DebugConfig.debugPrint(
+          'Cannot get conversation history: user ID is null');
       return [];
     }
 
@@ -1904,17 +2071,18 @@ class DashMessagingService implements MessagingService {
           .collection('chat')
           .orderBy('createdAt', descending: false)
           .limitToLast(limit);
-      
+
       final snapshot = await userMessagesRef.get();
-      
+
       final history = <Map<String, dynamic>>[];
-      for (var doc in snapshot.docs) { // Already in chronological order
+      for (var doc in snapshot.docs) {
+        // Already in chronological order
         final data = doc.data();
-        
+
         // Extract timestamp properly using the same logic as the app
         final timestamp = _extractTimestampFast(data);
         final timeString = timestamp.toString();
-        
+
         history.add({
           'id': data['serverMessageId'] ?? doc.id,
           'message': data['messageBody'] ?? '',
@@ -1923,14 +2091,15 @@ class DashMessagingService implements MessagingService {
           'isUserMessage': (data['source'] ?? '') == 'client',
         });
       }
-      
-             DebugConfig.debugPrint('📜 Conversation History ($_userId):');
+
+      DebugConfig.debugPrint('📜 Conversation History ($_userId):');
       for (var i = 0; i < history.length; i++) {
         final msg = history[i];
         final prefix = msg['isUserMessage'] ? '👤 User:' : '🤖 Server:';
-        DebugConfig.debugPrint('  ${i + 1}. $prefix ${msg['message']} [${msg['timestamp']}]');
+        DebugConfig.debugPrint(
+            '  ${i + 1}. $prefix ${msg['message']} [${msg['timestamp']}]');
       }
-      
+
       return history;
     } catch (e) {
       DebugConfig.debugPrint('Error getting conversation history: $e');
@@ -1946,51 +2115,54 @@ class DashMessagingService implements MessagingService {
     }
 
     try {
-      DebugConfig.debugPrint('🔍 Verifying message ordering for user: $_userId');
-      
+      DebugConfig.debugPrint(
+          '🔍 Verifying message ordering for user: $_userId');
+
       final userMessagesRef = FirebaseFirestore.instance
           .collection('messages')
           .doc(_userId!)
           .collection('chat')
           .orderBy('createdAt', descending: false) // Get in chronological order
           .limit(20);
-      
+
       final snapshot = await userMessagesRef.get();
-      
+
       if (snapshot.docs.isEmpty) {
         DebugConfig.debugPrint('✅ No messages to verify ordering');
         return;
       }
-      
-      DebugConfig.debugPrint('📋 Message ordering verification (chronological):');
+
+      DebugConfig.debugPrint(
+          '📋 Message ordering verification (chronological):');
       DateTime? lastTimestamp;
       bool orderingIssues = false;
-      
+
       for (int i = 0; i < snapshot.docs.length; i++) {
         final doc = snapshot.docs[i];
         final data = doc.data();
         final timestamp = _extractTimestampFast(data);
         final source = data['source'] ?? 'unknown';
         final messageBody = data['messageBody'] ?? '';
-        
+
         if (lastTimestamp != null && timestamp.isBefore(lastTimestamp)) {
           DebugConfig.debugPrint('⚠️  Ordering issue at message ${i + 1}');
           orderingIssues = true;
         }
-        
+
         final timeStr = timestamp.toString().substring(11, 19); // HH:MM:SS
         final prefix = source == 'client' ? '👤' : '🤖';
-        DebugConfig.debugPrint('  ${i + 1}. $prefix [$timeStr] ${messageBody.substring(0, messageBody.length > 30 ? 30 : messageBody.length)}${messageBody.length > 30 ? '...' : ''}');
-        
+        DebugConfig.debugPrint(
+            '  ${i + 1}. $prefix [$timeStr] ${messageBody.substring(0, messageBody.length > 30 ? 30 : messageBody.length)}${messageBody.length > 30 ? '...' : ''}');
+
         lastTimestamp = timestamp;
       }
-      
+
       if (orderingIssues) {
-        DebugConfig.debugPrint('⚠️  Ordering issues detected. Consider clearing and resyncing messages.');
+        DebugConfig.debugPrint(
+            '⚠️  Ordering issues detected. Consider clearing and resyncing messages.');
       } else {
         DebugConfig.debugPrint('✅ Message ordering is correct');
       }
-      
     } catch (e) {
       DebugConfig.debugPrint('Error verifying message ordering: $e');
     }
@@ -1999,68 +2171,72 @@ class DashMessagingService implements MessagingService {
   // Force reload all messages (clear cache and reload)
   Future<void> forceReloadMessages() async {
     DebugConfig.debugPrint('🔄 Force reloading all messages...');
-    
+
     // Clear the cache to remove old format messages
     clearCache();
-    
+
     // Reset timestamps
     _lastFirestoreMessageTime = 0;
     _lowestLoadedTimestamp = 0;
-    
+
     // Stop existing listener
     stopRealtimeMessageListener();
-    
+
     // Reload messages with new logic
     await loadExistingMessages();
-    
+
     // Restart listener
     startRealtimeMessageListener();
-    
+
     DebugConfig.debugPrint('🔄 ✅ Force reload completed');
   }
 
   // Debug method to test message alignment fix
   Future<void> debugMessageAlignment() async {
     if (_userId == null) {
-      DebugConfig.debugPrint('❌ Cannot debug message alignment: user ID is null');
+      DebugConfig.debugPrint(
+          '❌ Cannot debug message alignment: user ID is null');
       return;
     }
 
     try {
-      DebugConfig.debugPrint('🔍 DEBUG: Testing message alignment fix for user: $_userId');
-      
+      DebugConfig.debugPrint(
+          '🔍 DEBUG: Testing message alignment fix for user: $_userId');
+
       final userMessagesRef = FirebaseFirestore.instance
           .collection('messages')
           .doc(_userId!)
           .collection('chat')
           .orderBy('createdAt', descending: false)
           .limit(10);
-      
+
       final snapshot = await userMessagesRef.get();
-      
+
       if (snapshot.docs.isEmpty) {
         DebugConfig.debugPrint('✅ No messages found to test alignment');
         return;
       }
-      
+
       DebugConfig.debugPrint('📋 Message alignment test results:');
-      
+
       for (int i = 0; i < snapshot.docs.length; i++) {
         final doc = snapshot.docs[i];
         final data = doc.data();
-        
+
         // Use the same logic as the fixed code
         final source = data['source']?.toString() ?? '';
         final senderId = data['senderId'] ?? data['userId'] ?? '';
-        final isMe = source == 'client' || (source.isEmpty && senderId == _userId);
+        final isMe =
+            source == 'client' || (source.isEmpty && senderId == _userId);
         final messageBody = data['messageBody'] ?? '';
-        
+
         final alignmentStatus = isMe ? '👤 USER (RIGHT)' : '🤖 SERVER (LEFT)';
         final sourceInfo = source.isNotEmpty ? source : 'no source';
-        
-        DebugConfig.debugPrint('  ${i + 1}. $alignmentStatus - "$messageBody" (source: $sourceInfo)');
+
+        DebugConfig.debugPrint(
+            '  ${i + 1}. $alignmentStatus - "$messageBody" (source: $sourceInfo)');
       }
-      
+
       DebugConfig.debugPrint('✅ Message alignment test completed');
     } catch (e) {
       DebugConfig.debugPrint('❌ Error testing message alignment: $e');
@@ -2068,20 +2244,23 @@ class DashMessagingService implements MessagingService {
   }
 
   // Helper method to process any message with unified logic
-  ChatMessage? _processUnifiedMessage(Map<String, dynamic> data, String messageId, DateTime timestamp, bool isMe) {
+  ChatMessage? _processUnifiedMessage(Map<String, dynamic> data,
+      String messageId, DateTime timestamp, bool isMe) {
     final content = data['messageBody']?.toString() ?? '';
     if (content.isEmpty) return null;
-    
+
     // Enhanced poll detection - check ALL possible quick reply fields
     final isPoll = data['isPoll'];
     final questionsAnswers = data['questionsAnswers'] as Map<String, dynamic>?;
     final answers = data['answers'];
     final buttons = data['buttons'] as List<dynamic>?;
     final suggestedReplies = data['suggestedReplies'] as List<dynamic>?;
-    
+
     // Comprehensive logging for debugging
-    if (content.toLowerCase().contains('cigarette') || content.toLowerCase().contains('ready') || 
-        content.toLowerCase().contains('quiz') || content.toLowerCase().contains('smoke')) {
+    if (content.toLowerCase().contains('cigarette') ||
+        content.toLowerCase().contains('ready') ||
+        content.toLowerCase().contains('quiz') ||
+        content.toLowerCase().contains('smoke')) {
       DebugConfig.debugPrint('🔍 UNIFIED: Analyzing potential poll message:');
       DebugConfig.debugPrint('🔍 Content: $content');
       DebugConfig.debugPrint('🔍 isPoll: $isPoll');
@@ -2091,42 +2270,50 @@ class DashMessagingService implements MessagingService {
       DebugConfig.debugPrint('🔍 suggestedReplies: $suggestedReplies');
       DebugConfig.debugPrint('🔍 All keys: ${data.keys.toList()}');
     }
-    
+
     // Enhanced quick reply detection - check ALL possible sources
-    final hasQuickReplyData = isMessagePoll(isPoll) || 
-                             questionsAnswers != null || 
-                             answers != null || 
-                             buttons != null || 
-                             suggestedReplies != null;
-    
+    final hasQuickReplyData = isMessagePoll(isPoll) ||
+        questionsAnswers != null ||
+        answers != null ||
+        buttons != null ||
+        suggestedReplies != null;
+
     if (hasQuickReplyData) {
       List<QuickReply> quickReplies = [];
-      
+
       // Process quick replies from ALL possible sources
-      
+
       // 1. questionsAnswers (Map format)
       if (questionsAnswers != null && questionsAnswers.isNotEmpty) {
         for (final entry in questionsAnswers.entries) {
-          quickReplies.add(QuickReply(text: entry.key, value: entry.value.toString()));
+          quickReplies
+              .add(QuickReply(text: entry.key, value: entry.value.toString()));
         }
-        DebugConfig.debugPrint('🔧 UNIFIED: Added ${questionsAnswers.length} quick replies from questionsAnswers');
+        DebugConfig.debugPrint(
+            '🔧 UNIFIED: Added ${questionsAnswers.length} quick replies from questionsAnswers');
       }
-      
+
       // 2. answers (List or String format)
       else if (answers is List && answers.isNotEmpty) {
         for (var a in answers.take(4)) {
           quickReplies.add(QuickReply(text: a.toString(), value: a.toString()));
         }
-        DebugConfig.debugPrint('🔧 UNIFIED: Added ${answers.length} quick replies from answers (List)');
-      } 
-      else if (answers is String && answers != 'None' && answers.isNotEmpty) {
-        final answerList = answers.split(',').map((e) => e.trim()).where((e) => e.isNotEmpty).take(4).toList();
+        DebugConfig.debugPrint(
+            '🔧 UNIFIED: Added ${answers.length} quick replies from answers (List)');
+      } else if (answers is String && answers != 'None' && answers.isNotEmpty) {
+        final answerList = answers
+            .split(',')
+            .map((e) => e.trim())
+            .where((e) => e.isNotEmpty)
+            .take(4)
+            .toList();
         for (final a in answerList) {
           quickReplies.add(QuickReply(text: a, value: a));
         }
-        DebugConfig.debugPrint('🔧 UNIFIED: Added ${answerList.length} quick replies from answers (String)');
+        DebugConfig.debugPrint(
+            '🔧 UNIFIED: Added ${answerList.length} quick replies from answers (String)');
       }
-      
+
       // 3. buttons (from push notifications)
       else if (buttons != null && buttons.isNotEmpty) {
         for (var button in buttons.take(4)) {
@@ -2135,9 +2322,10 @@ class DashMessagingService implements MessagingService {
             quickReplies.add(QuickReply(text: title, value: title));
           }
         }
-        DebugConfig.debugPrint('🔧 UNIFIED: Added ${buttons.length} quick replies from buttons');
+        DebugConfig.debugPrint(
+            '🔧 UNIFIED: Added ${buttons.length} quick replies from buttons');
       }
-      
+
       // 4. suggestedReplies (already processed)
       else if (suggestedReplies != null && suggestedReplies.isNotEmpty) {
         for (var reply in suggestedReplies.take(4)) {
@@ -2147,22 +2335,26 @@ class DashMessagingService implements MessagingService {
             quickReplies.add(QuickReply(text: text, value: value));
           }
         }
-        DebugConfig.debugPrint('🔧 UNIFIED: Added ${suggestedReplies.length} quick replies from suggestedReplies');
+        DebugConfig.debugPrint(
+            '🔧 UNIFIED: Added ${suggestedReplies.length} quick replies from suggestedReplies');
       }
-      
+
       // 5. Check for legacy field names that might exist
       final oldAnswers = data['options'] ?? data['choices'] ?? data['replies'];
       if (quickReplies.isEmpty && oldAnswers != null) {
         if (oldAnswers is List) {
           for (var option in oldAnswers.take(4)) {
-            quickReplies.add(QuickReply(text: option.toString(), value: option.toString()));
+            quickReplies.add(
+                QuickReply(text: option.toString(), value: option.toString()));
           }
-          DebugConfig.debugPrint('🔧 UNIFIED: Added ${oldAnswers.length} quick replies from legacy options/choices/replies');
+          DebugConfig.debugPrint(
+              '🔧 UNIFIED: Added ${oldAnswers.length} quick replies from legacy options/choices/replies');
         }
       }
-      
+
       if (quickReplies.isNotEmpty) {
-        DebugConfig.debugPrint('🔧 ✅ UNIFIED: Created single poll message with content and ${quickReplies.length} options: ${quickReplies.map((r) => r.text).join(", ")}');
+        DebugConfig.debugPrint(
+            '🔧 ✅ UNIFIED: Created single poll message with content and ${quickReplies.length} options: ${quickReplies.map((r) => r.text).join(", ")}');
         return ChatMessage(
           id: messageId,
           content: content, // Include the poll question content
@@ -2172,10 +2364,11 @@ class DashMessagingService implements MessagingService {
           suggestedReplies: quickReplies,
         );
       } else {
-        DebugConfig.debugPrint('🔧 ⚠️ UNIFIED: Poll detected but no valid quick replies created for: $content');
+        DebugConfig.debugPrint(
+            '🔧 ⚠️ UNIFIED: Poll detected but no valid quick replies created for: $content');
       }
     }
-    
+
     // Create regular text message
     return ChatMessage(
       id: messageId,
@@ -2184,13 +2377,15 @@ class DashMessagingService implements MessagingService {
       isMe: isMe,
       type: MessageType.text,
     );
-      }
+  }
 
   // Test connection to the server using the exact URL
   Future<bool> testServerConnection() async {
     try {
       DebugConfig.debugPrint('Testing connection to server: $_hostUrl');
-      final response = await http.get(Uri.parse(_hostUrl)).timeout(const Duration(seconds: 5));
+      final response = await http
+          .get(Uri.parse(_hostUrl))
+          .timeout(const Duration(seconds: 5));
       DebugConfig.debugPrint('Server response: ${response.statusCode}');
       return response.statusCode >= 200 && response.statusCode < 300;
     } catch (e) {
@@ -2198,7 +2393,7 @@ class DashMessagingService implements MessagingService {
       return false;
     }
   }
-  
+
   // Print a sample JSON request to the console for testing purposes
   void printSampleJsonRequest() {
     final sampleRequest = {
@@ -2209,10 +2404,10 @@ class DashMessagingService implements MessagingService {
       'messageTime': DateTime.now().millisecondsSinceEpoch ~/ 1000,
       'eventTypeCode': 1,
     };
-    
+
     // Use the enhanced JSON printing function
     DebugConfig.jsonPrint('SAMPLE REQUEST', sampleRequest);
-    
+
     // Show what the response might look like
     final sampleResponse = {
       'messageBody': 'This is a sample response from the server',
@@ -2226,55 +2421,60 @@ class DashMessagingService implements MessagingService {
       'serverMessageId': 'server-generated-id-${_uuid.v4().substring(0, 8)}',
       'timestamp': DateTime.now().millisecondsSinceEpoch ~/ 1000
     };
-    
+
     DebugConfig.jsonPrint('SAMPLE RESPONSE', sampleResponse);
   }
 
   // Process snapshot with proper chronological ordering
   void _processSnapshotInstant(QuerySnapshot snapshot) {
     if (snapshot.docs.isEmpty) return;
-    
+
     final processedIds = <String>{};
     final messages = <ChatMessage>[];
     int lowestTimestamp = DateTime.now().millisecondsSinceEpoch;
-    
+
     // Process documents (already in chronological order due to limitToLast)
     for (var doc in snapshot.docs) {
       try {
         final data = doc.data() as Map<String, dynamic>?;
         if (data == null) continue;
-        
+
         final messageId = data['serverMessageId'] ?? doc.id;
-        
+
         // Skip if already processed
-        if (processedIds.contains(messageId) || _messageCache.containsKey(messageId)) {
+        if (processedIds.contains(messageId) ||
+            _messageCache.containsKey(messageId)) {
           continue;
         }
         processedIds.add(messageId);
-        
+
         // Extract content
         final content = data['messageBody']?.toString() ?? '';
         if (content.isEmpty) continue;
-        
+
         // Fast timestamp extraction
         final timestamp = _extractTimestampFast(data);
-        lowestTimestamp = timestamp.millisecondsSinceEpoch < lowestTimestamp 
-            ? timestamp.millisecondsSinceEpoch 
+        lowestTimestamp = timestamp.millisecondsSinceEpoch < lowestTimestamp
+            ? timestamp.millisecondsSinceEpoch
             : lowestTimestamp;
-        
+
         // Quick user check - prioritize source field for reliability
         final source = data['source']?.toString() ?? '';
         final senderId = data['senderId'] ?? data['userId'] ?? '';
         // FIXED: Prioritize source field since it's more reliable than senderId comparison
-        final isMe = source == 'client' || (source.isEmpty && senderId == _userId);
-        
+        final isMe =
+            source == 'client' || (source.isEmpty && senderId == _userId);
+
         // DEBUG: Log message alignment for troubleshooting
         if (_debugMessageAlignment && content.isNotEmpty) {
-          DebugConfig.debugPrint('📍 INITIAL Message alignment check: "${content.substring(0, content.length > 30 ? 30 : content.length)}..." -> isMe: $isMe (source: "$source", senderId: "$senderId", _userId: "$_userId")');
+          DebugConfig.debugPrint(
+              '📍 INITIAL Message alignment check: "${content.substring(0, content.length > 30 ? 30 : content.length)}..." -> isMe: $isMe (source: "$source", senderId: "$senderId", _userId: "$_userId")');
         }
-        
+
         // Debug: Print full message data for messages that might have quick replies
-        if (content.toLowerCase().contains('cigarette') || content.toLowerCase().contains('ready') || content.toLowerCase().contains('quiz')) {
+        if (content.toLowerCase().contains('cigarette') ||
+            content.toLowerCase().contains('ready') ||
+            content.toLowerCase().contains('quiz')) {
           DebugConfig.debugPrint('🔍 POTENTIAL QUICK REPLY MESSAGE:');
           DebugConfig.debugPrint('🔍 Content: $content');
           DebugConfig.debugPrint('🔍 Full data keys: ${data.keys.toList()}');
@@ -2283,15 +2483,19 @@ class DashMessagingService implements MessagingService {
 
         // Enhanced poll detection - check ALL possible quick reply fields
         final isPoll = data['isPoll'];
-        final questionsAnswers = data['questionsAnswers'] as Map<String, dynamic>?;
+        final questionsAnswers =
+            data['questionsAnswers'] as Map<String, dynamic>?;
         final answers = data['answers'];
         final buttons = data['buttons'] as List<dynamic>?;
         final suggestedReplies = data['suggestedReplies'] as List<dynamic>?;
-        
+
         // Comprehensive logging for debugging
-        if (content.toLowerCase().contains('cigarette') || content.toLowerCase().contains('ready') || 
-            content.toLowerCase().contains('quiz') || content.toLowerCase().contains('smoke')) {
-          DebugConfig.debugPrint('🔍 INITIAL: Analyzing potential poll message:');
+        if (content.toLowerCase().contains('cigarette') ||
+            content.toLowerCase().contains('ready') ||
+            content.toLowerCase().contains('quiz') ||
+            content.toLowerCase().contains('smoke')) {
+          DebugConfig.debugPrint(
+              '🔍 INITIAL: Analyzing potential poll message:');
           DebugConfig.debugPrint('🔍 Content: $content');
           DebugConfig.debugPrint('🔍 isPoll: $isPoll');
           DebugConfig.debugPrint('🔍 questionsAnswers: $questionsAnswers');
@@ -2300,11 +2504,12 @@ class DashMessagingService implements MessagingService {
           DebugConfig.debugPrint('🔍 suggestedReplies: $suggestedReplies');
           DebugConfig.debugPrint('🔍 All keys: ${data.keys.toList()}');
         }
-        
+
         // Use the helper method to extract quick replies
         final quickReplies = _extractAllQuickReplies(data);
-        final hasQuickReplyData = isMessagePoll(isPoll) || quickReplies.isNotEmpty;
-        
+        final hasQuickReplyData =
+            isMessagePoll(isPoll) || quickReplies.isNotEmpty;
+
         if (hasQuickReplyData && quickReplies.isNotEmpty) {
           // Create a single message with both content and quick replies
           final message = ChatMessage(
@@ -2315,10 +2520,11 @@ class DashMessagingService implements MessagingService {
             type: MessageType.quickReply, // Mark as quick reply type
             suggestedReplies: quickReplies,
           );
-          
+
           _messageCache[messageId] = message;
           messages.add(message);
-          DebugConfig.debugPrint('🔧 ✅ INITIAL: Created single poll message with content and ${quickReplies.length} options: ${quickReplies.map((r) => r.text).join(", ")}');
+          DebugConfig.debugPrint(
+              '🔧 ✅ INITIAL: Created single poll message with content and ${quickReplies.length} options: ${quickReplies.map((r) => r.text).join(", ")}');
         } else {
           // Create regular text message
           final message = ChatMessage(
@@ -2328,63 +2534,66 @@ class DashMessagingService implements MessagingService {
             isMe: isMe,
             type: MessageType.text,
           );
-          
+
           _messageCache[messageId] = message;
           messages.add(message);
         }
-        
       } catch (e) {
         DebugConfig.debugPrint('Error processing doc: $e');
       }
     }
-    
+
     // Sort messages by timestamp to ensure perfect chronological order
     messages.sort((a, b) => a.timestamp.compareTo(b.timestamp));
-    
+
     // Add messages to stream in chronological order
     for (var message in messages) {
       _safeAddToStream(message);
     }
-    
+
     _lowestLoadedTimestamp = lowestTimestamp;
-    DebugConfig.debugPrint('⚡ Processed ${processedIds.length} messages in chronological order');
+    DebugConfig.debugPrint(
+        '⚡ Processed ${processedIds.length} messages in chronological order');
   }
 
   // Clear all messages in Firebase for the current user
   Future<void> clearAllMessagesInFirebase() async {
     if (_userId == null) {
-      DebugConfig.debugPrint('Cannot clear messages in Firebase: user ID is null');
+      DebugConfig.debugPrint(
+          'Cannot clear messages in Firebase: user ID is null');
       return;
     }
-    
-    DebugConfig.debugPrint('Clearing all messages in Firebase for user: $_userId');
-    
+
+    DebugConfig.debugPrint(
+        'Clearing all messages in Firebase for user: $_userId');
+
     try {
       // Reference to the user's chat collection
       final chatRef = FirebaseFirestore.instance
           .collection('messages')
           .doc(_userId)
           .collection('chat');
-      
+
       // Get all messages
       final snapshot = await chatRef.get();
-      
+
       if (snapshot.docs.isEmpty) {
         DebugConfig.debugPrint('No messages found to delete');
         return;
       }
-      
-      DebugConfig.debugPrint('Deleting ${snapshot.docs.length} messages from Firebase');
-      
+
+      DebugConfig.debugPrint(
+          'Deleting ${snapshot.docs.length} messages from Firebase');
+
       // Use batched writes for efficiency (max 500 operations per batch)
       const int batchSize = 500;
       int count = 0;
       WriteBatch batch = FirebaseFirestore.instance.batch();
-      
+
       for (var doc in snapshot.docs) {
         batch.delete(doc.reference);
         count++;
-        
+
         // Commit batch when it reaches the limit and create a new batch
         if (count >= batchSize) {
           await batch.commit();
@@ -2393,13 +2602,13 @@ class DashMessagingService implements MessagingService {
           batch = FirebaseFirestore.instance.batch();
         }
       }
-      
+
       // Commit any remaining operations
       if (count > 0) {
         await batch.commit();
         DebugConfig.debugPrint('Committed final batch of $count deletions');
       }
-      
+
       DebugConfig.debugPrint('Successfully cleared all messages in Firebase');
     } catch (e) {
       DebugConfig.errorPrint('Error clearing messages in Firebase: $e');

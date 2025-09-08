@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import '../models/quick_reply.dart';
 import '../models/chat_message.dart';
-import '../models/link_preview.dart';
 import '../services/link_preview_service.dart';
 import '../utils/debug_config.dart';
 import 'package:uuid/uuid.dart';

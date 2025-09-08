@@ -41,16 +41,17 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
   bool _isImageUrl(String url) {
     final lowerUrl = url.toLowerCase();
     return lowerUrl.endsWith('.jpg') ||
-           lowerUrl.endsWith('.jpeg') ||
-           lowerUrl.endsWith('.png') ||
-           lowerUrl.endsWith('.webp') ||
-           lowerUrl.endsWith('.gif');
+        lowerUrl.endsWith('.jpeg') ||
+        lowerUrl.endsWith('.png') ||
+        lowerUrl.endsWith('.webp') ||
+        lowerUrl.endsWith('.gif');
   }
 
   // Helper function to check if content is a local asset path
   bool _isLocalAssetGif(String content) {
-     final trimmedContent = content.trim();
-     return trimmedContent.startsWith('assets/') && trimmedContent.toLowerCase().endsWith('.gif');
+    final trimmedContent = content.trim();
+    return trimmedContent.startsWith('assets/') &&
+        trimmedContent.toLowerCase().endsWith('.gif');
   }
 
   // Helper to launch URL
@@ -151,29 +152,32 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
       );
     }
 
-    // --- Check for Local Asset GIF First --- 
+    // --- Check for Local Asset GIF First ---
     if (_isLocalAssetGif(widget.message.content)) {
-       try {
-          return Image.asset(
-             widget.message.content.trim(),
-             height: 150,
-             fit: BoxFit.contain,
-             errorBuilder: (context, error, stackTrace) {
-                DebugConfig.debugPrint("Image.asset Error loading ${widget.message.content}: $error");
-                return Container(
-                   height: 150,
-                   color: Colors.grey[300],
-                   child: const Center(child: Icon(Icons.error, color: Colors.red))
-                );
-             },
-          );
-       } catch (e) {
-           DebugConfig.debugPrint("Error loading asset ${widget.message.content}: $e");
-           return Text("[Error loading asset: ${widget.message.content}]", style: const TextStyle(color: Colors.red));
-       }
+      try {
+        return Image.asset(
+          widget.message.content.trim(),
+          height: 150,
+          fit: BoxFit.contain,
+          errorBuilder: (context, error, stackTrace) {
+            DebugConfig.debugPrint(
+                "Image.asset Error loading ${widget.message.content}: $error");
+            return Container(
+                height: 150,
+                color: Colors.grey[300],
+                child:
+                    const Center(child: Icon(Icons.error, color: Colors.red)));
+          },
+        );
+      } catch (e) {
+        DebugConfig.debugPrint(
+            "Error loading asset ${widget.message.content}: $e");
+        return Text("[Error loading asset: ${widget.message.content}]",
+            style: const TextStyle(color: Colors.red));
+      }
     }
 
-    // --- Network URL Processing --- 
+    // --- Network URL Processing ---
     final urlRegex = RegExp(
       r'https?://(?:[a-zA-Z]|[0-9]|[$-_@.&+]|[!*\(\),]|(?:%[0-9a-fA-F][0-9a-fA-F]))+',
       caseSensitive: false,
@@ -205,10 +209,11 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
           Padding(
             padding: const EdgeInsets.only(bottom: 8.0),
             child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
               decoration: BoxDecoration(
-                color: widget.message.isMe 
-                    ? Colors.white.withValues(alpha: 0.2) 
+                color: widget.message.isMe
+                    ? Colors.white.withValues(alpha: 0.2)
                     : Colors.grey.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(6.0),
               ),
@@ -217,14 +222,17 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
                   Icon(
                     Icons.play_circle_outline,
                     size: 16,
-                    color: widget.message.isMe ? Colors.white70 : Colors.grey[600],
+                    color:
+                        widget.message.isMe ? Colors.white70 : Colors.grey[600],
                   ),
                   const SizedBox(width: 6),
                   Expanded(
                     child: Text(
                       firstUrl,
                       style: TextStyle(
-                        color: widget.message.isMe ? Colors.white70 : Colors.grey[600],
+                        color: widget.message.isMe
+                            ? Colors.white70
+                            : Colors.grey[600],
                         fontSize: 12,
                         fontStyle: FontStyle.italic,
                       ),
@@ -263,7 +271,8 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
                     );
                   },
                   errorBuilder: (context, error, stackTrace) {
-                    DebugConfig.debugPrint("Error loading $thumbnailUrl: $error");
+                    DebugConfig.debugPrint(
+                        "Error loading $thumbnailUrl: $error");
                     return Container(
                         height: 150,
                         width: double.infinity,
@@ -273,7 +282,8 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
                           children: [
                             Icon(Icons.error),
                             SizedBox(height: 4),
-                            Text('Tap to open link', style: TextStyle(fontSize: 12)),
+                            Text('Tap to open link',
+                                style: TextStyle(fontSize: 12)),
                           ],
                         ));
                   },
@@ -360,7 +370,8 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
                       children: [
                         Icon(Icons.error),
                         SizedBox(height: 4),
-                        Text('Tap to open link', style: TextStyle(fontSize: 12)),
+                        Text('Tap to open link',
+                            style: TextStyle(fontSize: 12)),
                       ],
                     ));
               },
@@ -379,7 +390,9 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
             ),
         ],
       );
-    } else if (firstUrl != null && match != null && widget.message.linkPreview != null) {
+    } else if (firstUrl != null &&
+        match != null &&
+        widget.message.linkPreview != null) {
       // Web page preview with thumbnail
       final linkPreview = widget.message.linkPreview!;
       return Column(
@@ -396,128 +409,154 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
                 ),
               ),
             ),
-          // Web page preview card
+          // Web page preview card with improved layout
           GestureDetector(
             onTap: () => _launchURL(firstUrl),
             child: Container(
               width: double.infinity,
+              constraints: const BoxConstraints(
+                minWidth: 200,
+                maxWidth: double.infinity,
+              ),
               decoration: BoxDecoration(
-                color: widget.message.isMe 
-                    ? Colors.white.withValues(alpha: 0.1) 
-                    : Colors.grey.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(8),
+                color: widget.message.isMe
+                    ? Colors.white.withValues(alpha: 0.15)
+                    : AppTheme.surfaceWhite,
+                borderRadius: BorderRadius.circular(12),
                 border: Border.all(
-                  color: widget.message.isMe 
-                      ? Colors.white.withValues(alpha: 0.3) 
-                      : Colors.grey.withValues(alpha: 0.3),
+                  color: widget.message.isMe
+                      ? Colors.white.withValues(alpha: 0.3)
+                      : AppTheme.borderLight,
                   width: 1,
                 ),
+                boxShadow: widget.message.isMe
+                    ? []
+                    : [
+                        BoxShadow(
+                          color: AppTheme.shadowSubtle,
+                          blurRadius: 4,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Thumbnail image
+                  // Thumbnail image - hide entirely if it fails to load
                   if (linkPreview.imageUrl != null)
                     ClipRRect(
                       borderRadius: const BorderRadius.only(
-                        topLeft: Radius.circular(8),
-                        topRight: Radius.circular(8),
+                        topLeft: Radius.circular(12),
+                        topRight: Radius.circular(12),
                       ),
-                      child: Image.network(
-                        linkPreview.imageUrl!,
-                        height: 120,
-                        width: double.infinity,
-                        fit: BoxFit.cover,
-                        loadingBuilder: (context, child, loadingProgress) {
-                          if (loadingProgress == null) return child;
-                          return Container(
-                            height: 120,
-                            width: double.infinity,
-                            color: Colors.grey[300],
-                            child: Center(
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                value: loadingProgress.expectedTotalBytes != null
-                                    ? loadingProgress.cumulativeBytesLoaded /
-                                        loadingProgress.expectedTotalBytes!
-                                    : null,
-                              ),
-                            ),
-                          );
-                        },
-                        errorBuilder: (context, error, stackTrace) {
-                          return Container(
-                            height: 120,
-                            width: double.infinity,
-                            color: Colors.grey[300],
-                            child: const Center(
-                              child: Icon(
-                                Icons.image_not_supported,
-                                size: 40,
-                                color: Colors.grey,
-                              ),
-                            ),
-                          );
-                        },
+                      child: _LinkPreviewImage(
+                        imageUrl: linkPreview.imageUrl!,
                       ),
                     ),
-                  // Content section
+                  // Content section with improved padding
                   Padding(
-                    padding: const EdgeInsets.all(12),
+                    padding: const EdgeInsets.all(16),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        // Title
-                        Text(
-                          linkPreview.title,
-                          style: TextStyle(
-                            color: widget.message.isMe ? Colors.white : Colors.black,
-                            fontSize: 14,
-                            fontWeight: FontWeight.w600,
-                          ),
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        const SizedBox(height: 4),
-                        // Description
-                        if (linkPreview.description.isNotEmpty)
-                          Text(
-                            linkPreview.description,
+                        // Title with improved wrapping
+                        SizedBox(
+                          width: double.infinity,
+                          child: Text(
+                            linkPreview.title,
                             style: TextStyle(
-                              color: widget.message.isMe 
-                                  ? Colors.white.withValues(alpha: 0.8) 
-                                  : Colors.grey[600],
-                              fontSize: 12,
+                              color: widget.message.isMe
+                                  ? Colors.white
+                                  : AppTheme.textPrimary,
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                              height: 1.3, // Better line height for readability
                             ),
-                            maxLines: 2,
+                            maxLines: 3, // Allow more lines for longer titles
                             overflow: TextOverflow.ellipsis,
+                            textAlign: TextAlign.start,
                           ),
+                        ),
                         const SizedBox(height: 6),
-                        // URL with icon
-                        Row(
-                          children: [
-                            Icon(
-                              Icons.link,
-                              size: 12,
-                              color: widget.message.isMe 
-                                  ? Colors.white.withValues(alpha: 0.7) 
-                                  : Colors.grey[500],
-                            ),
-                            const SizedBox(width: 4),
-                            Expanded(
-                              child: Text(
-                                linkPreview.siteName ?? Uri.parse(firstUrl).host,
-                                style: TextStyle(
-                                  color: widget.message.isMe 
-                                      ? Colors.white.withValues(alpha: 0.7) 
-                                      : Colors.grey[500],
-                                  fontSize: 11,
-                                ),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
+                        // Description with improved wrapping
+                        if (linkPreview.description.isNotEmpty)
+                          SizedBox(
+                            width: double.infinity,
+                            child: Text(
+                              linkPreview.description,
+                              style: TextStyle(
+                                color: widget.message.isMe
+                                    ? Colors.white.withValues(alpha: 0.9)
+                                    : AppTheme.textSecondary,
+                                fontSize: 13,
+                                height: 1.4, // Better line height
+                                fontWeight: FontWeight.w400,
                               ),
+                              maxLines: 3, // Allow more lines for descriptions
+                              overflow: TextOverflow.ellipsis,
+                              textAlign: TextAlign.start,
                             ),
-                          ],
+                          ),
+                        const SizedBox(height: 8),
+                        // URL with icon - improved layout
+                        Container(
+                          padding: const EdgeInsets.symmetric(vertical: 4),
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Container(
+                                margin: const EdgeInsets.only(top: 1),
+                                child: Icon(
+                                  Icons.link_rounded,
+                                  size: 14,
+                                  color: widget.message.isMe
+                                      ? Colors.white.withValues(alpha: 0.8)
+                                      : AppTheme.textTertiary,
+                                ),
+                              ),
+                              const SizedBox(width: 6),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    // Site name (if available)
+                                    if (linkPreview.siteName != null &&
+                                        linkPreview.siteName!.isNotEmpty)
+                                      Text(
+                                        linkPreview.siteName!,
+                                        style: TextStyle(
+                                          color: widget.message.isMe
+                                              ? Colors.white
+                                                  .withValues(alpha: 0.8)
+                                              : AppTheme.textSecondary,
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.w500,
+                                        ),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    // URL hostname with better wrapping
+                                    Text(
+                                      Uri.parse(firstUrl).host,
+                                      style: TextStyle(
+                                        color: widget.message.isMe
+                                            ? Colors.white
+                                                .withValues(alpha: 0.7)
+                                            : AppTheme.textTertiary,
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w400,
+                                        height: 1.2,
+                                      ),
+                                      maxLines:
+                                          2, // Allow URL to wrap to 2 lines if needed
+                                      overflow: TextOverflow.ellipsis,
+                                      softWrap: true,
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
                       ],
                     ),
@@ -548,9 +587,7 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
           color: widget.message.isMe ? Colors.white : Colors.black,
         ),
         linkStyle: TextStyle(
-          color: widget.message.isMe
-              ? Colors.white
-              : AppTheme.quitxtPurple,
+          color: widget.message.isMe ? Colors.white : AppTheme.quitxtPurple,
           decoration: TextDecoration.underline,
         ),
       );
@@ -569,8 +606,9 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
         bottom: 8,
       ),
       child: Row(
-        mainAxisAlignment:
-            widget.message.isMe ? MainAxisAlignment.end : MainAxisAlignment.start,
+        mainAxisAlignment: widget.message.isMe
+            ? MainAxisAlignment.end
+            : MainAxisAlignment.start,
         crossAxisAlignment: CrossAxisAlignment.end,
         children: [
           if (!widget.message.isMe) _buildAvatar(),
@@ -600,29 +638,56 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
   }
 
   Widget _buildAvatar() {
-    return Container(
-      width: 32,
-      height: 32,
-      decoration: BoxDecoration(
-        gradient: widget.message.isMe
-            ? LinearGradient(
-                colors: [AppTheme.quitxtTeal, AppTheme.quitxtPurple],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              )
-            : LinearGradient(
-                colors: [Colors.grey[400]!, Colors.grey[500]!],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: Icon(
-        widget.message.isMe ? Icons.person : Icons.support_agent,
-        color: Colors.white,
-        size: 16,
-      ),
-    );
+    if (widget.message.isMe) {
+      // User avatar - keep as icon for now
+      return Container(
+        width: 32,
+        height: 32,
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: AppTheme.primaryGradient,
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+              color: AppTheme.primaryBlue.withValues(alpha: 0.3),
+              blurRadius: 4,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: const Icon(
+          Icons.person_rounded,
+          color: Colors.white,
+          size: 16,
+        ),
+      );
+    } else {
+      // Quitxt bot avatar - use the logo
+      return Container(
+        width: 32,
+        height: 32,
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+              color: AppTheme.wellnessGreen.withValues(alpha: 0.3),
+              blurRadius: 4,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(16),
+          child: Image.asset(
+            'assets/logos/avatar high rez.jpg',
+            fit: BoxFit.cover,
+          ),
+        ),
+      );
+    }
   }
 
   Widget _buildModernMessageBubble() {
@@ -715,8 +780,6 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
       case MessageStatus.failed:
       case MessageStatus.error:
         return Icons.error_outline;
-      default:
-        return Icons.check;
     }
   }
 
@@ -733,8 +796,68 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
       case MessageStatus.failed:
       case MessageStatus.error:
         return Colors.red;
-      default:
-        return Colors.grey[600]!;
     }
+  }
+}
+
+// Helper widget to handle link preview images that can fail to load
+class _LinkPreviewImage extends StatefulWidget {
+  final String imageUrl;
+
+  const _LinkPreviewImage({
+    required this.imageUrl,
+  });
+
+  @override
+  State<_LinkPreviewImage> createState() => _LinkPreviewImageState();
+}
+
+class _LinkPreviewImageState extends State<_LinkPreviewImage> {
+  bool _imageLoadFailed = false;
+
+  @override
+  Widget build(BuildContext context) {
+    // If image failed to load, don't show anything (return empty container)
+    if (_imageLoadFailed) {
+      return const SizedBox.shrink();
+    }
+
+    return Image.network(
+      widget.imageUrl,
+      height: 120,
+      width: double.infinity,
+      fit: BoxFit.cover,
+      loadingBuilder: (context, child, loadingProgress) {
+        if (loadingProgress == null) return child;
+        return Container(
+          height: 120,
+          width: double.infinity,
+          color: Colors.grey[300],
+          child: Center(
+            child: CircularProgressIndicator(
+              strokeWidth: 2,
+              value: loadingProgress.expectedTotalBytes != null
+                  ? loadingProgress.cumulativeBytesLoaded /
+                      loadingProgress.expectedTotalBytes!
+                  : null,
+            ),
+          ),
+        );
+      },
+      errorBuilder: (context, error, stackTrace) {
+        DebugConfig.debugPrint(
+            "Link preview image failed to load: ${widget.imageUrl}, error: $error");
+        // Mark as failed and trigger rebuild to hide the image
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) {
+            setState(() {
+              _imageLoadFailed = true;
+            });
+          }
+        });
+        // Return empty container immediately
+        return const SizedBox.shrink();
+      },
+    );
   }
 }

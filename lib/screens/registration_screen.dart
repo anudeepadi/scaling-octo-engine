@@ -47,12 +47,12 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
     if (value == null || value.trim().isEmpty) {
       return AppLocalizations.of(context).translate('please_enter_email');
     }
-    
+
     final emailRegex = RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$');
     if (!emailRegex.hasMatch(value.trim())) {
       return AppLocalizations.of(context).translate('invalid_email');
     }
-    
+
     return null;
   }
 
@@ -60,11 +60,11 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
     if (value == null || value.isEmpty) {
       return AppLocalizations.of(context).translate('please_enter_password');
     }
-    
+
     if (value.length < 6) {
       return AppLocalizations.of(context).translate('password_too_short');
     }
-    
+
     return null;
   }
 
@@ -72,11 +72,11 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
     if (value == null || value.isEmpty) {
       return AppLocalizations.of(context).translate('please_enter_password');
     }
-    
+
     if (value != _passwordController.text) {
       return AppLocalizations.of(context).translate('password_mismatch');
     }
-    
+
     return null;
   }
 
@@ -91,7 +91,8 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
       );
 
       if (!success && mounted) {
-        final errorMessage = authProvider.error ?? AppLocalizations.of(context).translate('auth_error');
+        final errorMessage = authProvider.error ??
+            AppLocalizations.of(context).translate('auth_error');
         _showErrorDialog(errorMessage);
       } else if (success && mounted) {
         // Registration successful, navigate back to login or home
@@ -112,7 +113,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
 
   void _showErrorDialog(String message) {
     final localizations = AppLocalizations.of(context);
-    
+
     if (Platform.isIOS) {
       showCupertinoDialog(
         context: context,
@@ -147,7 +148,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
   @override
   Widget build(BuildContext context) {
     final localizations = AppLocalizations.of(context);
-    
+
     return Scaffold(
       backgroundColor: AppTheme.quitxtGreen, // Green background
       appBar: AppBar(
@@ -162,13 +163,14 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
-            padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 16.0),
+            padding:
+                const EdgeInsets.symmetric(horizontal: 24.0, vertical: 16.0),
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 400),
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  // QuitTXT Logo
+                  // Quitxt Logo
                   Container(
                     padding: const EdgeInsets.all(20),
                     decoration: BoxDecoration(
@@ -193,7 +195,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                     ),
                   ),
                   const SizedBox(height: 32),
-                  
+
                   // Registration Card
                   Card(
                     elevation: 8,
@@ -228,7 +230,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                               ),
                               const SizedBox(height: 8),
                               Text(
-                                'Join QuitTXT to start your smoke-free journey',
+                                'Join Quitxt to start your smoke-free journey',
                                 style: TextStyle(
                                   fontSize: 14,
                                   color: Colors.grey[600],
@@ -236,38 +238,46 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                                 textAlign: TextAlign.center,
                               ),
                               const SizedBox(height: 32),
-                              
+
                               // Full Name Field
                               TextFormField(
                                 controller: _fullNameController,
                                 textCapitalization: TextCapitalization.words,
                                 decoration: InputDecoration(
-                                  labelText: localizations.translate('full_name_hint'),
+                                  labelText:
+                                      localizations.translate('full_name_hint'),
                                   hintText: 'Enter your full name',
-                                  prefixIcon: const Icon(Icons.person_outline, color: AppTheme.quitxtTeal),
+                                  prefixIcon: const Icon(Icons.person_outline,
+                                      color: AppTheme.quitxtTeal),
                                   border: OutlineInputBorder(
                                     borderRadius: BorderRadius.circular(12),
-                                    borderSide: const BorderSide(color: Colors.grey, width: 1),
+                                    borderSide: const BorderSide(
+                                        color: Colors.grey, width: 1),
                                   ),
                                   enabledBorder: OutlineInputBorder(
                                     borderRadius: BorderRadius.circular(12),
-                                    borderSide: BorderSide(color: Colors.grey[300]!, width: 1),
+                                    borderSide: BorderSide(
+                                        color: Colors.grey[300]!, width: 1),
                                   ),
                                   focusedBorder: OutlineInputBorder(
                                     borderRadius: BorderRadius.circular(12),
-                                    borderSide: const BorderSide(color: AppTheme.quitxtTeal, width: 2),
+                                    borderSide: const BorderSide(
+                                        color: AppTheme.quitxtTeal, width: 2),
                                   ),
                                   errorBorder: OutlineInputBorder(
                                     borderRadius: BorderRadius.circular(12),
-                                    borderSide: const BorderSide(color: Colors.red, width: 1),
+                                    borderSide: const BorderSide(
+                                        color: Colors.red, width: 1),
                                   ),
                                   filled: true,
                                   fillColor: Colors.grey[50],
-                                  contentPadding: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
+                                  contentPadding: const EdgeInsets.symmetric(
+                                      vertical: 16, horizontal: 16),
                                 ),
                                 validator: (value) {
                                   if (value == null || value.trim().isEmpty) {
-                                    return localizations.translate('please_enter_name');
+                                    return localizations
+                                        .translate('please_enter_name');
                                   }
                                   if (value.trim().length < 2) {
                                     return 'Name must be at least 2 characters';
@@ -276,70 +286,86 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                                 },
                               ),
                               const SizedBox(height: 20),
-                              
+
                               // Email Field
                               TextFormField(
                                 controller: _emailController,
                                 keyboardType: TextInputType.emailAddress,
                                 autocorrect: false,
                                 decoration: InputDecoration(
-                                  labelText: localizations.translate('email_hint'),
+                                  labelText:
+                                      localizations.translate('email_hint'),
                                   hintText: 'Enter your email address',
-                                  prefixIcon: const Icon(Icons.email_outlined, color: AppTheme.quitxtTeal),
+                                  prefixIcon: const Icon(Icons.email_outlined,
+                                      color: AppTheme.quitxtTeal),
                                   border: OutlineInputBorder(
                                     borderRadius: BorderRadius.circular(12),
-                                    borderSide: const BorderSide(color: Colors.grey, width: 1),
+                                    borderSide: const BorderSide(
+                                        color: Colors.grey, width: 1),
                                   ),
                                   enabledBorder: OutlineInputBorder(
                                     borderRadius: BorderRadius.circular(12),
-                                    borderSide: BorderSide(color: Colors.grey[300]!, width: 1),
+                                    borderSide: BorderSide(
+                                        color: Colors.grey[300]!, width: 1),
                                   ),
                                   focusedBorder: OutlineInputBorder(
                                     borderRadius: BorderRadius.circular(12),
-                                    borderSide: const BorderSide(color: AppTheme.quitxtTeal, width: 2),
+                                    borderSide: const BorderSide(
+                                        color: AppTheme.quitxtTeal, width: 2),
                                   ),
                                   errorBorder: OutlineInputBorder(
                                     borderRadius: BorderRadius.circular(12),
-                                    borderSide: const BorderSide(color: Colors.red, width: 1),
+                                    borderSide: const BorderSide(
+                                        color: Colors.red, width: 1),
                                   ),
                                   filled: true,
                                   fillColor: Colors.grey[50],
-                                  contentPadding: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
+                                  contentPadding: const EdgeInsets.symmetric(
+                                      vertical: 16, horizontal: 16),
                                 ),
                                 validator: _validateEmail,
                               ),
                               const SizedBox(height: 20),
-                              
+
                               // Password Field
                               TextFormField(
                                 controller: _passwordController,
                                 obscureText: !_isPasswordVisible,
                                 decoration: InputDecoration(
-                                  labelText: localizations.translate('password_hint'),
+                                  labelText:
+                                      localizations.translate('password_hint'),
                                   hintText: 'Create a strong password',
-                                  prefixIcon: const Icon(Icons.lock_outline, color: AppTheme.quitxtTeal),
+                                  prefixIcon: const Icon(Icons.lock_outline,
+                                      color: AppTheme.quitxtTeal),
                                   border: OutlineInputBorder(
                                     borderRadius: BorderRadius.circular(12),
-                                    borderSide: const BorderSide(color: Colors.grey, width: 1),
+                                    borderSide: const BorderSide(
+                                        color: Colors.grey, width: 1),
                                   ),
                                   enabledBorder: OutlineInputBorder(
                                     borderRadius: BorderRadius.circular(12),
-                                    borderSide: BorderSide(color: Colors.grey[300]!, width: 1),
+                                    borderSide: BorderSide(
+                                        color: Colors.grey[300]!, width: 1),
                                   ),
                                   focusedBorder: OutlineInputBorder(
                                     borderRadius: BorderRadius.circular(12),
-                                    borderSide: const BorderSide(color: AppTheme.quitxtTeal, width: 2),
+                                    borderSide: const BorderSide(
+                                        color: AppTheme.quitxtTeal, width: 2),
                                   ),
                                   errorBorder: OutlineInputBorder(
                                     borderRadius: BorderRadius.circular(12),
-                                    borderSide: const BorderSide(color: Colors.red, width: 1),
+                                    borderSide: const BorderSide(
+                                        color: Colors.red, width: 1),
                                   ),
                                   filled: true,
                                   fillColor: Colors.grey[50],
-                                  contentPadding: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
+                                  contentPadding: const EdgeInsets.symmetric(
+                                      vertical: 16, horizontal: 16),
                                   suffixIcon: IconButton(
                                     icon: Icon(
-                                      _isPasswordVisible ? Icons.visibility_off : Icons.visibility,
+                                      _isPasswordVisible
+                                          ? Icons.visibility_off
+                                          : Icons.visibility,
                                       color: AppTheme.quitxtTeal,
                                     ),
                                     onPressed: _togglePasswordVisibility,
@@ -348,37 +374,46 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                                 validator: _validatePassword,
                               ),
                               const SizedBox(height: 20),
-                              
+
                               // Confirm Password Field
                               TextFormField(
                                 controller: _confirmPasswordController,
                                 obscureText: !_isConfirmPasswordVisible,
                                 decoration: InputDecoration(
-                                  labelText: localizations.translate('confirm_password_hint'),
+                                  labelText: localizations
+                                      .translate('confirm_password_hint'),
                                   hintText: 'Confirm your password',
-                                  prefixIcon: const Icon(Icons.lock_outline, color: AppTheme.quitxtTeal),
+                                  prefixIcon: const Icon(Icons.lock_outline,
+                                      color: AppTheme.quitxtTeal),
                                   border: OutlineInputBorder(
                                     borderRadius: BorderRadius.circular(12),
-                                    borderSide: const BorderSide(color: Colors.grey, width: 1),
+                                    borderSide: const BorderSide(
+                                        color: Colors.grey, width: 1),
                                   ),
                                   enabledBorder: OutlineInputBorder(
                                     borderRadius: BorderRadius.circular(12),
-                                    borderSide: BorderSide(color: Colors.grey[300]!, width: 1),
+                                    borderSide: BorderSide(
+                                        color: Colors.grey[300]!, width: 1),
                                   ),
                                   focusedBorder: OutlineInputBorder(
                                     borderRadius: BorderRadius.circular(12),
-                                    borderSide: const BorderSide(color: AppTheme.quitxtTeal, width: 2),
+                                    borderSide: const BorderSide(
+                                        color: AppTheme.quitxtTeal, width: 2),
                                   ),
                                   errorBorder: OutlineInputBorder(
                                     borderRadius: BorderRadius.circular(12),
-                                    borderSide: const BorderSide(color: Colors.red, width: 1),
+                                    borderSide: const BorderSide(
+                                        color: Colors.red, width: 1),
                                   ),
                                   filled: true,
                                   fillColor: Colors.grey[50],
-                                  contentPadding: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
+                                  contentPadding: const EdgeInsets.symmetric(
+                                      vertical: 16, horizontal: 16),
                                   suffixIcon: IconButton(
                                     icon: Icon(
-                                      _isConfirmPasswordVisible ? Icons.visibility_off : Icons.visibility,
+                                      _isConfirmPasswordVisible
+                                          ? Icons.visibility_off
+                                          : Icons.visibility,
                                       color: AppTheme.quitxtTeal,
                                     ),
                                     onPressed: _toggleConfirmPasswordVisibility,
@@ -387,7 +422,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                                 validator: _validateConfirmPassword,
                               ),
                               const SizedBox(height: 32),
-                              
+
                               // Create Account Button
                               SizedBox(
                                 width: double.infinity,
@@ -398,7 +433,8 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                                     backgroundColor: AppTheme.quitxtTeal,
                                     foregroundColor: Colors.white,
                                     elevation: 4,
-                                    shadowColor: AppTheme.quitxtTeal.withValues(alpha: 0.3),
+                                    shadowColor: AppTheme.quitxtTeal
+                                        .withValues(alpha: 0.3),
                                     shape: RoundedRectangleBorder(
                                       borderRadius: BorderRadius.circular(12),
                                     ),
@@ -414,7 +450,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                                 ),
                               ),
                               const SizedBox(height: 20),
-                              
+
                               // Divider with "OR"
                               Row(
                                 children: [
@@ -425,7 +461,8 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                                     ),
                                   ),
                                   Padding(
-                                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 16),
                                     child: Text(
                                       'OR',
                                       style: TextStyle(
@@ -443,7 +480,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                                 ],
                               ),
                               const SizedBox(height: 20),
-                              
+
                               // Google Sign In Button
                               SizedBox(
                                 width: double.infinity,
@@ -454,7 +491,9 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                                     'assets/images/google_logo.png',
                                     height: 20,
                                     width: 20,
-                                    errorBuilder: (ctx, obj, _) => const Icon(Icons.g_mobiledata, size: 20),
+                                    errorBuilder: (ctx, obj, _) => const Icon(
+                                        Icons.g_mobiledata,
+                                        size: 20),
                                   ),
                                   label: Text(
                                     'Continue with Google',
@@ -465,7 +504,8 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                                     ),
                                   ),
                                   style: OutlinedButton.styleFrom(
-                                    side: BorderSide(color: Colors.grey[300]!, width: 1),
+                                    side: BorderSide(
+                                        color: Colors.grey[300]!, width: 1),
                                     shape: RoundedRectangleBorder(
                                       borderRadius: BorderRadius.circular(12),
                                     ),
@@ -474,13 +514,14 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                                 ),
                               ),
                               const SizedBox(height: 24),
-                              
+
                               // Already have account link
                               Row(
                                 mainAxisAlignment: MainAxisAlignment.center,
                                 children: [
                                   Text(
-                                    localizations.translate('already_have_account'),
+                                    localizations
+                                        .translate('already_have_account'),
                                     style: TextStyle(
                                       color: Colors.grey[600],
                                       fontSize: 14,
@@ -506,7 +547,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                       ),
                     ),
                   ),
-                  
+
                   const SizedBox(height: 20),
                   Consumer<AuthProvider>(
                     builder: (context, authProvider, _) {
@@ -525,7 +566,8 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                                 height: 20,
                                 child: CircularProgressIndicator(
                                   strokeWidth: 2,
-                                  valueColor: AlwaysStoppedAnimation<Color>(AppTheme.quitxtTeal),
+                                  valueColor: AlwaysStoppedAnimation<Color>(
+                                      AppTheme.quitxtTeal),
                                 ),
                               ),
                               SizedBox(width: 12),
@@ -551,4 +593,4 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
       ),
     );
   }
-} 
+}

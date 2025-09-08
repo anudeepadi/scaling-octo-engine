@@ -8,7 +8,8 @@ class NotificationService {
   factory NotificationService() => _instance;
   NotificationService._internal();
 
-  final FlutterLocalNotificationsPlugin _localNotifications = FlutterLocalNotificationsPlugin();
+  final FlutterLocalNotificationsPlugin _localNotifications =
+      FlutterLocalNotificationsPlugin();
   bool _isInitialized = false;
 
   /// Initialize the notification service
@@ -17,10 +18,12 @@ class NotificationService {
 
     try {
       // Android initialization
-      const AndroidInitializationSettings androidSettings = AndroidInitializationSettings('@mipmap/ic_launcher');
+      const AndroidInitializationSettings androidSettings =
+          AndroidInitializationSettings('@mipmap/ic_launcher');
 
       // iOS initialization
-      const DarwinInitializationSettings iosSettings = DarwinInitializationSettings(
+      const DarwinInitializationSettings iosSettings =
+          DarwinInitializationSettings(
         requestAlertPermission: true,
         requestBadgePermission: true,
         requestSoundPermission: true,
@@ -46,9 +49,11 @@ class NotificationService {
       await _createNotificationChannel();
 
       _isInitialized = true;
-      developer.log('NotificationService initialized successfully', name: 'Notifications');
+      developer.log('NotificationService initialized successfully',
+          name: 'Notifications');
     } catch (e) {
-      developer.log('Failed to initialize NotificationService: $e', name: 'Notifications');
+      developer.log('Failed to initialize NotificationService: $e',
+          name: 'Notifications');
     }
   }
 
@@ -56,10 +61,13 @@ class NotificationService {
   Future<void> _requestAndroidPermissions() async {
     if (Platform.isAndroid) {
       final AndroidFlutterLocalNotificationsPlugin? androidImplementation =
-          _localNotifications.resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
+          _localNotifications.resolvePlatformSpecificImplementation<
+              AndroidFlutterLocalNotificationsPlugin>();
 
-      final bool? granted = await androidImplementation?.requestNotificationsPermission();
-      developer.log('Android notification permission granted: $granted', name: 'Notifications');
+      final bool? granted =
+          await androidImplementation?.requestNotificationsPermission();
+      developer.log('Android notification permission granted: $granted',
+          name: 'Notifications');
     }
   }
 
@@ -68,15 +76,16 @@ class NotificationService {
     if (Platform.isAndroid) {
       const AndroidNotificationChannel channel = AndroidNotificationChannel(
         'quitxt_messages', // Channel ID
-        'QuitTXT Messages', // Channel name
-        description: 'Notifications for QuitTXT messages',
+        'Quitxt Messages', // Channel name
+        description: 'Notifications for Quitxt messages',
         importance: Importance.high,
         playSound: true,
         enableVibration: true,
       );
 
       final AndroidFlutterLocalNotificationsPlugin? androidImplementation =
-          _localNotifications.resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
+          _localNotifications.resolvePlatformSpecificImplementation<
+              AndroidFlutterLocalNotificationsPlugin>();
 
       await androidImplementation?.createNotificationChannel(channel);
     }
@@ -84,7 +93,8 @@ class NotificationService {
 
   /// Handle notification tap
   void _onNotificationTapped(NotificationResponse notificationResponse) {
-    developer.log('Notification tapped: ${notificationResponse.payload}', name: 'Notifications');
+    developer.log('Notification tapped: ${notificationResponse.payload}',
+        name: 'Notifications');
     // TODO: Navigate to specific chat or message
     // You can add navigation logic here to open the app to the relevant chat
   }
@@ -100,10 +110,11 @@ class NotificationService {
     }
 
     try {
-      const AndroidNotificationDetails androidDetails = AndroidNotificationDetails(
+      const AndroidNotificationDetails androidDetails =
+          AndroidNotificationDetails(
         'quitxt_messages',
-        'QuitTXT Messages',
-        channelDescription: 'Notifications for QuitTXT messages',
+        'Quitxt Messages',
+        channelDescription: 'Notifications for Quitxt messages',
         importance: Importance.high,
         priority: Priority.high,
         icon: '@mipmap/ic_launcher',
@@ -132,20 +143,23 @@ class NotificationService {
         payload: payload,
       );
 
-      developer.log('Notification shown: $title - $body', name: 'Notifications');
+      developer.log('Notification shown: $title - $body',
+          name: 'Notifications');
     } catch (e) {
       developer.log('Failed to show notification: $e', name: 'Notifications');
     }
   }
 
   /// Show notification from Firebase message
-  Future<void> showNotificationFromFirebaseMessage(RemoteMessage message) async {
+  Future<void> showNotificationFromFirebaseMessage(
+      RemoteMessage message) async {
     final notification = message.notification;
     final data = message.data;
 
     // Extract title and body
-    String title = notification?.title ?? 'QuitTXT';
-    String body = notification?.body ?? data['messageBody'] ?? 'New message received';
+    String title = notification?.title ?? 'Quitxt';
+    String body =
+        notification?.body ?? data['messageBody'] ?? 'New message received';
 
     // Create payload with message data
     String payload = message.messageId ?? '';
@@ -166,4 +180,4 @@ class NotificationService {
   Future<void> cancelNotification(int id) async {
     await _localNotifications.cancel(id);
   }
-} 
+}

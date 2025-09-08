@@ -10,10 +10,10 @@ import '../services/media_picker_service.dart';
 import '../services/gif_service.dart';
 import '../widgets/chat_message_widget.dart';
 import '../widgets/quick_reply_widget.dart';
-import '../utils/app_localizations.dart';
 import '../theme/app_theme.dart';
 import 'profile_screen.dart';
 import 'about_screen.dart';
+import 'help_screen.dart';
 import '../utils/debug_config.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -41,7 +41,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         final chatProvider = context.read<ChatProvider>();
         final dashProvider = context.read<DashChatProvider>();
         dashProvider.setChatProvider(chatProvider);
-        DebugConfig.debugPrint('HomeScreen: Linked DashChatProvider and ChatProvider.');
+        DebugConfig.debugPrint(
+            'HomeScreen: Linked DashChatProvider and ChatProvider.');
       }
     });
   }
@@ -58,7 +59,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     super.didChangeAppLifecycleState(state);
-    
+
     switch (state) {
       case AppLifecycleState.resumed:
         DebugConfig.debugPrint('App resumed - checking for new messages');
@@ -102,14 +103,15 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   void _handleSubmitted(String text) {
     if (text.isEmpty) return;
 
-    DebugConfig.debugPrint('[SendMessage] Sending message with ID: ${DateTime.now().millisecondsSinceEpoch}');
-    
+    DebugConfig.debugPrint(
+        '[SendMessage] Sending message with ID: ${DateTime.now().millisecondsSinceEpoch}');
+
     final dashChatProvider = context.read<DashChatProvider>();
-    
+
     // FIXED: Don't add message to ChatProvider immediately
     // Let DashMessagingService handle adding the message with proper timestamp ordering
     // This prevents duplicate messages and ensures chronological order
-    
+
     // Send message to the Dash backend - this will handle adding to UI via Firebase
     dashChatProvider.sendMessage(text);
 
@@ -276,198 +278,234 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     return Drawer(
       child: Container(
         decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [
-              Color(0xFF00B7A3), // Lighter teal
-              Color(0xFF009688), // AppTheme.quitxtTeal
-              Color(0xFF00796B), // Darker teal
-            ],
-          ),
+          color: AppTheme.surfaceWhite,
         ),
         child: Column(
           children: [
-            // Header section with logo and user info
+            // Modern header section
             Container(
-              padding: const EdgeInsets.only(top: 60, bottom: 20, left: 20, right: 20),
+              padding: const EdgeInsets.only(
+                  top: 60, bottom: 32, left: 24, right: 24),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [
+                    AppTheme.primaryBlue.withValues(alpha: 0.08),
+                    AppTheme.wellnessGreen.withValues(alpha: 0.08),
+                  ],
+                ),
+              ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // QuiTXT logo and app name
+                  // Modern profile section
                   Row(
                     children: [
                       Container(
-                        width: 40,
-                        height: 40,
+                        width: 56,
+                        height: 56,
                         decoration: BoxDecoration(
-                          color: Colors.black,
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: const Center(
-                          child: Text(
-                            'Q',
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 24,
-                              fontWeight: FontWeight.bold,
+                          borderRadius: BorderRadius.circular(16),
+                          boxShadow: [
+                            BoxShadow(
+                              color:
+                                  AppTheme.wellnessGreen.withValues(alpha: 0.3),
+                              blurRadius: 12,
+                              offset: const Offset(0, 4),
                             ),
+                          ],
+                        ),
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(16),
+                          child: Image.asset(
+                            'assets/logos/avatar high rez.jpg',
+                            fit: BoxFit.cover,
                           ),
                         ),
                       ),
-                      const SizedBox(width: 12),
-                      const Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'QuiTXT mobile app',
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 16,
-                              fontWeight: FontWeight.w600,
-                            ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: SizedBox(
+                          height: 40,
+                          child: Image.asset(
+                            'assets/logos/Quitxt.png',
+                            fit: BoxFit.contain,
+                            alignment: Alignment.centerLeft,
                           ),
-                        ],
+                        ),
                       ),
                     ],
                   ),
-                  const SizedBox(height: 16),
-                  // User info
-                  Text(
-                    'User: ${userProfileProvider.displayName ?? authProvider.currentUser?.displayName ?? authProvider.currentUser?.email ?? 'User'}',
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 14,
-                      fontWeight: FontWeight.w400,
+                  const SizedBox(height: 20),
+                  // User info card
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: AppTheme.surfaceWhite,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: AppTheme.borderLight),
+                      boxShadow: [
+                        BoxShadow(
+                          color: AppTheme.shadowSubtle,
+                          blurRadius: 8,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                    child: Text(
+                      userProfileProvider.displayName ??
+                          authProvider.currentUser?.displayName ??
+                          authProvider.currentUser?.email ??
+                          'Welcome to your health journey',
+                      style: const TextStyle(
+                        color: AppTheme.textPrimary,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
                   ),
                 ],
               ),
             ),
-            
-            // Menu items
+
+            // Modern menu items
             Expanded(
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
+                padding: const EdgeInsets.symmetric(horizontal: 20),
                 child: Column(
                   children: [
-                    const SizedBox(height: 20),
-                    
+                    const SizedBox(height: 8),
+
                     // Profile item
-                    ListTile(
-                      leading: const Icon(
-                        Icons.person_outline,
-                        color: Colors.white,
-                        size: 24,
-                      ),
-                      title: const Text(
-                        'Profile',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 16,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
+                    _buildModernMenuItem(
+                      icon: Icons.person_outline_rounded,
+                      title: 'Profile',
+                      subtitle: 'Manage your account',
                       onTap: () {
                         Navigator.pop(context);
-                        
                         Navigator.push(
                           context,
-                          MaterialPageRoute(builder: (context) => const ProfileScreen()),
+                          MaterialPageRoute(
+                              builder: (context) => const ProfileScreen()),
                         );
                       },
                     ),
-                    
+
+                    const SizedBox(height: 8),
+
                     // Chat item
-                    ListTile(
-                      leading: const Icon(
-                        Icons.chat_bubble_outline,
-                        color: Colors.white,
-                        size: 24,
-                      ),
-                      title: const Text(
-                        'Chat',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 16,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
+                    _buildModernMenuItem(
+                      icon: Icons.chat_bubble_outline_rounded,
+                      title: 'Chat',
+                      subtitle: 'Your health conversations',
                       onTap: () {
                         Navigator.pop(context);
-                        // Already on chat screen, so just close drawer
                       },
+                      isActive: true,
                     ),
-                    
-                    // About item
-                    ListTile(
-                      leading: const Icon(
-                        Icons.info_outline,
-                        color: Colors.white,
-                        size: 24,
-                      ),
-                      title: const Text(
-                        'About',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 16,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
+
+                    const SizedBox(height: 8),
+
+                    // Help item
+                    _buildModernMenuItem(
+                      icon: Icons.help_outline_rounded,
+                      title: 'Help',
+                      subtitle: 'Quick keywords & support',
                       onTap: () {
                         Navigator.pop(context);
-                        
                         Navigator.push(
                           context,
-                          MaterialPageRoute(builder: (context) => const AboutScreen()),
+                          MaterialPageRoute(
+                              builder: (context) => const HelpScreen()),
                         );
                       },
                     ),
-                    
-                    // Exit item
-                    ListTile(
-                      leading: const Icon(
-                        Icons.exit_to_app,
-                        color: Colors.white,
-                        size: 24,
-                      ),
-                      title: const Text(
-                        'Exit',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 16,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
+
+                    const SizedBox(height: 8),
+
+                    // About item
+                    _buildModernMenuItem(
+                      icon: Icons.info_outline_rounded,
+                      title: 'About',
+                      subtitle: 'App information',
+                      onTap: () {
+                        Navigator.pop(context);
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                              builder: (context) => const AboutScreen()),
+                        );
+                      },
+                    ),
+
+                    const Spacer(),
+
+                    // Exit item (at bottom)
+                    _buildModernMenuItem(
+                      icon: Icons.logout_rounded,
+                      title: 'Sign Out',
+                      subtitle: 'Exit the app',
+                      isDestructive: true,
                       onTap: () async {
                         Navigator.pop(context);
-                        
-                        
-                        // Show confirmation dialog
+
+                        // Show modern confirmation dialog
                         bool confirmLogout = await showDialog(
-                          context: context,
-                          builder: (context) => AlertDialog(
-                            title: const Text('Confirm Exit'),
-                            content: const Text('Are you sure you want to exit?'),
-                            actions: [
-                              TextButton(
-                                onPressed: () => Navigator.pop(context, false),
-                                child: const Text('CANCEL'),
+                              context: context,
+                              builder: (context) => AlertDialog(
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(16),
+                                ),
+                                title: const Text(
+                                  'Sign Out',
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.w600,
+                                    color: AppTheme.textPrimary,
+                                  ),
+                                ),
+                                content: const Text(
+                                  'Are you sure you want to sign out of your account?',
+                                  style: TextStyle(
+                                    color: AppTheme.textSecondary,
+                                  ),
+                                ),
+                                actions: [
+                                  TextButton(
+                                    onPressed: () =>
+                                        Navigator.pop(context, false),
+                                    child: const Text(
+                                      'Cancel',
+                                      style: TextStyle(
+                                        color: AppTheme.textSecondary,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                  ),
+                                  TextButton(
+                                    onPressed: () =>
+                                        Navigator.pop(context, true),
+                                    child: const Text(
+                                      'Sign Out',
+                                      style: TextStyle(
+                                        color: AppTheme.errorSoft,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                  ),
+                                ],
                               ),
-                              TextButton(
-                                onPressed: () => Navigator.pop(context, true),
-                                child: const Text('EXIT'),
-                              ),
-                            ],
-                          ),
-                        ) ?? false;
-                        
-                        // If confirmed, proceed with logout
+                            ) ??
+                            false;
+
                         if (confirmLogout && mounted) {
                           await context.read<AuthProvider>().signOut();
                         }
                       },
                     ),
+
+                    const SizedBox(height: 24),
                   ],
                 ),
               ),
@@ -478,124 +516,175 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     );
   }
 
+  Widget _buildModernMenuItem({
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    required VoidCallback onTap,
+    bool isActive = false,
+    bool isDestructive = false,
+  }) {
+    return Container(
+      margin: const EdgeInsets.symmetric(vertical: 4),
+      child: Material(
+        color: isActive ? AppTheme.accentSoft : Colors.transparent,
+        borderRadius: BorderRadius.circular(12),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(12),
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            child: Row(
+              children: [
+                Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    color: isDestructive
+                        ? AppTheme.errorSoft.withValues(alpha: 0.1)
+                        : isActive
+                            ? AppTheme.primaryBlue.withValues(alpha: 0.1)
+                            : AppTheme.surfaceGray,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Icon(
+                    icon,
+                    color: isDestructive
+                        ? AppTheme.errorSoft
+                        : isActive
+                            ? AppTheme.primaryBlue
+                            : AppTheme.textSecondary,
+                    size: 20,
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        title,
+                        style: TextStyle(
+                          color: isDestructive
+                              ? AppTheme.errorSoft
+                              : AppTheme.textPrimary,
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                          letterSpacing: -0.25,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        subtitle,
+                        style: const TextStyle(
+                          color: AppTheme.textTertiary,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Icon(
+                  Icons.chevron_right_rounded,
+                  color: AppTheme.textTertiary,
+                  size: 20,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildMessageInput() {
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppTheme.surfaceWhite,
+        border: Border(
+          top: BorderSide(
+            color: AppTheme.borderLight,
+            width: 0.5,
+          ),
+        ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.08),
-            blurRadius: 20,
-            offset: const Offset(0, -4),
+            color: AppTheme.shadowSubtle,
+            blurRadius: 24,
+            offset: const Offset(0, -8),
           ),
         ],
       ),
       child: SafeArea(
         child: Padding(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
           child: Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
             children: [
-              // Attachment button
-              Container(
-                width: 44,
-                height: 44,
-                decoration: BoxDecoration(
-                  color: Colors.grey[100],
-                  borderRadius: BorderRadius.circular(22),
-                ),
-                child: Material(
-                  color: Colors.transparent,
-                  child: InkWell(
-                    borderRadius: BorderRadius.circular(22),
-                    onTap: () {
-                      // TODO: Show attachment options
-                    },
-                    child: Icon(
-                      Icons.add,
-                      color: Colors.grey[600],
-                      size: 20,
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 12),
-              
               // Text input field
               Expanded(
                 child: Container(
                   constraints: const BoxConstraints(
-                    minHeight: 44,
+                    minHeight: 48,
                     maxHeight: 120,
                   ),
                   decoration: BoxDecoration(
-                    color: const Color(0xFFF8F9FA),
-                    borderRadius: BorderRadius.circular(22),
+                    color: AppTheme.backgroundSecondary,
+                    borderRadius: BorderRadius.circular(26),
                     border: Border.all(
-                      color: Colors.grey.withValues(alpha: 0.2),
+                      color: AppTheme.borderLight,
+                      width: 0.5,
                     ),
                   ),
-                  child: Row(
-                    children: [
-                      const SizedBox(width: 16),
-                      Expanded(
-                        child: TextField(
-                          controller: _messageController,
-                          decoration: InputDecoration(
-                            hintText: 'Type a message...',
-                            border: InputBorder.none,
-                            hintStyle: TextStyle(
-                              color: Colors.grey[500],
-                              fontSize: 16,
-                              fontWeight: FontWeight.w400,
-                            ),
-                          ),
-                          style: const TextStyle(
-                            fontSize: 16,
-                            color: Colors.black87,
-                            fontWeight: FontWeight.w400,
-                          ),
-                          textCapitalization: TextCapitalization.sentences,
-                          keyboardType: TextInputType.multiline,
-                          maxLines: null,
-                          minLines: 1,
-                          onSubmitted: _handleSubmitted,
-                        ),
+                  child: TextField(
+                    controller: _messageController,
+                    decoration: const InputDecoration(
+                      hintText: 'Type a message...',
+                      border: InputBorder.none,
+                      contentPadding: EdgeInsets.symmetric(
+                        horizontal: 20,
+                        vertical: 14,
                       ),
-                      // Emoji button
-                      IconButton(
-                        icon: Icon(
-                          Icons.emoji_emotions_outlined,
-                          color: Colors.grey[600],
-                          size: 20,
-                        ),
-                        onPressed: () {
-                          // TODO: Show emoji picker
-                        },
+                      hintStyle: TextStyle(
+                        color: AppTheme.textTertiary,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w400,
                       ),
-                    ],
+                    ),
+                    style: const TextStyle(
+                      fontSize: 16,
+                      color: AppTheme.textPrimary,
+                      fontWeight: FontWeight.w500,
+                    ),
+                    textCapitalization: TextCapitalization.sentences,
+                    keyboardType: TextInputType.multiline,
+                    maxLines: null,
+                    minLines: 1,
+                    onSubmitted: _handleSubmitted,
                   ),
                 ),
               ),
-              const SizedBox(width: 12),
-              
+              const SizedBox(width: 8),
+
               // Send button
               Container(
-                width: 44,
-                height: 44,
+                width: 48,
+                height: 48,
                 decoration: BoxDecoration(
                   gradient: _isComposing
                       ? LinearGradient(
-                          colors: [AppTheme.quitxtTeal, AppTheme.quitxtPurple],
+                          colors: AppTheme.primaryGradient,
                           begin: Alignment.topLeft,
                           end: Alignment.bottomRight,
                         )
                       : null,
-                  color: _isComposing ? null : Colors.grey[300],
-                  borderRadius: BorderRadius.circular(22),
+                  color: _isComposing ? null : AppTheme.surfaceGray,
+                  borderRadius: BorderRadius.circular(24),
                   boxShadow: _isComposing
                       ? [
                           BoxShadow(
-                            color: AppTheme.quitxtTeal.withValues(alpha: 0.4),
+                            color: AppTheme.primaryBlue.withValues(alpha: 0.3),
                             blurRadius: 12,
                             offset: const Offset(0, 4),
                           ),
@@ -605,14 +694,15 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                 child: Material(
                   color: Colors.transparent,
                   child: InkWell(
-                    borderRadius: BorderRadius.circular(22),
-                    onTap: _isComposing 
+                    borderRadius: BorderRadius.circular(24),
+                    onTap: _isComposing
                         ? () => _handleSubmitted(_messageController.text)
                         : null,
                     child: Icon(
                       Icons.send_rounded,
-                      color: _isComposing ? Colors.white : Colors.grey[600],
-                      size: 20,
+                      color:
+                          _isComposing ? Colors.white : AppTheme.textTertiary,
+                      size: 22,
                     ),
                   ),
                 ),
@@ -630,26 +720,30 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       key: _scaffoldKey,
       appBar: AppBar(
         elevation: 0,
-        scrolledUnderElevation: 1,
-        backgroundColor: Colors.white,
-        foregroundColor: Colors.black87,
+        scrolledUnderElevation: 0,
+        backgroundColor: AppTheme.surfaceWhite,
+        surfaceTintColor: Colors.transparent,
         title: Row(
           children: [
             Container(
               width: 40,
               height: 40,
               decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [AppTheme.quitxtTeal, AppTheme.quitxtPurple],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
-                borderRadius: BorderRadius.circular(20),
+                borderRadius: BorderRadius.circular(12),
+                boxShadow: [
+                  BoxShadow(
+                    color: AppTheme.wellnessGreen.withValues(alpha: 0.2),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
               ),
-              child: const Icon(
-                Icons.support_agent,
-                color: Colors.white,
-                size: 20,
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: Image.asset(
+                  'assets/logos/avatar high rez.jpg',
+                  fit: BoxFit.cover,
+                ),
               ),
             ),
             const SizedBox(width: 12),
@@ -657,20 +751,21 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    AppLocalizations.of(context).translate('app_title'),
-                    style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.black87,
+                  const Text(
+                    'Quitxt',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w700,
+                      color: AppTheme.textPrimary,
+                      letterSpacing: -0.5,
                     ),
                   ),
-                  Text(
-                    'Here to help you quit smoking',
+                  const Text(
+                    'Your health companion',
                     style: TextStyle(
                       fontSize: 12,
-                      color: Colors.grey[600],
-                      fontWeight: FontWeight.w400,
+                      color: AppTheme.textSecondary,
+                      fontWeight: FontWeight.w500,
                     ),
                   ),
                 ],
@@ -679,14 +774,29 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           ],
         ),
         leading: IconButton(
-          icon: Icon(Icons.menu, color: Colors.grey[700]),
+          icon: const Icon(
+            Icons.menu_rounded,
+            color: AppTheme.textPrimary,
+          ),
           onPressed: () {
             _scaffoldKey.currentState?.openDrawer();
           },
         ),
         actions: [
           IconButton(
-            icon: Icon(Icons.person_outline, color: Colors.grey[700]),
+            icon: Container(
+              width: 32,
+              height: 32,
+              decoration: BoxDecoration(
+                color: AppTheme.accentSoft,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: const Icon(
+                Icons.person_outline_rounded,
+                color: AppTheme.primaryBlue,
+                size: 18,
+              ),
+            ),
             onPressed: () {
               Navigator.push(
                 context,
@@ -694,6 +804,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               );
             },
           ),
+          const SizedBox(width: 8),
         ],
       ),
       drawer: _buildDrawer(),
@@ -701,7 +812,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         children: [
           Expanded(
             child: Container(
-              color: const Color(0xFFF8F9FA),
+              color: AppTheme.backgroundSecondary,
               child: Consumer<DashChatProvider>(
                 builder: (context, dashChatProvider, child) {
                   WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -737,7 +848,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                           ),
                           const SizedBox(height: 24),
                           const Text(
-                            'Welcome to QuitTXT! 👋',
+                            'Welcome to Quitxt! 👋',
                             style: TextStyle(
                               fontSize: 24,
                               fontWeight: FontWeight.w700,
@@ -755,12 +866,14 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                           ),
                           const SizedBox(height: 16),
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 20, vertical: 12),
                             decoration: BoxDecoration(
                               color: AppTheme.quitxtTeal.withValues(alpha: 0.1),
                               borderRadius: BorderRadius.circular(20),
                               border: Border.all(
-                                color: AppTheme.quitxtTeal.withValues(alpha: 0.2),
+                                color:
+                                    AppTheme.quitxtTeal.withValues(alpha: 0.2),
                               ),
                             ),
                             child: Text(
@@ -778,22 +891,25 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                   }
 
                   // Show quick reply buttons for ALL poll messages, not just the most recent one
-                  DebugConfig.debugPrint('🔍 HomeScreen: Analyzing ${dashChatProvider.messages.length} messages for quick replies');
-                  
+                  DebugConfig.debugPrint(
+                      '🔍 HomeScreen: Analyzing ${dashChatProvider.messages.length} messages for quick replies');
+
                   return ListView.builder(
                     controller: _scrollController,
                     padding: const EdgeInsets.all(16),
                     itemCount: dashChatProvider.messages.length,
                     itemBuilder: (context, index) {
                       final message = dashChatProvider.messages[index];
-                      
+
                       // Check if this message has quick replies - show for ALL poll messages
-                      final shouldShowQuickReplies = message.type == MessageType.quickReply && 
-                          message.suggestedReplies != null && 
-                          message.suggestedReplies!.isNotEmpty;
-                      
-                      DebugConfig.debugPrint('🔍 HomeScreen: Message $index: type=${message.type}, hasReplies=${message.suggestedReplies?.isNotEmpty}, shouldShow=$shouldShowQuickReplies');
-                      
+                      final shouldShowQuickReplies =
+                          message.type == MessageType.quickReply &&
+                              message.suggestedReplies != null &&
+                              message.suggestedReplies!.isNotEmpty;
+
+                      DebugConfig.debugPrint(
+                          '🔍 HomeScreen: Message $index: type=${message.type}, hasReplies=${message.suggestedReplies?.isNotEmpty}, shouldShow=$shouldShowQuickReplies');
+
                       if (shouldShowQuickReplies) {
                         // For poll messages with quick replies, show both content and buttons
                         return Column(
@@ -804,8 +920,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                               onReactionAdd: (value) {
                                 if (value.isNotEmpty) {
                                   dashChatProvider.handleQuickReply(
-                                    QuickReply(text: value, value: value)
-                                  );
+                                      QuickReply(text: value, value: value));
                                 }
                                 _scrollToBottom();
                               },
@@ -828,8 +943,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                           onReactionAdd: (value) {
                             if (value.isNotEmpty) {
                               dashChatProvider.handleQuickReply(
-                                QuickReply(text: value, value: value)
-                              );
+                                  QuickReply(text: value, value: value));
                             }
                             _scrollToBottom();
                           },

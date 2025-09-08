@@ -1,0 +1,42 @@
+Analyzing rcs_application...                                    
+
+warning • Unused import: '../models/link_preview.dart' • lib/providers/chat_provider.dart:4:8 • unused_import
+warning • Unused import: '../services/emoji_converter_service.dart' • lib/providers/chat_provider.dart:6:8 • unused_import
+warning • Unused import: '../services/emoji_converter_service.dart' • lib/providers/dash_chat_provider.dart:7:8 • unused_import
+warning • Unused import: '../models/link_preview.dart' • lib/providers/system_chat_provider.dart:4:8 • unused_import
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/screens/help_screen.dart:124:39 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/screens/help_screen.dart:208:38 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/screens/help_screen.dart:259:30 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/screens/help_screen.dart:262:32 • deprecated_member_use
+warning • Unused import: '../models/link_preview.dart' • lib/services/dash_messaging_service.dart:9:8 • unused_import
+warning • Unused import: 'package:flutter/foundation.dart' • lib/services/dash_messaging_service.dart:14:8 • unused_import
+warning • Unused import: '../constants/app_constants.dart' • lib/services/dash_messaging_service.dart:15:8 • unused_import
+   info • The member 'messageStream' overrides an inherited member but isn't annotated with '@override' • lib/services/dash_messaging_service.dart:65:27 • annotate_overrides
+   info • Don't invoke 'print' in production code • lib/services/dash_messaging_service.dart:326:61 • avoid_print
+   info • Unnecessary use of string interpolation • lib/services/dash_messaging_service.dart:724:30 • unnecessary_string_interpolations
+   info • Unnecessary use of string interpolation • lib/services/dash_messaging_service.dart:754:34 • unnecessary_string_interpolations
+warning • Unused import: 'dart:convert' • lib/services/link_preview_service.dart:1:8 • unused_import
+   info • Don't invoke 'print' in production code • lib/services/service_manager.dart:46:5 • avoid_print
+warning • Unused import: 'package:flutter/foundation.dart' • lib/utils/ios_performance_utils.dart:2:8 • unused_import
+warning • This default clause is covered by the previous cases • lib/widgets/chat_message_widget.dart:799:7 • unreachable_switch_default
+warning • This default clause is covered by the previous cases • lib/widgets/chat_message_widget.dart:817:7 • unreachable_switch_default
+warning • Unused import: '../utils/debug_config.dart' • lib/widgets/modern_chat_screen.dart:9:8 • unused_import
+   info • The private field _showEmojiPicker could be 'final' • lib/widgets/modern_chat_screen.dart:24:8 • prefer_final_fields
+warning • The value of the field '_showEmojiPicker' isn't used • lib/widgets/modern_chat_screen.dart:24:8 • unused_field
+warning • This default clause is covered by the previous cases • lib/widgets/modern_message_bubble.dart:381:7 • unreachable_switch_default
+warning • This default clause is covered by the previous cases • lib/widgets/modern_message_bubble.dart:399:7 • unreachable_switch_default
+warning • The declaration '_buildIOSQuickReply' isn't referenced • lib/widgets/quick_reply_widget.dart:263:10 • unused_element
+warning • The declaration '_buildAndroidQuickReply' isn't referenced • lib/widgets/quick_reply_widget.dart:300:10 • unused_element
+warning • Unused import: 'package:mockito/mockito.dart' • test/test_config.dart:2:8 • unused_import
+warning • Unused import: 'package:firebase_core/firebase_core.dart' • test/test_config.dart:3:8 • unused_import
+warning • Unused import: 'package:firebase_auth/firebase_auth.dart' • test/test_config.dart:4:8 • unused_import
+warning • Unused import: 'package:cloud_firestore/cloud_firestore.dart' • test/test_config.dart:5:8 • unused_import
+warning • Unused import: 'package:firebase_storage/firebase_storage.dart' • test/test_config.dart:6:8 • unused_import
+warning • Unused import: 'package:firebase_messaging/firebase_messaging.dart' • test/test_config.dart:7:8 • unused_import
+  error • Target of URI doesn't exist: 'providers/auth_provider_test.dart' • test/test_runner.dart:5:8 • uri_does_not_exist
+  error • Target of URI doesn't exist: 'providers/chat_provider_test.dart' • test/test_runner.dart:6:8 • uri_does_not_exist
+  error • Target of URI doesn't exist: 'services/emoji_converter_service_test.dart' • test/test_runner.dart:7:8 • uri_does_not_exist
+  error • Target of URI doesn't exist: 'services/link_preview_service_test.dart' • test/test_runner.dart:8:8 • uri_does_not_exist
+warning • Unused import: 'package:quitxt_app/providers/auth_provider.dart' • test/widget_test.dart:11:8 • unused_import
+
+38 issues found. (ran in 16.6s)

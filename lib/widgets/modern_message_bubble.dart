@@ -71,11 +71,21 @@ class ModernMessageBubble extends StatelessWidget {
               ),
         borderRadius: BorderRadius.circular(16),
       ),
-      child: Icon(
-        message.isMe ? Icons.person : Icons.support_agent,
-        color: Colors.white,
-        size: 16,
-      ),
+      child: message.isMe
+          ? const Icon(
+              Icons.person_rounded,
+              color: Colors.white,
+              size: 16,
+            )
+          : ClipRRect(
+              borderRadius: BorderRadius.circular(16),
+              child: Image.asset(
+                'assets/logos/avatar high rez.jpg',
+                width: 32,
+                height: 32,
+                fit: BoxFit.cover,
+              ),
+            ),
     );
   }
 
@@ -137,17 +147,17 @@ class ModernMessageBubble extends StatelessWidget {
 
   Widget _buildLinkPreview(BuildContext context) {
     final linkPreview = message.linkPreview!;
-    
+
     return Container(
       width: double.infinity,
       decoration: BoxDecoration(
-        color: message.isMe 
-            ? Colors.white.withValues(alpha: 0.15) 
+        color: message.isMe
+            ? Colors.white.withValues(alpha: 0.15)
             : Colors.white,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: message.isMe 
-              ? Colors.white.withValues(alpha: 0.3) 
+          color: message.isMe
+              ? Colors.white.withValues(alpha: 0.3)
               : Colors.grey.withValues(alpha: 0.2),
           width: 1,
         ),
@@ -212,59 +222,98 @@ class ModernMessageBubble extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Title
-                Text(
-                  linkPreview.title,
-                  style: TextStyle(
-                    color: message.isMe ? Colors.white : Colors.black87,
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                  ),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                if (linkPreview.description.isNotEmpty) ...[
-                  const SizedBox(height: 4),
-                  Text(
-                    linkPreview.description,
+                // Title with improved wrapping
+                SizedBox(
+                  width: double.infinity,
+                  child: Text(
+                    linkPreview.title,
                     style: TextStyle(
-                      color: message.isMe 
-                          ? Colors.white.withValues(alpha: 0.8) 
-                          : Colors.grey[600],
-                      fontSize: 12,
+                      color: message.isMe ? Colors.white : AppTheme.textPrimary,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
                       height: 1.3,
                     ),
-                    maxLines: 2,
+                    maxLines: 3,
                     overflow: TextOverflow.ellipsis,
+                    textAlign: TextAlign.start,
+                  ),
+                ),
+                if (linkPreview.description.isNotEmpty) ...[
+                  const SizedBox(height: 6),
+                  SizedBox(
+                    width: double.infinity,
+                    child: Text(
+                      linkPreview.description,
+                      style: TextStyle(
+                        color: message.isMe
+                            ? Colors.white.withValues(alpha: 0.9)
+                            : AppTheme.textSecondary,
+                        fontSize: 13,
+                        height: 1.4,
+                        fontWeight: FontWeight.w400,
+                      ),
+                      maxLines: 3,
+                      overflow: TextOverflow.ellipsis,
+                      textAlign: TextAlign.start,
+                    ),
                   ),
                 ],
                 const SizedBox(height: 8),
-                // URL with icon
-                Row(
-                  children: [
-                    Icon(
-                      Icons.link,
-                      size: 12,
-                      color: message.isMe 
-                          ? Colors.white.withValues(alpha: 0.7) 
-                          : Colors.grey[500],
-                    ),
-                    const SizedBox(width: 4),
-                    Expanded(
-                      child: Text(
-                        linkPreview.siteName ?? Uri.parse(linkPreview.url).host,
-                        style: TextStyle(
-                          color: message.isMe 
-                              ? Colors.white.withValues(alpha: 0.7) 
-                              : Colors.grey[500],
-                          fontSize: 11,
-                          fontWeight: FontWeight.w500,
+                // URL with icon - improved layout
+                Container(
+                  padding: const EdgeInsets.symmetric(vertical: 4),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Container(
+                        margin: const EdgeInsets.only(top: 1),
+                        child: Icon(
+                          Icons.link_rounded,
+                          size: 14,
+                          color: message.isMe
+                              ? Colors.white.withValues(alpha: 0.8)
+                              : AppTheme.textTertiary,
                         ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
                       ),
-                    ),
-                  ],
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            // Site name (if available)
+                            if (linkPreview.siteName != null && linkPreview.siteName!.isNotEmpty)
+                              Text(
+                                linkPreview.siteName!,
+                                style: TextStyle(
+                                  color: message.isMe
+                                      ? Colors.white.withValues(alpha: 0.8)
+                                      : AppTheme.textSecondary,
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            // URL hostname with better wrapping
+                            Text(
+                              Uri.parse(linkPreview.url).host,
+                              style: TextStyle(
+                                color: message.isMe
+                                    ? Colors.white.withValues(alpha: 0.7)
+                                    : AppTheme.textTertiary,
+                                fontSize: 11,
+                                fontWeight: FontWeight.w400,
+                                height: 1.2,
+                              ),
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              softWrap: true,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ],
             ),
@@ -329,8 +378,6 @@ class ModernMessageBubble extends StatelessWidget {
       case MessageStatus.failed:
       case MessageStatus.error:
         return Icons.error_outline;
-      default:
-        return Icons.check;
     }
   }
 
@@ -347,8 +394,6 @@ class ModernMessageBubble extends StatelessWidget {
       case MessageStatus.failed:
       case MessageStatus.error:
         return Colors.red;
-      default:
-        return Colors.grey[600]!;
     }
   }
 }

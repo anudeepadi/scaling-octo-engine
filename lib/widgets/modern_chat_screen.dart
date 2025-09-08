@@ -6,7 +6,6 @@ import '../providers/dash_chat_provider.dart';
 import '../theme/app_theme.dart';
 import '../widgets/chat_message_widget.dart';
 import '../widgets/quick_reply_widget.dart';
-import '../utils/debug_config.dart';
 
 class ModernChatScreen extends StatefulWidget {
   const ModernChatScreen({super.key});
@@ -21,7 +20,7 @@ class _ModernChatScreenState extends State<ModernChatScreen>
   final ScrollController _scrollController = ScrollController();
   final FocusNode _focusNode = FocusNode();
   bool _isComposing = false;
-  bool _showEmojiPicker = false;
+  final bool _showEmojiPicker = false;
   late AnimationController _fabAnimationController;
   late AnimationController _typingAnimationController;
 
@@ -54,7 +53,7 @@ class _ModernChatScreenState extends State<ModernChatScreen>
     setState(() {
       _isComposing = _messageController.text.trim().isNotEmpty;
     });
-    
+
     if (_isComposing) {
       _fabAnimationController.forward();
     } else {
@@ -130,7 +129,7 @@ class _ModernChatScreenState extends State<ModernChatScreen>
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const Text(
-                'QuitTXT Assistant',
+                'Quitxt Assistant',
                 style: TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.w600,
@@ -173,7 +172,7 @@ class _ModernChatScreenState extends State<ModernChatScreen>
           itemCount: dashChatProvider.messages.length,
           itemBuilder: (context, index) {
             final message = dashChatProvider.messages[index];
-            
+
             return Container(
               margin: const EdgeInsets.only(bottom: 8),
               child: _buildMessageBubble(message, dashChatProvider),
@@ -184,9 +183,10 @@ class _ModernChatScreenState extends State<ModernChatScreen>
     );
   }
 
-  Widget _buildMessageBubble(ChatMessage message, DashChatProvider dashChatProvider) {
-    final shouldShowQuickReplies = message.type == MessageType.quickReply && 
-        message.suggestedReplies != null && 
+  Widget _buildMessageBubble(
+      ChatMessage message, DashChatProvider dashChatProvider) {
+    final shouldShowQuickReplies = message.type == MessageType.quickReply &&
+        message.suggestedReplies != null &&
         message.suggestedReplies!.isNotEmpty;
 
     if (shouldShowQuickReplies) {
@@ -197,9 +197,8 @@ class _ModernChatScreenState extends State<ModernChatScreen>
             onReplyTap: () => _scrollToBottom(),
             onReactionAdd: (value) {
               if (value.isNotEmpty) {
-                dashChatProvider.handleQuickReply(
-                  QuickReply(text: value, value: value)
-                );
+                dashChatProvider
+                    .handleQuickReply(QuickReply(text: value, value: value));
               }
               _scrollToBottom();
             },
@@ -220,9 +219,8 @@ class _ModernChatScreenState extends State<ModernChatScreen>
         onReplyTap: () => _scrollToBottom(),
         onReactionAdd: (value) {
           if (value.isNotEmpty) {
-            dashChatProvider.handleQuickReply(
-              QuickReply(text: value, value: value)
-            );
+            dashChatProvider
+                .handleQuickReply(QuickReply(text: value, value: value));
           }
           _scrollToBottom();
         },
@@ -257,7 +255,7 @@ class _ModernChatScreenState extends State<ModernChatScreen>
           ),
           const SizedBox(height: 24),
           const Text(
-            'Welcome to QuitTXT! 👋',
+            'Welcome to Quitxt! 👋',
             style: TextStyle(
               fontSize: 24,
               fontWeight: FontWeight.w700,
@@ -384,7 +382,8 @@ class _ModernChatScreenState extends State<ModernChatScreen>
                         boxShadow: _isComposing
                             ? [
                                 BoxShadow(
-                                  color: AppTheme.quitxtTeal.withValues(alpha: 0.3),
+                                  color: AppTheme.quitxtTeal
+                                      .withValues(alpha: 0.3),
                                   blurRadius: 8,
                                   offset: const Offset(0, 2),
                                 ),
@@ -420,7 +419,7 @@ class _ModernChatScreenState extends State<ModernChatScreen>
     return Consumer<DashChatProvider>(
       builder: (context, dashChatProvider, child) {
         if (dashChatProvider.messages.isEmpty) return const SizedBox.shrink();
-        
+
         return FloatingActionButton.small(
           onPressed: _scrollToBottom,
           backgroundColor: AppTheme.quitxtTeal,

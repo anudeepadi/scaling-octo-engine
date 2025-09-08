@@ -12,7 +12,8 @@ class AppLocalizations {
   }
 
   // Static member to have a simple access to the delegate from the MaterialApp
-  static const LocalizationsDelegate<AppLocalizations> delegate = _AppLocalizationsDelegate();
+  static const LocalizationsDelegate<AppLocalizations> delegate =
+      _AppLocalizationsDelegate();
 
   // List of supported languages
   static final List<Locale> supportedLocales = [
@@ -47,7 +48,7 @@ class AppLocalizations {
       'password_mismatch': 'Passwords do not match',
 
       // Home screen
-      'app_title': 'QuitTXT Mobile',
+      'app_title': 'Quitxt Mobile',
       'type_message': 'Type a message...',
       'send': 'SEND',
 
@@ -55,7 +56,7 @@ class AppLocalizations {
       'profile': 'Profile',
       'chat': 'Chat',
       'exit': 'Exit',
-      
+
       // Profile screen
       'user': 'User',
       'last_access_time': 'Last access time',
@@ -63,7 +64,7 @@ class AppLocalizations {
       'user_id': 'User ID',
       'language': 'Language',
       'sign_out': 'Sign Out',
-      
+
       // Chat messages
       'quit_ready': 'Are you ready to quit smoking tomorrow?',
       'yes_do_it': 'Yes, let\'s do it!',
@@ -72,15 +73,16 @@ class AppLocalizations {
       'better_health': 'Better Health',
       'save_money': 'Save Money',
       'more_energy': 'More Energy',
-      
+
       // Clear messages feature
       'clear_all_messages': 'Clear All Messages',
       'clear_messages_title': 'Clear All Messages',
-      'clear_messages_confirmation': 'Are you sure you want to delete all messages? This action cannot be undone.',
+      'clear_messages_confirmation':
+          'Are you sure you want to delete all messages? This action cannot be undone.',
       'cancel': 'Cancel',
       'clear': 'Clear',
       'messages_cleared': 'All messages have been cleared',
-      
+
       // Error messages
       'error': 'Error',
       'ok': 'OK',
@@ -110,7 +112,7 @@ class AppLocalizations {
       'password_mismatch': 'Las contraseñas no coinciden',
 
       // Home screen
-      'app_title': 'QuitTXT Móvil',
+      'app_title': 'Quitxt Móvil',
       'type_message': 'Escribe un mensaje...',
       'send': 'ENVIAR',
 
@@ -118,7 +120,7 @@ class AppLocalizations {
       'profile': 'Perfil',
       'chat': 'Chat',
       'exit': 'Salir',
-      
+
       // Profile screen
       'user': 'Usuario',
       'last_access_time': 'Último acceso',
@@ -126,7 +128,7 @@ class AppLocalizations {
       'user_id': 'ID de usuario',
       'language': 'Idioma',
       'sign_out': 'Cerrar Sesión',
-      
+
       // Chat messages
       'quit_ready': '¿Estás listo para dejar de fumar mañana?',
       'yes_do_it': '¡Sí, hagámoslo!',
@@ -135,31 +137,34 @@ class AppLocalizations {
       'better_health': 'Mejor Salud',
       'save_money': 'Ahorrar Dinero',
       'more_energy': 'Más Energía',
-      
+
       // Clear messages feature
       'clear_all_messages': 'Borrar Todos los Mensajes',
       'clear_messages_title': 'Borrar Todos los Mensajes',
-      'clear_messages_confirmation': '¿Estás seguro de que deseas eliminar todos los mensajes? Esta acción no se puede deshacer.',
+      'clear_messages_confirmation':
+          '¿Estás seguro de que deseas eliminar todos los mensajes? Esta acción no se puede deshacer.',
       'cancel': 'Cancelar',
       'clear': 'Borrar',
       'messages_cleared': 'Todos los mensajes han sido borrados',
-      
+
       // Error messages
       'error': 'Error',
       'ok': 'Aceptar',
     },
   };
 
-  String get appTitle => _localizedValues[locale.languageCode]?['app_title'] ?? 'QuitTXT Mobile';
-  
+  String get appTitle =>
+      _localizedValues[locale.languageCode]?['app_title'] ?? 'Quitxt Mobile';
+
   String translate(String key) {
-    return _localizedValues[locale.languageCode]?[key] ?? 
-           _localizedValues['en']?[key] ?? 
-           key;
+    return _localizedValues[locale.languageCode]?[key] ??
+        _localizedValues['en']?[key] ??
+        key;
   }
 }
 
-class _AppLocalizationsDelegate extends LocalizationsDelegate<AppLocalizations> {
+class _AppLocalizationsDelegate
+    extends LocalizationsDelegate<AppLocalizations> {
   const _AppLocalizationsDelegate();
 
   @override

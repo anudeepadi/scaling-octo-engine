@@ -4,7 +4,6 @@ import '../models/chat_message.dart';
 import '../models/quick_reply.dart';
 import '../services/dash_messaging_service.dart';
 import '../services/firebase_messaging_service.dart';
-import '../services/emoji_converter_service.dart';
 import '../utils/debug_config.dart';
 import 'chat_provider.dart';
 import 'package:firebase_auth/firebase_auth.dart';

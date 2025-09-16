@@ -23,6 +23,14 @@
           }
         },
         {
+          "client_id": "560333483278-6vbusb0jkohg152h504pilfbl48fouh7.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.utsascns.quitTxTapp",
+            "certificate_hash": "3fdb0b569025830e67dd72ab76915fbae1656280"
+          }
+        },
+        {
           "client_id": "560333483278-shfouvf0c8gc6pqlq9ovtk2586aa16te.apps.googleusercontent.com",
           "client_type": 3
         }

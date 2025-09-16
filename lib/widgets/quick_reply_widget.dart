@@ -130,37 +130,6 @@ class _QuickReplyWidgetState extends State<QuickReplyWidget> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Header
-          Padding(
-            padding: const EdgeInsets.only(bottom: 16, left: 4),
-            child: Row(
-              children: [
-                Container(
-                  width: 4,
-                  height: 20,
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: AppTheme.wellnessGradient,
-                      begin: Alignment.topCenter,
-                      end: Alignment.bottomCenter,
-                    ),
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Text(
-                  'Quick Replies',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w700,
-                    color: AppTheme.textPrimary,
-                    letterSpacing: -0.25,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          
           // Quick reply buttons in vertical layout, sorted ascending
           Column(
             children: _getSortedQuickReplies().map((reply) {

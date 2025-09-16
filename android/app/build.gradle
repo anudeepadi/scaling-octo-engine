@@ -51,7 +51,7 @@ android {
     defaultConfig {
         applicationId "com.utsascns.quitTxTapp"
         minSdkVersion 23
-        targetSdkVersion 34
+        targetSdkVersion 35
         versionCode flutterVersionCode.toInteger()
         versionName flutterVersionName
         multiDexEnabled true

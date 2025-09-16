@@ -160,11 +160,11 @@ class UserProfile {
       'reasonsForQuitting': reasonsForQuitting,
       'supportNetwork': supportNetwork.map((e) => e.name).toList(),
       'readinessToQuit': readinessToQuit?.name,
-      'dailyChatTime': dailyChatTime != null ? '${dailyChatTime!.hour}:${dailyChatTime!.minute}' : null,
+      'dailyChatTime': dailyChatTime != null ? '${dailyChatTime!.hour}:${dailyChatTime!.minute.toString().padLeft(2, '0')}' : null,
       'quitDate': quitDate?.toIso8601String(),
       'notificationsEnabled': notificationsEnabled,
-      'notificationStartTime': notificationStartTime != null ? '${notificationStartTime!.hour}:${notificationStartTime!.minute}' : null,
-      'notificationEndTime': notificationEndTime != null ? '${notificationEndTime!.hour}:${notificationEndTime!.minute}' : null,
+      'notificationStartTime': notificationStartTime != null ? '${notificationStartTime!.hour}:${notificationStartTime!.minute.toString().padLeft(2, '0')}' : null,
+      'notificationEndTime': notificationEndTime != null ? '${notificationEndTime!.hour}:${notificationEndTime!.minute.toString().padLeft(2, '0')}' : null,
       'highContrastMode': highContrastMode,
       'actualQuitDate': actualQuitDate?.toIso8601String(),
       'daysSmokeFree': daysSmokeFree,
@@ -228,11 +228,35 @@ class UserProfile {
   }
 
   static TimeOfDay _parseTimeOfDay(String timeString) {
-    final parts = timeString.split(':');
-    return TimeOfDay(
-      hour: int.parse(parts[0]),
-      minute: int.parse(parts[1]),
-    );
+    // Handle both "8:30" and "830" formats
+    if (timeString.contains(':')) {
+      final parts = timeString.split(':');
+      return TimeOfDay(
+        hour: int.parse(parts[0]),
+        minute: int.parse(parts[1]),
+      );
+    } else {
+      // Handle "830" format - assume it's HHMM or HMM
+      if (timeString.length == 3) {
+        // Format like "830" -> hour=8, minute=30
+        return TimeOfDay(
+          hour: int.parse(timeString.substring(0, 1)),
+          minute: int.parse(timeString.substring(1)),
+        );
+      } else if (timeString.length == 4) {
+        // Format like "1130" -> hour=11, minute=30
+        return TimeOfDay(
+          hour: int.parse(timeString.substring(0, 2)),
+          minute: int.parse(timeString.substring(2)),
+        );
+      } else {
+        // Fallback: assume it's just hours
+        return TimeOfDay(
+          hour: int.parse(timeString),
+          minute: 0,
+        );
+      }
+    }
   }
 
   // Helper methods

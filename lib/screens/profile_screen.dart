@@ -5,6 +5,7 @@ import '../providers/language_provider.dart';
 import '../providers/user_profile_provider.dart';
 import '../theme/app_theme.dart';
 import '../utils/app_localizations.dart';
+import 'login_screen.dart';
 
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key});
@@ -333,8 +334,14 @@ class ProfileScreen extends StatelessWidget {
         ],
       ),
       child: ElevatedButton(
-        onPressed: () {
-          authProvider.signOut();
+        onPressed: () async {
+          await authProvider.signOut();
+          if (context.mounted) {
+            Navigator.of(context).pushAndRemoveUntil(
+              MaterialPageRoute(builder: (context) => const LoginScreen()),
+              (route) => false,
+            );
+          }
         },
         style: ElevatedButton.styleFrom(
           backgroundColor: Colors.red.shade600,

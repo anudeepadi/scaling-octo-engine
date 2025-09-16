@@ -74,7 +74,7 @@ class AppErrorBoundary extends StatelessWidget {
                   ),
                   const SizedBox(height: 16),
                   const Text(
-                    'Initializing app services...',
+                    'Your Health Companion',
                     style: TextStyle(
                       fontSize: 18,
                       color: Colors.black54,
@@ -82,14 +82,6 @@ class AppErrorBoundary extends StatelessWidget {
                   ),
                   const SizedBox(height: 32),
                   const CircularProgressIndicator(),
-                  const SizedBox(height: 24),
-                  Text(
-                    'Starting Firebase connection',
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: Colors.grey[600],
-                    ),
-                  ),
                 ],
               ),
             ),
@@ -265,7 +257,7 @@ void main() async {
 
     // Show error boundary instead of crashing
     runApp(AppErrorBoundary(
-      error: 'Initializing app services...',
+      error: 'Loading...',
       child: const MyApp(),
     ));
 

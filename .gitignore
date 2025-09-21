@@ -67,4 +67,9 @@ node_modules/
 
 # Task files
 # tasks.json
-# tasks/ 
+# tasks/
+
+# BMAD-METHOD
+.bmad-core/
+.bmad/
+bmad-config.json 

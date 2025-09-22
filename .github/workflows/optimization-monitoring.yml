@@ -1,0 +1,131 @@
+name: Optimization Monitoring
+
+on:
+  push:
+    branches: [ main, master, new_ui ]
+  pull_request:
+    branches: [ main, master ]
+  schedule:
+    # Run daily monitoring at 9 AM UTC
+    - cron: '0 9 * * *'
+
+jobs:
+  optimization-tracking:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup Flutter
+      uses: subosito/flutter-action@v2
+      with:
+        flutter-version: '3.16.0'
+        channel: 'stable'
+        
+    - name: Get dependencies
+      run: flutter pub get
+      
+    - name: Run optimization monitoring
+      run: |
+        chmod +x scripts/optimization_monitor.sh
+        ./scripts/optimization_monitor.sh --with-tests
+        
+    - name: Run performance tests
+      run: flutter test test/performance/optimization_tests.dart --reporter=json > performance_results.json
+      continue-on-error: true
+      
+    - name: Archive performance results
+      uses: actions/upload-artifact@v3
+      with:
+        name: performance-results
+        path: |
+          performance_results.json
+          OPTIMIZATION_PROGRESS_REPORT.md
+          
+    - name: Comment PR with performance results
+      if: github.event_name == 'pull_request'
+      uses: actions/github-script@v6
+      with:
+        script: |
+          const fs = require('fs');
+          
+          // Read performance report if it exists
+          let reportContent = '';
+          try {
+            reportContent = fs.readFileSync('OPTIMIZATION_PROGRESS_REPORT.md', 'utf8');
+          } catch (error) {
+            reportContent = 'Performance report not available';
+          }
+          
+          // Create comment body
+          const comment = `## 🔍 Optimization Monitoring Report
+          
+          ${reportContent}
+          
+          ---
+          *Automated optimization monitoring for QuitTxt*`;
+          
+          // Post comment on PR
+          github.rest.issues.createComment({
+            issue_number: context.issue.number,
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            body: comment
+          });
+          
+  performance-regression-check:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup Flutter
+      uses: subosito/flutter-action@v2
+      with:
+        flutter-version: '3.16.0'
+        channel: 'stable'
+        
+    - name: Get dependencies
+      run: flutter pub get
+      
+    - name: Run baseline performance tests
+      run: |
+        flutter test test/performance/optimization_tests.dart --reporter=json > baseline_performance.json
+      continue-on-error: true
+      
+    - name: Checkout base branch
+      run: |
+        git fetch origin ${{ github.base_ref }}
+        git checkout origin/${{ github.base_ref }}
+        
+    - name: Get dependencies (base)
+      run: flutter pub get
+      
+    - name: Run base performance tests
+      run: |
+        flutter test test/performance/optimization_tests.dart --reporter=json > base_performance.json
+      continue-on-error: true
+      
+    - name: Compare performance
+      run: |
+        echo "## Performance Comparison" > performance_comparison.md
+        echo "Comparing performance between base branch and PR..." >> performance_comparison.md
+        echo "" >> performance_comparison.md
+        echo "### Baseline (PR branch)" >> performance_comparison.md
+        echo '```json' >> performance_comparison.md
+        cat baseline_performance.json >> performance_comparison.md || echo "No baseline results" >> performance_comparison.md
+        echo '```' >> performance_comparison.md
+        echo "" >> performance_comparison.md
+        echo "### Base (target branch)" >> performance_comparison.md
+        echo '```json' >> performance_comparison.md
+        cat base_performance.json >> performance_comparison.md || echo "No base results" >> performance_comparison.md
+        echo '```' >> performance_comparison.md
+        
+    - name: Upload comparison results
+      uses: actions/upload-artifact@v3
+      with:
+        name: performance-comparison
+        path: performance_comparison.md

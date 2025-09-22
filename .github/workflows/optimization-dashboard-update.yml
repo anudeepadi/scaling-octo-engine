@@ -1,0 +1,283 @@
+name: Optimization Dashboard Update
+
+on:
+  push:
+    branches: [ main, master, new_ui ]
+    paths:
+      - 'lib/**/*.dart'
+      - 'pubspec.yaml'
+      - 'test/**/*.dart'
+  pull_request:
+    branches: [ main, master ]
+  schedule:
+    # Update dashboard twice daily (9 AM and 6 PM UTC)
+    - cron: '0 9,18 * * *'
+  workflow_dispatch:
+    inputs:
+      commit_changes:
+        description: 'Commit dashboard updates'
+        required: false
+        default: 'false'
+        type: boolean
+
+jobs:
+  update-dashboard:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        token: ${{ secrets.GITHUB_TOKEN }}
+        
+    - name: Setup Flutter
+      uses: subosito/flutter-action@v2
+      with:
+        flutter-version: '3.16.0'
+        channel: 'stable'
+        
+    - name: Get dependencies
+      run: flutter pub get
+      
+    - name: Run optimization dashboard update
+      run: |
+        chmod +x scripts/update_optimization_dashboard.sh
+        ./scripts/update_optimization_dashboard.sh
+        
+    - name: Archive dashboard reports
+      uses: actions/upload-artifact@v3
+      with:
+        name: optimization-reports
+        path: |
+          OPTIMIZATION_DASHBOARD.md
+          OPTIMIZATION_STATUS_REPORT.md
+          OPTIMIZATION_PROGRESS_REPORT.md
+          
+    - name: Generate dashboard summary for PR
+      if: github.event_name == 'pull_request'
+      run: |
+        echo "## 📊 Optimization Dashboard Update" > dashboard_summary.md
+        echo "" >> dashboard_summary.md
+        
+        # Extract key metrics from status report
+        if [ -f "OPTIMIZATION_STATUS_REPORT.md" ]; then
+          echo "### Current Status" >> dashboard_summary.md
+          grep -A 10 "Executive Summary" OPTIMIZATION_STATUS_REPORT.md >> dashboard_summary.md || true
+          echo "" >> dashboard_summary.md
+          
+          echo "### Critical Issues Progress" >> dashboard_summary.md
+          grep -A 15 "Critical Issues Status" OPTIMIZATION_STATUS_REPORT.md >> dashboard_summary.md || true
+          echo "" >> dashboard_summary.md
+        fi
+        
+        # Add performance test results if available
+        if [ -f "/tmp/performance_results.json" ]; then
+          echo "### Performance Test Results" >> dashboard_summary.md
+          echo '```json' >> dashboard_summary.md
+          head -20 /tmp/performance_results.json >> dashboard_summary.md || true
+          echo '```' >> dashboard_summary.md
+          echo "" >> dashboard_summary.md
+        fi
+        
+        echo "### Next Actions" >> dashboard_summary.md
+        echo "- Check detailed dashboard: [OPTIMIZATION_DASHBOARD.md](./OPTIMIZATION_DASHBOARD.md)" >> dashboard_summary.md
+        echo "- View status report: [OPTIMIZATION_STATUS_REPORT.md](./OPTIMIZATION_STATUS_REPORT.md)" >> dashboard_summary.md
+        echo "- Monitor performance: Run \`flutter test test/performance/optimization_tests.dart\`" >> dashboard_summary.md
+        
+    - name: Comment PR with dashboard summary
+      if: github.event_name == 'pull_request'
+      uses: actions/github-script@v6
+      with:
+        script: |
+          const fs = require('fs');
+          
+          let summaryContent = '';
+          try {
+            summaryContent = fs.readFileSync('dashboard_summary.md', 'utf8');
+          } catch (error) {
+            summaryContent = '## 📊 Optimization Dashboard Update\n\nDashboard update completed. Check the uploaded artifacts for detailed reports.';
+          }
+          
+          // Find existing comment
+          const comments = await github.rest.issues.listComments({
+            issue_number: context.issue.number,
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+          });
+          
+          const existingComment = comments.data.find(comment => 
+            comment.body.includes('📊 Optimization Dashboard Update')
+          );
+          
+          if (existingComment) {
+            // Update existing comment
+            await github.rest.issues.updateComment({
+              comment_id: existingComment.id,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: summaryContent
+            });
+          } else {
+            // Create new comment
+            await github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: summaryContent
+            });
+          }
+          
+    - name: Commit dashboard updates
+      if: |
+        (github.event_name == 'push' && github.ref == 'refs/heads/new_ui') ||
+        (github.event_name == 'workflow_dispatch' && github.event.inputs.commit_changes == 'true') ||
+        github.event_name == 'schedule'
+      run: |
+        git config --local user.email "action@github.com"
+        git config --local user.name "GitHub Action"
+        
+        # Check if there are changes to commit
+        if git diff --quiet OPTIMIZATION_*.md; then
+          echo "No changes to commit"
+        else
+          git add OPTIMIZATION_*.md
+          git commit -m "🤖 Auto-update optimization dashboard
+          
+          - Updated progress metrics and task statuses
+          - Generated automated status report  
+          - Analyzed code for completion indicators
+          
+          Generated by GitHub Actions on $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
+          
+          git push
+          echo "Dashboard updates committed and pushed"
+        fi
+        
+  performance-benchmarks:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup Flutter
+      uses: subosito/flutter-action@v2
+      with:
+        flutter-version: '3.16.0'
+        channel: 'stable'
+        
+    - name: Get dependencies
+      run: flutter pub get
+      
+    - name: Run performance benchmarks
+      run: |
+        # Create performance benchmark results
+        echo "## 📈 Performance Benchmarks" > performance_benchmarks.md
+        echo "" >> performance_benchmarks.md
+        echo "**Branch**: \`${{ github.head_ref }}\`" >> performance_benchmarks.md
+        echo "**Commit**: \`${{ github.sha }}\`" >> performance_benchmarks.md
+        echo "**Date**: $(date -u '+%Y-%m-%d %H:%M:%S UTC')" >> performance_benchmarks.md
+        echo "" >> performance_benchmarks.md
+        
+        # Run Flutter analyze
+        echo "### Static Analysis" >> performance_benchmarks.md
+        echo '```' >> performance_benchmarks.md
+        flutter analyze --no-congratulate >> performance_benchmarks.md 2>&1 || true
+        echo '```' >> performance_benchmarks.md
+        echo "" >> performance_benchmarks.md
+        
+        # Run performance tests if they exist
+        if [ -f "test/performance/optimization_tests.dart" ]; then
+          echo "### Performance Tests" >> performance_benchmarks.md
+          echo '```' >> performance_benchmarks.md
+          flutter test test/performance/optimization_tests.dart --reporter=expanded >> performance_benchmarks.md 2>&1 || true
+          echo '```' >> performance_benchmarks.md
+          echo "" >> performance_benchmarks.md
+        fi
+        
+        # Check optimization progress
+        echo "### Optimization Progress" >> performance_benchmarks.md
+        ./scripts/update_optimization_dashboard.sh >> performance_benchmarks.md 2>&1 || true
+        
+    - name: Upload performance benchmarks
+      uses: actions/upload-artifact@v3
+      with:
+        name: performance-benchmarks
+        path: performance_benchmarks.md
+        
+  dashboard-validation:
+    runs-on: ubuntu-latest
+    needs: update-dashboard
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Download dashboard reports
+      uses: actions/download-artifact@v3
+      with:
+        name: optimization-reports
+        
+    - name: Validate dashboard integrity
+      run: |
+        echo "🔍 Validating dashboard integrity..."
+        
+        # Check required files exist
+        required_files=("OPTIMIZATION_DASHBOARD.md" "OPTIMIZATION_STATUS_REPORT.md")
+        for file in "${required_files[@]}"; do
+          if [ ! -f "$file" ]; then
+            echo "❌ Missing required file: $file"
+            exit 1
+          fi
+          echo "✅ Found: $file"
+        done
+        
+        # Validate dashboard structure
+        if grep -q "Executive Summary" OPTIMIZATION_DASHBOARD.md; then
+          echo "✅ Dashboard has Executive Summary"
+        else
+          echo "❌ Dashboard missing Executive Summary"
+          exit 1
+        fi
+        
+        if grep -q "Critical Performance Issues" OPTIMIZATION_DASHBOARD.md; then
+          echo "✅ Dashboard has Critical Issues section"
+        else
+          echo "❌ Dashboard missing Critical Issues section"
+          exit 1
+        fi
+        
+        # Validate metrics format
+        if grep -q "Overall Progress.*%" OPTIMIZATION_STATUS_REPORT.md; then
+          echo "✅ Status report has progress metrics"
+        else
+          echo "❌ Status report missing progress metrics"
+          exit 1
+        fi
+        
+        echo "🎉 Dashboard validation completed successfully"
+        
+    - name: Create validation summary
+      run: |
+        echo "## ✅ Dashboard Validation Results" > validation_summary.md
+        echo "" >> validation_summary.md
+        echo "**Validation Date**: $(date -u '+%Y-%m-%d %H:%M:%S UTC')" >> validation_summary.md
+        echo "**Status**: PASSED" >> validation_summary.md
+        echo "" >> validation_summary.md
+        echo "### Validated Components" >> validation_summary.md
+        echo "- ✅ Dashboard file structure" >> validation_summary.md
+        echo "- ✅ Required sections present" >> validation_summary.md  
+        echo "- ✅ Progress metrics format" >> validation_summary.md
+        echo "- ✅ Status report generation" >> validation_summary.md
+        echo "" >> validation_summary.md
+        echo "### Next Steps" >> validation_summary.md
+        echo "1. Review dashboard updates in OPTIMIZATION_DASHBOARD.md" >> validation_summary.md
+        echo "2. Check status report in OPTIMIZATION_STATUS_REPORT.md" >> validation_summary.md
+        echo "3. Monitor optimization progress" >> validation_summary.md
+        
+    - name: Upload validation results
+      uses: actions/upload-artifact@v3
+      with:
+        name: validation-results
+        path: validation_summary.md

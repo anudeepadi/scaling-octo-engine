@@ -1,4 +1,4 @@
-# QuitTXT Modern Health Design System
+# Quitxt Modern Health Design System
 
 ## Overview
 

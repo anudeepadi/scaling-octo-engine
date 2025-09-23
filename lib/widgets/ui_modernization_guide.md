@@ -1,4 +1,4 @@
-# 🎨 UI Modernization Guide for QuitTXT Chat
+# 🎨 UI Modernization Guide for Quitxt Chat
 
 ## 📱 Current UI Analysis
 

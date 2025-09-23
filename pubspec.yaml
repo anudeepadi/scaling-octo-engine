@@ -53,6 +53,7 @@ dev_dependencies:
   mockito: ^5.4.4
   build_runner: ^2.4.9
   test: ^1.25.2
+  flutter_launcher_icons: ^0.13.1
 
 flutter:
   uses-material-design: true
@@ -62,3 +63,21 @@ flutter:
     - assets/logos/
     - assets/gifs/
     - lib/l10n/
+
+flutter_launcher_icons:
+  android: "launcher_icon"
+  ios: true
+  image_path: "assets/logos/avatar high rez.jpg"
+  min_sdk_android: 21 # android min sdk min:16, default 21
+  web:
+    generate: true
+    image_path: "assets/logos/avatar high rez.jpg"
+    background_color: "#hexcode"
+    theme_color: "#hexcode"
+  windows:
+    generate: true
+    image_path: "assets/logos/avatar high rez.jpg"
+    icon_size: 48 # min:48, max:256, default: 48
+  macos:
+    generate: true
+    image_path: "assets/logos/avatar high rez.jpg"

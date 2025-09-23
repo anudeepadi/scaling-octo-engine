@@ -138,17 +138,23 @@ class HelpScreen extends StatelessWidget {
             width: 48,
             height: 48,
             decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: [AppTheme.primaryBlue, AppTheme.wellnessGreen],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
               borderRadius: BorderRadius.circular(12),
+              boxShadow: [
+                BoxShadow(
+                  color: AppTheme.shadowSubtle,
+                  blurRadius: 8,
+                  offset: const Offset(0, 2),
+                ),
+              ],
             ),
-            child: const Icon(
-              Icons.help_outline_rounded,
-              color: Colors.white,
-              size: 24,
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(12),
+              child: Image.asset(
+                'assets/logos/avatar high rez.jpg',
+                width: 48,
+                height: 48,
+                fit: BoxFit.cover,
+              ),
             ),
           ),
           const SizedBox(height: 12),
@@ -182,6 +188,20 @@ class HelpScreen extends StatelessWidget {
     Color accentColor,
     List<Map<String, String>> keywords,
   ) {
+    // Separate English and Spanish keywords
+    final englishKeywords = <Map<String, String>>[];
+    final spanishKeywords = <Map<String, String>>[];
+    
+    for (final keyword in keywords) {
+      final label = keyword['label']!;
+      // Check if the label contains Spanish characters or is a common Spanish word
+      if (_isSpanishKeyword(label)) {
+        spanishKeywords.add(keyword);
+      } else {
+        englishKeywords.add(keyword);
+      }
+    }
+
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(20),
@@ -226,21 +246,97 @@ class HelpScreen extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 16),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: keywords.map((keywordData) {
-              return _buildKeywordChip(
-                context,
-                keywordData['keyword']!,
-                keywordData['label']!,
-                keywordData['description']!,
-                accentColor,
-              );
-            }).toList(),
-          ),
+          // English keywords
+          if (englishKeywords.isNotEmpty) ...[
+            _buildLanguageLabel('English', accentColor),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: englishKeywords.map((keywordData) {
+                return _buildKeywordChip(
+                  context,
+                  keywordData['keyword']!,
+                  keywordData['label']!,
+                  keywordData['description']!,
+                  accentColor,
+                );
+              }).toList(),
+            ),
+          ],
+          // Separator between English and Spanish
+          if (englishKeywords.isNotEmpty && spanishKeywords.isNotEmpty) ...[
+            const SizedBox(height: 16),
+            Container(
+              height: 1,
+              margin: const EdgeInsets.symmetric(horizontal: 8),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    Colors.transparent,
+                    accentColor.withValues(alpha: 0.3),
+                    Colors.transparent,
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+          ],
+          // Spanish keywords
+          if (spanishKeywords.isNotEmpty) ...[
+            _buildLanguageLabel('Español', accentColor),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: spanishKeywords.map((keywordData) {
+                return _buildKeywordChip(
+                  context,
+                  keywordData['keyword']!,
+                  keywordData['label']!,
+                  keywordData['description']!,
+                  accentColor,
+                );
+              }).toList(),
+            ),
+          ],
         ],
       ),
+    );
+  }
+
+  bool _isSpanishKeyword(String label) {
+    // List of Spanish keywords and characters to identify Spanish language
+    final spanishIndicators = [
+      'Ayuda', 'Ahora', 'Antojo', 'Estrés', 'Mal Humor', 'Recaída', 
+      'Fumadores', 'Motivación', 'é', 'ñ', 'ó', 'í', 'á', 'ú'
+    ];
+    
+    return spanishIndicators.any((indicator) => label.contains(indicator));
+  }
+
+  Widget _buildLanguageLabel(String language, Color accentColor) {
+    return Row(
+      children: [
+        Container(
+          width: 4,
+          height: 12,
+          decoration: BoxDecoration(
+            color: accentColor,
+            borderRadius: BorderRadius.circular(2),
+          ),
+        ),
+        const SizedBox(width: 8),
+        Text(
+          language,
+          style: TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w600,
+            color: accentColor,
+            letterSpacing: 0.5,
+          ),
+        ),
+      ],
     );
   }
 

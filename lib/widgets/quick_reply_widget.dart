@@ -88,6 +88,22 @@ class _QuickReplyWidgetState extends State<QuickReplyWidget> {
     widget.onReplySelected(reply);
   }
 
+  String _formatTimeDisplay(String text) {
+    // Check if the text is a 3 or 4 digit time format (like 815, 830, 845, 900)
+    RegExp timeRegex = RegExp(r'^\d{3,4}$');
+    if (timeRegex.hasMatch(text)) {
+      // Convert to time format (8:15, 8:30, 8:45, 9:00)
+      if (text.length == 3) {
+        // Handle 3-digit times like 815 -> 8:15
+        return '${text[0]}:${text.substring(1)}';
+      } else if (text.length == 4) {
+        // Handle 4-digit times like 1015 -> 10:15
+        return '${text.substring(0, 2)}:${text.substring(2)}';
+      }
+    }
+    return text; // Return original text if not a time format
+  }
+
   List<QuickReply> _getSortedQuickReplies() {
     // Create a copy of the list to avoid modifying the original
     List<QuickReply> sortedReplies = List.from(widget.quickReplies);
@@ -199,7 +215,7 @@ class _QuickReplyWidgetState extends State<QuickReplyWidget> {
               children: [
                 Expanded(
                   child: Text(
-                    reply.text,
+                    _formatTimeDisplay(reply.text),
                     style: TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.w600,
@@ -251,7 +267,7 @@ class _QuickReplyWidgetState extends State<QuickReplyWidget> {
               ),
             ),
           Text(
-            reply.text,
+            _formatTimeDisplay(reply.text),
             style: TextStyle(
               color: isGreyedOut
                   ? CupertinoColors.systemGrey2 // Greyed out text
@@ -296,7 +312,7 @@ class _QuickReplyWidgetState extends State<QuickReplyWidget> {
               ),
             ),
           Text(
-            reply.text,
+            _formatTimeDisplay(reply.text),
             style: TextStyle(
               color: isGreyedOut 
                   ? Colors.grey[600] // Greyed out text

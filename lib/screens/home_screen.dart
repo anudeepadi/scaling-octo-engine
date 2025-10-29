@@ -7,11 +7,9 @@ import '../providers/chat_provider.dart';
 import '../providers/dash_chat_provider.dart';
 import '../providers/user_profile_provider.dart';
 import '../services/media_picker_service.dart';
-import '../services/dash_messaging_service.dart';
 import '../services/gif_service.dart';
 import '../widgets/chat_message_widget.dart';
 import '../widgets/quick_reply_widget.dart';
-import '../widgets/quit_day_debug_panel.dart';
 import '../theme/app_theme.dart';
 import 'profile_screen.dart';
 import 'about_screen.dart';
@@ -764,14 +762,12 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         ],
       ),
       drawer: _buildDrawer(),
-      body: Stack(
+      body: Column(
         children: [
-          Column(
-            children: [
-              Expanded(
-                child: Container(
-                  color: AppTheme.backgroundSecondary,
-                  child: Consumer<DashChatProvider>(
+          Expanded(
+            child: Container(
+              color: AppTheme.backgroundSecondary,
+              child: Consumer<DashChatProvider>(
                 builder: (context, dashChatProvider, child) {
                   WidgetsBinding.instance.addPostFrameCallback((_) {
                     if (dashChatProvider.messages.isNotEmpty) {
@@ -914,17 +910,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             ),
           ),
           _buildMessageInput(),
-        ],
-      ),
-          // Debug panel for testing quit days (only shows in debug mode)
-          Consumer<AuthProvider>(
-            builder: (context, authProvider, child) {
-              return QuitDayDebugPanel(
-                userId: authProvider.currentUser?.uid,
-                serverUrl: DashMessagingService().hostUrl,
-              );
-            },
-          ),
         ],
       ),
     );

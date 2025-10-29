@@ -66,24 +66,32 @@ class _QuickReplyWidgetState extends State<QuickReplyWidget> {
   }
 
   void _handleQuickReplyTap(QuickReply reply) {
+    print('[HandleQuickReply] Selected reply: text=\'${reply.text}\', value=\'${reply.value}\'');
+
     // If no messageId provided, use old behavior (single selection)
     if (widget.messageId == null) {
+      print('[HandleQuickReply] No messageId, using old behavior');
       widget.onReplySelected(reply);
       return;
     }
 
     // Check if any option has already been selected for this message
     if (_quickReplyService.isMessageSetDisabled(widget.messageId!)) {
+      print('[HandleQuickReply] Message ${widget.messageId} already has selection, showing dialog');
       _showAlreadySelectedDialog();
       return;
     }
-    
+
+    print('[HandleQuickReply] Saving selection for message ${widget.messageId}: ${reply.value}');
+
     // Select this option and disable all others in the set
     _quickReplyService.selectQuickReply(widget.messageId!, reply.value);
-    
+
     // Trigger UI update
-    setState(() {});
-    
+    setState(() {
+      print('[HandleQuickReply] setState triggered for UI update');
+    });
+
     // Call the original callback
     widget.onReplySelected(reply);
   }
@@ -149,11 +157,15 @@ class _QuickReplyWidgetState extends State<QuickReplyWidget> {
           // Quick reply buttons in vertical layout, sorted ascending
           Column(
             children: _getSortedQuickReplies().map((reply) {
-              final bool isSelected = widget.messageId != null && 
+              final bool isSelected = widget.messageId != null &&
                   _quickReplyService.isQuickReplySelected(widget.messageId!, reply.value);
-              final bool isDisabled = widget.messageId != null && 
+              final bool isDisabled = widget.messageId != null &&
                   _quickReplyService.isOptionDisabled(widget.messageId!, reply.value);
-              
+
+              if (isSelected || isDisabled) {
+                print('[QuickReply] Rendering ${reply.text}: isSelected=$isSelected, isDisabled=$isDisabled');
+              }
+
               return Padding(
                 padding: const EdgeInsets.only(bottom: 8),
                 child: _buildModernQuickReply(reply, isSelected, isDisabled),

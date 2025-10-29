@@ -87,11 +87,18 @@ class DashMessagingService implements MessagingService {
   // Add cache management
   final Map<String, ChatMessage> _messageCache = {};
 
+  // Deduplication cache to prevent duplicate quick reply buttons on retry
+  // Maps "content|reply1|reply2..." to the original message ID
+  final Map<String, String> _messageContentCache = {};
+
   // Add performance monitoring
   final Stopwatch _performanceStopwatch = Stopwatch();
 
   // Debug flag for message alignment logging
   static const bool _debugMessageAlignment = true; // Set to false in production
+
+  // Filter messages older than this many days to prevent legacy messages
+  static const int _maxMessageAgeDays = 30;
 
   void _startPerformanceTimer(String operation) {
     _performanceStopwatch.reset();
@@ -116,7 +123,41 @@ class DashMessagingService implements MessagingService {
 
   void clearCache() {
     _messageCache.clear();
+    _messageContentCache.clear();
     DebugConfig.debugPrint('Message cache cleared');
+  }
+
+  // Generate deduplication key from message content and quick replies
+  String _generateMessageKey(String content, List<QuickReply>? quickReplies) {
+    if (quickReplies == null || quickReplies.isEmpty) {
+      return content;
+    }
+    final replyValues = quickReplies.map((r) => r.value).join('|');
+    return '$content|$replyValues';
+  }
+
+  // Check if a message with the same content and quick replies already exists
+  bool _isDuplicateMessage(String content, List<QuickReply>? quickReplies) {
+    final key = _generateMessageKey(content, quickReplies);
+    return _messageContentCache.containsKey(key);
+  }
+
+  // Register message in content cache to prevent duplicates
+  void _registerMessage(String messageId, String content, List<QuickReply>? quickReplies) {
+    final key = _generateMessageKey(content, quickReplies);
+    _messageContentCache[key] = messageId;
+  }
+
+  // Check if message is too old and should be filtered out
+  bool _isMessageTooOld(DateTime timestamp) {
+    final now = DateTime.now();
+    final age = now.difference(timestamp);
+    final tooOld = age.inDays > _maxMessageAgeDays;
+    if (tooOld) {
+      DebugConfig.debugPrint(
+          '🗑️  Filtering out old message (${age.inDays} days old): ${timestamp.toIso8601String()}');
+    }
+    return tooOld;
   }
 
   @override
@@ -538,6 +579,7 @@ class DashMessagingService implements MessagingService {
             final quickReplies = _extractAllQuickReplies(data);
 
             if (quickReplies.isNotEmpty) {
+              // Use server content and quick replies directly without transformation
               final message = ChatMessage(
                 id: messageId,
                 content: content,
@@ -923,6 +965,11 @@ class DashMessagingService implements MessagingService {
               // Instant timestamp - use now if not available
               final messageTimestamp = _extractTimestampFast(data);
 
+              // Filter out messages that are too old (legacy messages)
+              if (_isMessageTooOld(messageTimestamp)) {
+                continue; // Skip old messages
+              }
+
               // Quick user check - prioritize source field for reliability
               final source = data['source']?.toString() ?? '';
               final senderId = data['senderId'] ?? data['userId'] ?? '';
@@ -1051,6 +1098,14 @@ class DashMessagingService implements MessagingService {
                 }
 
                 if (quickReplies.isNotEmpty) {
+                  // Check for duplicate message (retry scenario)
+                  if (_isDuplicateMessage(messageBody, quickReplies)) {
+                    DebugConfig.debugPrint(
+                        '🔧 ⏭️  REALTIME: Skipping duplicate message (retry): "$messageBody"');
+                    continue; // Skip this duplicate message
+                  }
+
+                  // Use server content and quick replies directly without transformation
                   // Create a single message with both content and quick replies
                   final message = ChatMessage(
                     id: messageId,
@@ -1062,6 +1117,7 @@ class DashMessagingService implements MessagingService {
                   );
 
                   _messageCache[messageId] = message;
+                  _registerMessage(messageId, messageBody, quickReplies);
                   newMessages.add(message);
                   DebugConfig.debugPrint(
                       '🔧 ✅ REALTIME: Created single poll message with content and ${quickReplies.length} options: ${quickReplies.map((r) => r.text).join(", ")}');
@@ -1213,6 +1269,8 @@ class DashMessagingService implements MessagingService {
       }
 
       if (quickReplies.isNotEmpty) {
+        // Use server quick replies directly without transformation
+
         DebugConfig.debugPrint(
             '🔧 ✅ Created quick reply message with ${quickReplies.length} options: ${quickReplies.map((r) => r.text).join(", ")}');
         return ChatMessage(
@@ -1328,6 +1386,8 @@ class DashMessagingService implements MessagingService {
         return;
       }
 
+      // Use server message content directly without transformation
+
       // Create message object
       final ChatMessage message = ChatMessage(
         id: serverMessageId,
@@ -1353,6 +1413,8 @@ class DashMessagingService implements MessagingService {
         }
 
         if (quickReplies.isNotEmpty) {
+          // Use server quick replies directly without transformation
+
           // Add a separate message with quick replies
           final quickReplyMessage = ChatMessage(
             id: '${serverMessageId}_replies',
@@ -1379,6 +1441,8 @@ class DashMessagingService implements MessagingService {
           }
 
           if (quickReplies.isNotEmpty) {
+            // Use server quick replies directly without transformation
+
             // Add a separate message with quick replies
             final quickReplyMessage = ChatMessage(
               id: '${serverMessageId}_replies',
@@ -1429,8 +1493,8 @@ class DashMessagingService implements MessagingService {
 
   // Send a quick reply to the server
   Future<void> sendQuickReply(String value, String text) async {
-    DebugConfig.debugPrint('Sending quick reply: value="$value", text="$text"');
-    return sendMessage(text,
+    DebugConfig.debugPrint('Sending quick reply: value="$value", text="$text" (sending value to server)');
+    return sendMessage(value,
         metadata: {'eventTypeCode': 2, 'quickReplyValue': value});
   }
 
@@ -1460,6 +1524,8 @@ class DashMessagingService implements MessagingService {
           for (final entry in questionsAnswers.entries) {
             quickReplies.add(QuickReply(text: entry.key, value: entry.value));
           }
+
+          // Use server content and quick replies directly without transformation
 
           // Add poll message with quick replies
           final message = ChatMessage(
@@ -2353,6 +2419,8 @@ class DashMessagingService implements MessagingService {
       }
 
       if (quickReplies.isNotEmpty) {
+        // Use server content and quick replies directly without transformation
+
         DebugConfig.debugPrint(
             '🔧 ✅ UNIFIED: Created single poll message with content and ${quickReplies.length} options: ${quickReplies.map((r) => r.text).join(", ")}');
         return ChatMessage(
@@ -2511,6 +2579,8 @@ class DashMessagingService implements MessagingService {
             isMessagePoll(isPoll) || quickReplies.isNotEmpty;
 
         if (hasQuickReplyData && quickReplies.isNotEmpty) {
+          // Use server content and quick replies directly without transformation
+
           // Create a single message with both content and quick replies
           final message = ChatMessage(
             id: messageId,

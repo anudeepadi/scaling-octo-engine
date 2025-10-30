@@ -32,6 +32,7 @@ import 'services/notification_service.dart';
 import 'services/user_profile_service.dart';
 import 'services/analytics_service.dart';
 import 'services/quick_reply_state_service.dart';
+import 'services/user_registration_service.dart';
 
 // Import dotenv for environment variables
 import 'package:flutter_dotenv/flutter_dotenv.dart';
@@ -347,6 +348,22 @@ class MyApp extends StatelessWidget {
                       developer.log(
                           'Server Service initialized successfully for user: $userId',
                           name: 'App');
+
+                      // Register user with backend to ensure they can receive messages
+                      try {
+                        final serverUrl = dotenv.env['SERVER_URL'] ??
+                                       'https://dashmessaging-com.ngrok.io/scheduler/mobile-app';
+                        await UserRegistrationService.registerUser(
+                          userId: userId,
+                          serverUrl: serverUrl,
+                          fcmToken: token,
+                          email: authProvider.currentUser?.email,
+                        );
+                        developer.log('User registered with backend: $userId', name: 'App');
+                      } catch (registrationError) {
+                        developer.log('User registration failed: $registrationError', name: 'App');
+                        // Don't block user - they can still try sending messages
+                      }
                     } catch (initError) {
                       developer.log(
                           'Error initializing server service for user $userId: $initError',

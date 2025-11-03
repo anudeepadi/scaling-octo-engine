@@ -20,8 +20,7 @@ class EnvSwitcher {
           fileName = '.env.production';
           break;
       }
-      
-      // Try to load the environment file but don't fail if it doesn't exist
+
       try {
         await dotenv.load(fileName: fileName, mergeWith: {}).timeout(
           const Duration(seconds: 2),
@@ -32,8 +31,6 @@ class EnvSwitcher {
         );
       } catch (e) {
         DebugConfig.debugPrint('Could not load $fileName: $e');
-        DebugConfig.debugPrint('Continuing with default environment variables');
-        // Set default values based on environment
         if (env == Environment.development) {
           dotenv.env['SERVER_URL'] = 'http://localhost:8080';
           dotenv.env['ENV'] = 'development';
@@ -42,45 +39,41 @@ class EnvSwitcher {
           dotenv.env['ENV'] = 'production';
         }
       }
-      
-      // Save the current environment to preferences
+
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString('current_env', env.toString());
-      
+
       DebugConfig.debugPrint('Switched to ${env.toString()} environment');
-      DebugConfig.debugPrint('SERVER_URL: ${dotenv.env['SERVER_URL']}');
-      
-      // You can add app restart logic here if needed
     } catch (e) {
       DebugConfig.debugPrint('Error switching environment: $e');
     }
   }
-  
+
   static Future<Environment> getCurrentEnvironment() async {
     try {
       final prefs = await SharedPreferences.getInstance();
       final currentEnv = prefs.getString('current_env');
-      
+
       if (currentEnv == Environment.production.toString()) {
         return Environment.production;
       }
-      
+
       return Environment.development;
     } catch (e) {
       DebugConfig.debugPrint('Error getting current environment: $e');
-      return Environment.development; // Default to development
+      return Environment.development;
     }
   }
-  
+
   static bool isProduction() {
     return dotenv.env['ENV'] == 'production';
   }
-  
+
   static bool isDevelopment() {
     return dotenv.env['ENV'] == 'development';
   }
-  
+
   static String getServerUrl() {
     return dotenv.env['SERVER_URL'] ?? 'http://localhost:8080';
   }
-} 
+}

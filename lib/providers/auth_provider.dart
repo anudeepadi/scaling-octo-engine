@@ -3,40 +3,30 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import '../utils/debug_config.dart';
 
-// Update class to use Firebase Authentication
 class AuthProvider extends ChangeNotifier {
-  final FirebaseAuth _auth = FirebaseAuth.instance; // Get Firebase Auth instance
+  final FirebaseAuth _auth = FirebaseAuth.instance;
   final GoogleSignIn _googleSignIn = GoogleSignIn(
     scopes: ['email', 'profile'],
   );
-  User? _user; // Hold the current Firebase User
+  User? _user;
 
   bool _isLoading = false;
   String? _error;
-  // Remove default true for isAuthenticated
-  // bool _isAuthenticated = true; 
 
-  bool get isAuthenticated => _user != null; // Check if user object exists
+  bool get isAuthenticated => _user != null;
   bool get isLoading => _isLoading;
   String? get error => _error;
-  // Return actual Firebase User ID or a placeholder if null
-  String get userId => _user?.uid ?? 'anonymous'; 
-  // Add currentUser getter
+  String get userId => _user?.uid ?? 'anonymous';
   User? get currentUser => _user;
 
   AuthProvider() {
-    // Listen to authentication state changes
     _auth.authStateChanges().listen(_onAuthStateChanged);
-    // Set initial state
-    _user = _auth.currentUser; 
-    DebugConfig.debugPrint('AuthProvider: Initializing - User: ${_user?.uid}');
+    _user = _auth.currentUser;
   }
 
-  // Listener for auth state changes
   void _onAuthStateChanged(User? user) {
     _user = user;
-    DebugConfig.debugPrint('AuthProvider: Auth State Changed - User: ${_user?.uid}');
-    _isLoading = false; // Reset loading state on change
+    _isLoading = false;
     notifyListeners();
   }
 
@@ -44,21 +34,17 @@ class AuthProvider extends ChangeNotifier {
     _isLoading = true;
     _error = null;
     notifyListeners();
-    
+
     try {
-      // Use Firebase sign in with retry logic for network issues
       await _auth.signInWithEmailAndPassword(email: email, password: password);
-      // _onAuthStateChanged will handle updating state and notifying listeners
-      return true; // Indicate success
+      return true;
     } on FirebaseAuthException catch (e) {
       _error = _getDetailedFirebaseErrorMessage(e);
-      DebugConfig.debugPrint('AuthProvider: SignIn Error - ${e.code}: ${e.message}');
       _isLoading = false;
       notifyListeners();
-      return false; // Indicate failure
+      return false;
     } catch (e) {
       _error = _getNetworkErrorMessage(e);
-      DebugConfig.debugPrint('AuthProvider: SignIn Unexpected Error - $e');
       _isLoading = false;
       notifyListeners();
       return false;
@@ -69,114 +55,87 @@ class AuthProvider extends ChangeNotifier {
     _isLoading = true;
     _error = null;
     notifyListeners();
-    
+
     try {
-      // Use Firebase sign up
-      UserCredential userCredential = await _auth.createUserWithEmailAndPassword(email: email, password: password);
-      
-      // Update display name with the provided username
+      UserCredential userCredential = await _auth.createUserWithEmailAndPassword(
+        email: email,
+        password: password
+      );
+
       if (username.isNotEmpty) {
         await userCredential.user?.updateDisplayName(username);
-        // Reload user to get updated profile
         await userCredential.user?.reload();
         _user = _auth.currentUser;
       }
 
-      // _onAuthStateChanged will handle updating state
-      return true; // Indicate success
+      return true;
     } on FirebaseAuthException catch (e) {
       _error = e.message ?? 'Sign up failed.';
-       DebugConfig.debugPrint('AuthProvider: SignUp Error - ${e.code}: ${e.message}');
       _isLoading = false;
       notifyListeners();
-      return false; // Indicate failure
+      return false;
     } catch (e) {
-       _error = 'An unexpected error occurred during sign up.';
-       DebugConfig.debugPrint('AuthProvider: SignUp Unexpected Error - $e');
-       _isLoading = false;
-       notifyListeners();
-       return false;
+      _error = 'An unexpected error occurred during sign up.';
+      _isLoading = false;
+      notifyListeners();
+      return false;
     }
   }
 
   Future<void> signOut() async {
     _isLoading = true;
-    _error = null; // Clear previous errors on sign out attempt
+    _error = null;
     notifyListeners();
 
     try {
-      // Use Firebase sign out
       await _auth.signOut();
-      // _onAuthStateChanged will handle updating state
     } catch (e) {
-       // Although signOut rarely fails, good practice to catch potential errors
-       _error = 'An unexpected error occurred during sign out.';
-       DebugConfig.debugPrint('AuthProvider: SignOut Unexpected Error - $e');
-       _isLoading = false; // Ensure loading is false even on error
-       notifyListeners();
+      _error = 'An unexpected error occurred during sign out.';
+      _isLoading = false;
+      notifyListeners();
     }
-    // Loading state is reset within _onAuthStateChanged after sign out completes
   }
 
   Future<bool> signInWithGoogle() async {
     _isLoading = true;
     _error = null;
     notifyListeners();
-    
+
     try {
-      // First check if user is already signed in to Google
       GoogleSignInAccount? currentUser = _googleSignIn.currentUser;
-      
-      // If no current user, trigger the authentication flow
       currentUser ??= await _googleSignIn.signIn();
-      
+
       if (currentUser == null) {
-        // User canceled the sign-in process
         _isLoading = false;
         notifyListeners();
         return false;
       }
 
-      // Obtain the auth details from the request
       final GoogleSignInAuthentication googleAuth = await currentUser.authentication;
 
-      // Validate that we got the required tokens
       if (googleAuth.accessToken == null || googleAuth.idToken == null) {
         _error = 'Failed to get Google authentication tokens.';
-        DebugConfig.debugPrint('AuthProvider: Missing Google tokens - AccessToken: ${googleAuth.accessToken != null}, IdToken: ${googleAuth.idToken != null}');
         await _googleSignIn.signOut();
         _isLoading = false;
         notifyListeners();
         return false;
       }
 
-      // Create a new credential
       final credential = GoogleAuthProvider.credential(
         accessToken: googleAuth.accessToken,
         idToken: googleAuth.idToken,
       );
 
-      DebugConfig.debugPrint('AuthProvider: Attempting Firebase sign in with Google credential');
-      
-      // Sign in to Firebase with the Google user credential
-      final UserCredential userCredential = await _auth.signInWithCredential(credential);
-      
-      DebugConfig.debugPrint('AuthProvider: Google SignIn successful - User: ${userCredential.user?.uid}');
-      
-      // Success - _onAuthStateChanged will handle the rest
+      await _auth.signInWithCredential(credential);
       return true;
     } on FirebaseAuthException catch (e) {
       _error = _getFirebaseErrorMessage(e);
-      DebugConfig.debugPrint('AuthProvider: Google SignIn FirebaseAuthException - ${e.code}: ${e.message}');
-      // Clean up Google Sign-In state on error
       await _googleSignIn.signOut();
       _isLoading = false;
       notifyListeners();
       return false;
     } catch (e) {
       _error = 'An unexpected error occurred during Google sign in: $e';
-      DebugConfig.debugPrint('AuthProvider: Google SignIn Unexpected Error - $e');
-      // Clean up Google Sign-In state on error
       await _googleSignIn.signOut();
       _isLoading = false;
       notifyListeners();
@@ -198,10 +157,6 @@ class AuthProvider extends ChangeNotifier {
         return 'No user found with this credential.';
       case 'wrong-password':
         return 'Wrong password provided.';
-      case 'invalid-verification-code':
-        return 'Invalid verification code.';
-      case 'invalid-verification-id':
-        return 'Invalid verification ID.';
       case 'network-request-failed':
         return 'Network error occurred. Please check your internet connection and try again.';
       default:
@@ -240,8 +195,8 @@ class AuthProvider extends ChangeNotifier {
 
   String _getNetworkErrorMessage(dynamic error) {
     final errorString = error.toString().toLowerCase();
-    if (errorString.contains('network') || 
-        errorString.contains('timeout') || 
+    if (errorString.contains('network') ||
+        errorString.contains('timeout') ||
         errorString.contains('connection') ||
         errorString.contains('resolve')) {
       return 'Network connection failed. Please check your internet connection and try again.';
@@ -255,34 +210,28 @@ class AuthProvider extends ChangeNotifier {
       notifyListeners();
       return;
     }
-    
+
     _isLoading = true;
     _error = null;
     notifyListeners();
-    
+
     try {
-      // Use Firebase update profile methods
       if (displayName != null) {
         await _user!.updateDisplayName(displayName);
       }
       if (photoURL != null) {
         await _user!.updatePhotoURL(photoURL);
       }
-      // Reload user data to reflect changes immediately if needed, though not strictly required
-      // await _user!.reload(); 
-      // _user = _auth.currentUser; // Re-assign user if reloaded
-       _isLoading = false;
-       notifyListeners(); // Notify UI of success/loading finished
+      _isLoading = false;
+      notifyListeners();
     } on FirebaseAuthException catch (e) {
       _error = e.message ?? 'Profile update failed.';
-      DebugConfig.debugPrint('AuthProvider: UpdateProfile Error - ${e.code}: ${e.message}');
       _isLoading = false;
       notifyListeners();
     } catch (e) {
-       _error = 'An unexpected error occurred during profile update.';
-       DebugConfig.debugPrint('AuthProvider: UpdateProfile Unexpected Error - $e');
-       _isLoading = false;
-       notifyListeners();
+      _error = 'An unexpected error occurred during profile update.';
+      _isLoading = false;
+      notifyListeners();
     }
   }
 }

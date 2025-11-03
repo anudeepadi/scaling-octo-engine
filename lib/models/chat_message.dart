@@ -97,7 +97,6 @@ class ChatMessage {
   });
 
   factory ChatMessage.fromFirestore(Map<String, dynamic> data, String documentId) {
-    // Parse createdAt timestamp
     DateTime timestamp;
     try {
       var createdAt = data['createdAt'];
@@ -114,51 +113,44 @@ class ChatMessage {
         timestamp = DateTime.now();
       }
     } catch (e) {
-      DebugConfig.debugPrint('Error parsing timestamp: $e');
       timestamp = DateTime.now();
     }
-    
-    // Get message content and convert text emoticons to emoji
+
     String rawContent = data['messageBody'] ?? '';
     String content = EmojiConverterService.convertTextToEmoji(rawContent);
-    
-    // Determine if message is from the user
+
     bool isMe = data['source'] == 'client';
-    
-    // Get message ID
+
     String messageId = data['serverMessageId'] ?? documentId;
-    
-    // Check for quick replies
+
     List<QuickReply>? suggestedReplies;
     final isPoll = data['isPoll'];
     final answers = data['answers'];
-    
+
     if (isMessagePoll(isPoll) && answers != null) {
       suggestedReplies = [];
-      
+
       if (answers is String && answers != 'None' && answers.isNotEmpty) {
-        // Parse comma-separated answers string
         final answerList = answers.split(',').map((e) => e.trim()).where((e) => e.isNotEmpty).toList();
         suggestedReplies = answerList.map((item) => QuickReply(
-          text: EmojiConverterService.convertTextToEmoji(item), 
+          text: EmojiConverterService.convertTextToEmoji(item),
           value: item
         )).toList();
       } else if (answers is List) {
         suggestedReplies = List<String>.from(answers)
             .map((item) => QuickReply(
-              text: EmojiConverterService.convertTextToEmoji(item), 
+              text: EmojiConverterService.convertTextToEmoji(item),
               value: item
             ))
             .toList();
       }
     }
-    
-    // Determine message type
+
     MessageType type = MessageType.text;
     if (suggestedReplies != null && suggestedReplies.isNotEmpty) {
       type = MessageType.quickReply;
     }
-    
+
     return ChatMessage(
       id: messageId,
       content: content,
@@ -169,7 +161,7 @@ class ChatMessage {
       status: MessageStatus.sent,
     );
   }
-  
+
   factory ChatMessage.fromJson(Map<String, dynamic> json) {
     return ChatMessage(
       id: json['id'] as String,

@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../theme/app_theme.dart';
-import '../utils/debug_config.dart';
 
 class AboutScreen extends StatefulWidget {
   const AboutScreen({super.key});
@@ -11,15 +10,12 @@ class AboutScreen extends StatefulWidget {
 }
 
 class _AboutScreenState extends State<AboutScreen> {
-  
-  // Helper to launch URL
   Future<void> _launchURL(String url) async {
     final uri = Uri.parse(url);
     try {
       if (await canLaunchUrl(uri)) {
         await launchUrl(uri);
       } else {
-        DebugConfig.debugPrint('Could not launch $url');
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(content: Text('Could not open $url')),
@@ -27,7 +23,6 @@ class _AboutScreenState extends State<AboutScreen> {
         }
       }
     } catch (e) {
-      DebugConfig.debugPrint('Error launching URL: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Error opening link')),
@@ -50,7 +45,6 @@ class _AboutScreenState extends State<AboutScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // App Logo Section
             Center(
               child: Column(
                 children: [
@@ -110,10 +104,9 @@ class _AboutScreenState extends State<AboutScreen> {
                 ],
               ),
             ),
-            
+
             const SizedBox(height: 32),
-            
-            // Main Description
+
             const Text(
               'About the Quitxt Program',
               style: TextStyle(
@@ -122,9 +115,9 @@ class _AboutScreenState extends State<AboutScreen> {
                 color: AppTheme.quitxtTeal,
               ),
             ),
-            
+
             const SizedBox(height: 16),
-            
+
             const Text(
               'Smoking and vaping are tough opponents.',
               style: TextStyle(
@@ -133,9 +126,9 @@ class _AboutScreenState extends State<AboutScreen> {
                 height: 1.5,
               ),
             ),
-            
+
             const SizedBox(height: 12),
-            
+
             const Text(
               "That's why you are invited to join Quitxt, a free bilingual texting service that turns your smartphone into a personal coach to help you quit smoking/vaping!",
               style: TextStyle(
@@ -143,9 +136,9 @@ class _AboutScreenState extends State<AboutScreen> {
                 height: 1.5,
               ),
             ),
-            
+
             const SizedBox(height: 16),
-            
+
             const Text(
               'Quitxt sends interactive and entertaining texts over 4 months of service with links to online support, and music and videos developed by UT Health San Antonio researchers, with an additional 2 months of support to help you stay free from smoking/vaping.',
               style: TextStyle(
@@ -153,9 +146,9 @@ class _AboutScreenState extends State<AboutScreen> {
                 height: 1.5,
               ),
             ),
-            
+
             const SizedBox(height: 16),
-            
+
             const Text(
               'Texts focus on motivation to quit, setting a quit date, finding things to do instead of smoking/vaping, handling stress, coping, and more.',
               style: TextStyle(
@@ -163,10 +156,9 @@ class _AboutScreenState extends State<AboutScreen> {
                 height: 1.5,
               ),
             ),
-            
+
             const SizedBox(height: 24),
-            
-            // How to Join Section
+
             const Text(
               'How to Join',
               style: TextStyle(
@@ -175,10 +167,9 @@ class _AboutScreenState extends State<AboutScreen> {
                 color: AppTheme.quitxtTeal,
               ),
             ),
-            
+
             const SizedBox(height: 16),
-            
-            // Simple chat instruction
+
             Container(
               width: double.infinity,
               padding: const EdgeInsets.all(24),
@@ -227,10 +218,9 @@ class _AboutScreenState extends State<AboutScreen> {
                 ],
               ),
             ),
-            
+
             const SizedBox(height: 24),
-            
-            // Effectiveness Section
+
             Container(
               width: double.infinity,
               padding: const EdgeInsets.all(20),
@@ -286,10 +276,9 @@ class _AboutScreenState extends State<AboutScreen> {
                 ],
               ),
             ),
-            
+
             const SizedBox(height: 24),
-            
-            // Target Audience
+
             const Text(
               'Who Can Join',
               style: TextStyle(
@@ -298,9 +287,9 @@ class _AboutScreenState extends State<AboutScreen> {
                 color: AppTheme.quitxtTeal,
               ),
             ),
-            
+
             const SizedBox(height: 12),
-            
+
             const Text(
               'Quitxt is now enrolling English- and Spanish-speaking individuals who are trying to quit smoking and/or vaping. The program is primarily designed for young adults ages 18-29, but everyone who wants to quit is welcomed to enroll. If you would like to enroll and are 18 and older, text the number above.',
               style: TextStyle(
@@ -308,10 +297,9 @@ class _AboutScreenState extends State<AboutScreen> {
                 height: 1.5,
               ),
             ),
-            
+
             const SizedBox(height: 24),
-            
-            // Research Information
+
             const Text(
               'Research & Development',
               style: TextStyle(
@@ -320,9 +308,9 @@ class _AboutScreenState extends State<AboutScreen> {
                 color: AppTheme.quitxtTeal,
               ),
             ),
-            
+
             const SizedBox(height: 12),
-            
+
             const Text(
               'The service for text messaging was created by the Institute for Health Promotion Research (IHPR) at UT Health San Antonio and developed by the Software Communications and Navigation Systems (SCNS) Laboratory at the University of Texas at San Antonio, for a study funded by the Cancer Prevention and Research Institute of Texas. The service is supported by a grant from the Cancer Prevention and Research Institute of Texas.',
               style: TextStyle(
@@ -331,10 +319,9 @@ class _AboutScreenState extends State<AboutScreen> {
                 color: Colors.black,
               ),
             ),
-            
+
             const SizedBox(height: 16),
-            
-            // Website Link
+
             Center(
               child: GestureDetector(
                 onTap: () => _launchURL('https://quitxt.org/'),
@@ -374,10 +361,9 @@ class _AboutScreenState extends State<AboutScreen> {
                 ),
               ),
             ),
-            
+
             const SizedBox(height: 32),
-            
-            // Footer
+
             Center(
               child: Column(
                 children: [
@@ -418,7 +404,7 @@ class _AboutScreenState extends State<AboutScreen> {
                 ],
               ),
             ),
-            
+
             const SizedBox(height: 20),
           ],
         ),

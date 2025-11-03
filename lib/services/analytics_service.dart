@@ -1,6 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_analytics/firebase_analytics.dart';
-import '../utils/debug_config.dart';
 
 class AnalyticsService {
   final FirebaseAnalytics _analytics;
@@ -10,10 +9,9 @@ class AnalyticsService {
   AnalyticsService({
     FirebaseAnalytics? analytics,
     FirebaseFirestore? firestore,
-  }) : _analytics = analytics ?? FirebaseAnalytics.instance,
-       _firestore = firestore ?? FirebaseFirestore.instance;
+  })  : _analytics = analytics ?? FirebaseAnalytics.instance,
+        _firestore = firestore ?? FirebaseFirestore.instance;
 
-  // Track user events
   Future<void> trackEvent(String name, Map<String, Object> parameters) async {
     try {
       await _analytics.logEvent(
@@ -21,49 +19,42 @@ class AnalyticsService {
         parameters: parameters,
       );
 
-      // Store event in Firestore for analysis
       await _firestore.collection(_eventsCollection).add({
         'eventName': name,
         'parameters': parameters,
         'timestamp': FieldValue.serverTimestamp(),
       });
     } catch (e) {
-      DebugConfig.debugPrint('Error tracking event: $e');
+      // Silent failure
     }
   }
 
-  // Track screen views
   Future<void> trackScreenView(String screenName) async {
     try {
       await _analytics.logScreenView(screenName: screenName);
     } catch (e) {
-      DebugConfig.debugPrint('Error tracking screen view: $e');
+      // Silent failure
     }
   }
 
-  // Track user properties
   Future<void> setUserProperty(String name, String? value) async {
     try {
       await _analytics.setUserProperty(name: name, value: value);
     } catch (e) {
-      DebugConfig.debugPrint('Error setting user property: $e');
+      // Silent failure
     }
   }
 
-  // Track user ID
   Future<void> setUserId(String? userId) async {
     try {
       await _analytics.setUserId(id: userId);
     } catch (e) {
-      DebugConfig.debugPrint('Error setting user ID: $e');
+      // Silent failure
     }
   }
 
-  // Study-specific tracking methods
   Future<void> trackOnboardingStep(String stepName) async {
-    await trackEvent('onboarding_step', {
-      'step_name': stepName,
-    });
+    await trackEvent('onboarding_step', {'step_name': stepName});
   }
 
   Future<void> trackIntakeProgress(int stepNumber, int totalSteps) async {
@@ -73,7 +64,8 @@ class AnalyticsService {
     });
   }
 
-  Future<void> trackMessageInteraction(String messageId, String interactionType) async {
+  Future<void> trackMessageInteraction(
+      String messageId, String interactionType) async {
     await trackEvent('message_interaction', {
       'message_id': messageId,
       'interaction_type': interactionType,
@@ -88,24 +80,19 @@ class AnalyticsService {
   }
 
   Future<void> trackProgressMilestone(String milestoneName) async {
-    await trackEvent('progress_milestone', {
-      'milestone_name': milestoneName,
-    });
+    await trackEvent('progress_milestone', {'milestone_name': milestoneName});
   }
 
   Future<void> trackOptOut(String reason) async {
-    await trackEvent('user_opt_out', {
-      'reason': reason,
-    });
+    await trackEvent('user_opt_out', {'reason': reason});
   }
 
   Future<void> trackHelpRequest(String helpType) async {
-    await trackEvent('help_requested', {
-      'help_type': helpType,
-    });
+    await trackEvent('help_requested', {'help_type': helpType});
   }
 
-  Future<void> trackNotificationInteraction(String notificationId, String action) async {
+  Future<void> trackNotificationInteraction(
+      String notificationId, String action) async {
     await trackEvent('notification_interaction', {
       'notification_id': notificationId,
       'action': action,
@@ -113,9 +100,7 @@ class AnalyticsService {
   }
 
   Future<void> trackLanguageChange(String newLanguage) async {
-    await trackEvent('language_changed', {
-      'new_language': newLanguage,
-    });
+    await trackEvent('language_changed', {'new_language': newLanguage});
   }
 
   Future<void> trackSlipEvent(String trigger, String response) async {
@@ -125,8 +110,8 @@ class AnalyticsService {
     });
   }
 
-  // Error logging
-  Future<void> logError(String errorCode, String errorMessage, [Map<String, dynamic>? parameters]) async {
+  Future<void> logError(String errorCode, String errorMessage,
+      [Map<String, dynamic>? parameters]) async {
     try {
       await _analytics.logEvent(
         name: 'error_occurred',
@@ -137,12 +122,12 @@ class AnalyticsService {
         },
       );
     } catch (e) {
-      DebugConfig.debugPrint('Error logging error: $e');
+      // Silent failure
     }
   }
 
-  // Analytics queries for study monitoring
-  Future<Map<String, dynamic>> getEventCounts(DateTime startDate, DateTime endDate) async {
+  Future<Map<String, dynamic>> getEventCounts(
+      DateTime startDate, DateTime endDate) async {
     try {
       final snapshot = await _firestore
           .collection(_eventsCollection)
@@ -161,10 +146,14 @@ class AnalyticsService {
       return {
         'total_events': events.length,
         'event_counts': eventCounts,
-        'unique_users': snapshot.docs.map((doc) => doc.data()['parameters']?['userId'] as String? ?? '').where((id) => id.isNotEmpty).toSet().length,
+        'unique_users': snapshot.docs
+            .map((doc) =>
+                doc.data()['parameters']?['userId'] as String? ?? '')
+            .where((id) => id.isNotEmpty)
+            .toSet()
+            .length,
       };
     } catch (e) {
-      DebugConfig.debugPrint('Error getting event counts: $e');
       return {
         'total_events': 0,
         'event_counts': {},
@@ -190,27 +179,26 @@ class AnalyticsService {
         };
       }).toList();
     } catch (e) {
-      DebugConfig.debugPrint('Error getting user journey: $e');
       return [];
     }
   }
 
   Future<Map<String, dynamic>> getStudyMetrics() async {
     try {
-      final snapshot = await _firestore
-          .collection(_eventsCollection)
-          .get();
-
+      final snapshot = await _firestore.collection(_eventsCollection).get();
       final events = snapshot.docs.map((doc) => doc.data()).toList();
-      
+
       return {
-        'total_participants': events.map((e) => e['parameters']?['userId'] as String? ?? '').where((id) => id.isNotEmpty).toSet().length,
+        'total_participants': events
+            .map((e) => e['parameters']?['userId'] as String? ?? '')
+            .where((id) => id.isNotEmpty)
+            .toSet()
+            .length,
         'completion_rate': _calculateCompletionRate(events),
         'average_engagement': _calculateAverageEngagement(events),
         'retention_rate': _calculateRetentionRate(events),
       };
     } catch (e) {
-      DebugConfig.debugPrint('Error getting study metrics: $e');
       return {
         'total_participants': 0,
         'completion_rate': 0.0,
@@ -221,29 +209,22 @@ class AnalyticsService {
   }
 
   double _calculateCompletionRate(List<Map<String, dynamic>> events) {
-    // Implementation depends on your study's completion criteria
     return 0.0;
   }
 
   double _calculateAverageEngagement(List<Map<String, dynamic>> events) {
-    // Implementation depends on your engagement metrics
     return 0.0;
   }
 
   double _calculateRetentionRate(List<Map<String, dynamic>> events) {
-    // Implementation depends on your retention criteria
     return 0.0;
   }
 
-  // Conversion funnel analysis
   Future<Map<String, dynamic>> getConversionFunnel() async {
     try {
-      final snapshot = await _firestore
-          .collection(_eventsCollection)
-          .get();
-
+      final snapshot = await _firestore.collection(_eventsCollection).get();
       final events = snapshot.docs.map((doc) => doc.data()).toList();
-      
+
       return {
         'onboarding_started': _countEventType(events, 'onboarding_step'),
         'onboarding_completed': _countEventType(events, 'onboarding_completed'),
@@ -254,7 +235,6 @@ class AnalyticsService {
         'quit_successful': _countEventType(events, 'quit_successful'),
       };
     } catch (e) {
-      DebugConfig.debugPrint('Error getting conversion funnel: $e');
       return {
         'onboarding_started': 0,
         'onboarding_completed': 0,
@@ -270,4 +250,4 @@ class AnalyticsService {
   int _countEventType(List<Map<String, dynamic>> events, String eventName) {
     return events.where((e) => e['eventName'] == eventName).length;
   }
-} 
+}

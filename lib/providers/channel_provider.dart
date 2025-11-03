@@ -30,4 +30,4 @@ class ChannelProvider with ChangeNotifier {
       notifyListeners();
     }
   }
-} 
+}

@@ -188,13 +188,11 @@ class HelpScreen extends StatelessWidget {
     Color accentColor,
     List<Map<String, String>> keywords,
   ) {
-    // Separate English and Spanish keywords
     final englishKeywords = <Map<String, String>>[];
     final spanishKeywords = <Map<String, String>>[];
-    
+
     for (final keyword in keywords) {
       final label = keyword['label']!;
-      // Check if the label contains Spanish characters or is a common Spanish word
       if (_isSpanishKeyword(label)) {
         spanishKeywords.add(keyword);
       } else {
@@ -246,7 +244,6 @@ class HelpScreen extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 16),
-          // English keywords
           if (englishKeywords.isNotEmpty) ...[
             _buildLanguageLabel('English', accentColor),
             const SizedBox(height: 8),
@@ -264,7 +261,6 @@ class HelpScreen extends StatelessWidget {
               }).toList(),
             ),
           ],
-          // Separator between English and Spanish
           if (englishKeywords.isNotEmpty && spanishKeywords.isNotEmpty) ...[
             const SizedBox(height: 16),
             Container(
@@ -282,7 +278,6 @@ class HelpScreen extends StatelessWidget {
             ),
             const SizedBox(height: 16),
           ],
-          // Spanish keywords
           if (spanishKeywords.isNotEmpty) ...[
             _buildLanguageLabel('Español', accentColor),
             const SizedBox(height: 8),
@@ -306,12 +301,11 @@ class HelpScreen extends StatelessWidget {
   }
 
   bool _isSpanishKeyword(String label) {
-    // List of Spanish keywords and characters to identify Spanish language
     final spanishIndicators = [
-      'Ayuda', 'Ahora', 'Antojo', 'Estrés', 'Mal Humor', 'Recaída', 
+      'Ayuda', 'Ahora', 'Antojo', 'Estrés', 'Mal Humor', 'Recaída',
       'Fumadores', 'Motivación', 'é', 'ñ', 'ó', 'í', 'á', 'ú'
     ];
-    
+
     return spanishIndicators.any((indicator) => label.contains(indicator));
   }
 
@@ -390,14 +384,9 @@ class HelpScreen extends StatelessWidget {
 
   void _sendKeywordToChat(BuildContext context, String keyword) {
     final dashChatProvider = Provider.of<DashChatProvider>(context, listen: false);
-
-    // Send the keyword as a message
     dashChatProvider.sendMessage(keyword);
-
-    // Navigate back to the home screen (chat)
     Navigator.of(context).pop();
 
-    // Show confirmation
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text('Sent "$keyword" to your health coach'),

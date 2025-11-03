@@ -22,7 +22,6 @@ class ChatMessageWidget extends StatefulWidget {
 }
 
 class _ChatMessageWidgetState extends State<ChatMessageWidget> {
-  // Helper function to extract YouTube video ID
   String? _getYoutubeVideoId(String url) {
     final uri = Uri.tryParse(url);
     if (uri == null) return null;
@@ -37,7 +36,6 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
     return null;
   }
 
-  // Helper function to check if a URL points to a known image/gif type
   bool _isImageUrl(String url) {
     final lowerUrl = url.toLowerCase();
     return lowerUrl.endsWith('.jpg') ||
@@ -47,20 +45,17 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
         lowerUrl.endsWith('.gif');
   }
 
-  // Helper function to check if content is a local asset path
   bool _isLocalAssetGif(String content) {
     final trimmedContent = content.trim();
     return trimmedContent.startsWith('assets/') &&
         trimmedContent.toLowerCase().endsWith('.gif');
   }
 
-  // Helper to launch URL
   Future<void> _launchURL(String url) async {
     final uri = Uri.parse(url);
     if (await canLaunchUrl(uri)) {
       await launchUrl(uri);
     } else {
-      DebugConfig.debugPrint('Could not launch $url');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Could not open link')),
@@ -70,7 +65,6 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
   }
 
   Widget _buildContent() {
-    // Handle video messages first
     if (widget.message.type == MessageType.video) {
       return Container(
         width: 250,
@@ -81,7 +75,6 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
         ),
         child: Stack(
           children: [
-            // Video thumbnail background
             Container(
               width: double.infinity,
               height: double.infinity,
@@ -97,7 +90,6 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
                 ),
               ),
             ),
-            // Doctor's image placeholder
             Positioned(
               top: 20,
               left: 20,
@@ -117,7 +109,6 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
                 ),
               ),
             ),
-            // Doctor's name and title
             Positioned(
               bottom: 10,
               left: 10,
@@ -139,7 +130,6 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
                 ),
               ),
             ),
-            // Play button
             const Center(
               child: Icon(
                 Icons.play_circle_fill,
@@ -152,7 +142,6 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
       );
     }
 
-    // --- Check for Local Asset GIF First ---
     if (_isLocalAssetGif(widget.message.content)) {
       try {
         return Image.asset(
@@ -160,8 +149,6 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
           height: 150,
           fit: BoxFit.contain,
           errorBuilder: (context, error, stackTrace) {
-            DebugConfig.debugPrint(
-                "Image.asset Error loading ${widget.message.content}: $error");
             return Container(
                 height: 150,
                 color: Colors.grey[300],
@@ -170,14 +157,11 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
           },
         );
       } catch (e) {
-        DebugConfig.debugPrint(
-            "Error loading asset ${widget.message.content}: $e");
         return Text("[Error loading asset: ${widget.message.content}]",
             style: const TextStyle(color: Colors.red));
       }
     }
 
-    // --- Network URL Processing ---
     final urlRegex = RegExp(
       r'https?://(?:[a-zA-Z]|[0-9]|[$-_@.&+]|[!*\(\),]|(?:%[0-9a-fA-F][0-9a-fA-F]))+',
       caseSensitive: false,
@@ -185,16 +169,13 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
     final match = urlRegex.firstMatch(widget.message.content);
     String? firstUrl = match?.group(0);
 
-    // Try to get videoId ONLY from the found URL
     String? videoId = (firstUrl != null) ? _getYoutubeVideoId(firstUrl) : null;
 
     if (videoId != null && firstUrl != null && match != null) {
       final thumbnailUrl = 'https://img.youtube.com/vi/$videoId/0.jpg';
-      // Build the content with text before/after thumbnail
       return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Display text before the URL if any
           if (match.start > 0)
             Padding(
               padding: const EdgeInsets.only(bottom: 4.0),
@@ -205,7 +186,6 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
                 ),
               ),
             ),
-          // Always display the YouTube URL above the thumbnail
           Padding(
             padding: const EdgeInsets.only(bottom: 8.0),
             child: Container(
@@ -244,7 +224,6 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
               ),
             ),
           ),
-          // Display the tappable thumbnail
           GestureDetector(
             onTap: () => _launchURL(firstUrl),
             child: Stack(
@@ -271,8 +250,6 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
                     );
                   },
                   errorBuilder: (context, error, stackTrace) {
-                    DebugConfig.debugPrint(
-                        "Error loading $thumbnailUrl: $error");
                     return Container(
                         height: 150,
                         width: double.infinity,
@@ -288,7 +265,6 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
                         ));
                   },
                 ),
-                // YouTube play button overlay
                 Positioned.fill(
                   child: Container(
                     decoration: BoxDecoration(
@@ -306,7 +282,6 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
               ],
             ),
           ),
-          // Display text after the URL if any
           if (match.end < widget.message.content.length)
             Padding(
               padding: const EdgeInsets.only(top: 4.0),
@@ -320,11 +295,9 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
         ],
       );
     } else if (firstUrl != null && _isImageUrl(firstUrl) && match != null) {
-      // It's an image/GIF URL
       return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Display text before the URL if any
           if (match.start > 0)
             Padding(
               padding: const EdgeInsets.only(bottom: 4.0),
@@ -335,7 +308,6 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
                 ),
               ),
             ),
-          // Display the tappable image
           GestureDetector(
             onTap: () => _launchURL(firstUrl),
             child: Image.network(
@@ -360,7 +332,6 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
                 );
               },
               errorBuilder: (context, error, stackTrace) {
-                DebugConfig.debugPrint("Error loading $firstUrl: $error");
                 return Container(
                     height: 150,
                     width: double.infinity,
@@ -377,7 +348,6 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
               },
             ),
           ),
-          // Display text after the URL if any
           if (match.end < widget.message.content.length)
             Padding(
               padding: const EdgeInsets.only(top: 4.0),
@@ -393,12 +363,10 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
     } else if (firstUrl != null &&
         match != null &&
         widget.message.linkPreview != null) {
-      // Web page preview with thumbnail
       final linkPreview = widget.message.linkPreview!;
       return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Display text before the URL if any
           if (match.start > 0)
             Padding(
               padding: const EdgeInsets.only(bottom: 4.0),
@@ -409,7 +377,6 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
                 ),
               ),
             ),
-          // Web page preview card with improved layout
           GestureDetector(
             onTap: () => _launchURL(firstUrl),
             child: Container(
@@ -442,7 +409,6 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Thumbnail image - hide entirely if it fails to load
                   if (linkPreview.imageUrl != null)
                     ClipRRect(
                       borderRadius: const BorderRadius.only(
@@ -453,13 +419,11 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
                         imageUrl: linkPreview.imageUrl!,
                       ),
                     ),
-                  // Content section with improved padding
                   Padding(
                     padding: const EdgeInsets.all(16),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        // Title with improved wrapping
                         SizedBox(
                           width: double.infinity,
                           child: Text(
@@ -470,15 +434,14 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
                                   : AppTheme.textPrimary,
                               fontSize: 14,
                               fontWeight: FontWeight.w600,
-                              height: 1.3, // Better line height for readability
+                              height: 1.3,
                             ),
-                            maxLines: 3, // Allow more lines for longer titles
+                            maxLines: 3,
                             overflow: TextOverflow.ellipsis,
                             textAlign: TextAlign.start,
                           ),
                         ),
                         const SizedBox(height: 6),
-                        // Description with improved wrapping
                         if (linkPreview.description.isNotEmpty)
                           SizedBox(
                             width: double.infinity,
@@ -489,16 +452,15 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
                                     ? Colors.white.withValues(alpha: 0.9)
                                     : AppTheme.textSecondary,
                                 fontSize: 13,
-                                height: 1.4, // Better line height
+                                height: 1.4,
                                 fontWeight: FontWeight.w400,
                               ),
-                              maxLines: 3, // Allow more lines for descriptions
+                              maxLines: 3,
                               overflow: TextOverflow.ellipsis,
                               textAlign: TextAlign.start,
                             ),
                           ),
                         const SizedBox(height: 8),
-                        // URL with icon - improved layout
                         Container(
                           padding: const EdgeInsets.symmetric(vertical: 4),
                           child: Row(
@@ -519,7 +481,6 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    // Site name (if available)
                                     if (linkPreview.siteName != null &&
                                         linkPreview.siteName!.isNotEmpty)
                                       Text(
@@ -535,7 +496,6 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
                                         maxLines: 1,
                                         overflow: TextOverflow.ellipsis,
                                       ),
-                                    // URL hostname with better wrapping
                                     Text(
                                       Uri.parse(firstUrl).host,
                                       style: TextStyle(
@@ -547,8 +507,7 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
                                         fontWeight: FontWeight.w400,
                                         height: 1.2,
                                       ),
-                                      maxLines:
-                                          2, // Allow URL to wrap to 2 lines if needed
+                                      maxLines: 2,
                                       overflow: TextOverflow.ellipsis,
                                       softWrap: true,
                                     ),
@@ -565,7 +524,6 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
               ),
             ),
           ),
-          // Display text after the URL if any
           if (match.end < widget.message.content.length)
             Padding(
               padding: const EdgeInsets.only(top: 4.0),
@@ -579,7 +537,6 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
         ],
       );
     } else {
-      // Default text with linkify
       return Linkify(
         onOpen: (link) => _launchURL(link.url),
         text: widget.message.content,
@@ -596,9 +553,6 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
 
   @override
   Widget build(BuildContext context) {
-    // NOTE: Quick reply buttons are now handled by the screen's ListView logic
-    // ChatMessageWidget only renders the message content bubble
-
     return Padding(
       padding: EdgeInsets.only(
         left: widget.message.isMe ? 60 : 0,
@@ -639,7 +593,6 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
 
   Widget _buildAvatar() {
     if (widget.message.isMe) {
-      // User avatar - keep as icon for now
       return Container(
         width: 32,
         height: 32,
@@ -665,7 +618,6 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
         ),
       );
     } else {
-      // Quitxt bot avatar - use the logo
       return Container(
         width: 32,
         height: 32,
@@ -753,7 +705,6 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
   }
 
   String _formatTime(DateTime timestamp) {
-    // Format as 12-hour time (e.g., "2:30 PM")
     final hour = timestamp.hour > 12 ? timestamp.hour - 12 : (timestamp.hour == 0 ? 12 : timestamp.hour);
     final minute = timestamp.minute.toString().padLeft(2, '0');
     final period = timestamp.hour >= 12 ? 'PM' : 'AM';
@@ -794,7 +745,6 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
   }
 }
 
-// Helper widget to handle link preview images that can fail to load
 class _LinkPreviewImage extends StatefulWidget {
   final String imageUrl;
 
@@ -811,7 +761,6 @@ class _LinkPreviewImageState extends State<_LinkPreviewImage> {
 
   @override
   Widget build(BuildContext context) {
-    // If image failed to load, don't show anything (return empty container)
     if (_imageLoadFailed) {
       return const SizedBox.shrink();
     }
@@ -839,9 +788,6 @@ class _LinkPreviewImageState extends State<_LinkPreviewImage> {
         );
       },
       errorBuilder: (context, error, stackTrace) {
-        DebugConfig.debugPrint(
-            "Link preview image failed to load: ${widget.imageUrl}, error: $error");
-        // Mark as failed and trigger rebuild to hide the image
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (mounted) {
             setState(() {
@@ -849,7 +795,6 @@ class _LinkPreviewImageState extends State<_LinkPreviewImage> {
             });
           }
         });
-        // Return empty container immediately
         return const SizedBox.shrink();
       },
     );

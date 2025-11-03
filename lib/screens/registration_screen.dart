@@ -95,7 +95,6 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
             AppLocalizations.of(context).translate('auth_error');
         _showErrorDialog(errorMessage);
       } else if (success && mounted) {
-        // Registration successful, navigate back to login or home
         Navigator.of(context).pop();
       }
     }
@@ -150,9 +149,9 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
     final localizations = AppLocalizations.of(context);
 
     return Scaffold(
-      backgroundColor: AppTheme.quitxtGreen, // Green background
+      backgroundColor: AppTheme.quitxtGreen,
       appBar: AppBar(
-        backgroundColor: AppTheme.quitxtPurple, // Purple header
+        backgroundColor: AppTheme.quitxtPurple,
         title: Text(localizations.translate('app_title')),
         centerTitle: false,
         leading: IconButton(
@@ -170,7 +169,6 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  // Quitxt Logo
                   Container(
                     padding: const EdgeInsets.all(20),
                     decoration: BoxDecoration(
@@ -196,7 +194,6 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                   ),
                   const SizedBox(height: 32),
 
-                  // Registration Card
                   Card(
                     elevation: 8,
                     margin: EdgeInsets.zero,
@@ -219,7 +216,6 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                           child: Column(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              // Create Account Text
                               Text(
                                 localizations.translate('register_title'),
                                 style: const TextStyle(
@@ -239,7 +235,6 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                               ),
                               const SizedBox(height: 32),
 
-                              // Full Name Field
                               TextFormField(
                                 controller: _fullNameController,
                                 textCapitalization: TextCapitalization.words,
@@ -287,7 +282,6 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                               ),
                               const SizedBox(height: 20),
 
-                              // Email Field
                               TextFormField(
                                 controller: _emailController,
                                 keyboardType: TextInputType.emailAddress,
@@ -327,7 +321,6 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                               ),
                               const SizedBox(height: 20),
 
-                              // Password Field
                               TextFormField(
                                 controller: _passwordController,
                                 obscureText: !_isPasswordVisible,
@@ -375,7 +368,6 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                               ),
                               const SizedBox(height: 20),
 
-                              // Confirm Password Field
                               TextFormField(
                                 controller: _confirmPasswordController,
                                 obscureText: !_isConfirmPasswordVisible,
@@ -423,7 +415,6 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                               ),
                               const SizedBox(height: 32),
 
-                              // Create Account Button
                               SizedBox(
                                 width: double.infinity,
                                 height: 50,
@@ -451,7 +442,6 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                               ),
                               const SizedBox(height: 20),
 
-                              // Divider with "OR"
                               Row(
                                 children: [
                                   Expanded(
@@ -481,7 +471,6 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                               ),
                               const SizedBox(height: 20),
 
-                              // Google Sign In Button
                               SizedBox(
                                 width: double.infinity,
                                 height: 48,
@@ -515,7 +504,6 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                               ),
                               const SizedBox(height: 24),
 
-                              // Already have account link
                               Row(
                                 mainAxisAlignment: MainAxisAlignment.center,
                                 children: [

@@ -14,7 +14,6 @@ import '../theme/app_theme.dart';
 import 'profile_screen.dart';
 import 'about_screen.dart';
 import 'help_screen.dart';
-import '../utils/debug_config.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -35,14 +34,11 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     WidgetsBinding.instance.addObserver(this);
     _messageController.addListener(_handleTextChange);
 
-    // Link DashChatProvider to ChatProvider
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
         final chatProvider = context.read<ChatProvider>();
         final dashProvider = context.read<DashChatProvider>();
         dashProvider.setChatProvider(chatProvider);
-        DebugConfig.debugPrint(
-            'HomeScreen: Linked DashChatProvider and ChatProvider.');
       }
     });
   }
@@ -60,27 +56,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   void didChangeAppLifecycleState(AppLifecycleState state) {
     super.didChangeAppLifecycleState(state);
 
-    switch (state) {
-      case AppLifecycleState.resumed:
-        DebugConfig.debugPrint('App resumed - checking for new messages');
-        // Refresh messages when app comes back to foreground
-        if (mounted) {
-          final dashProvider = context.read<DashChatProvider>();
-          dashProvider.refreshMessages();
-        }
-        break;
-      case AppLifecycleState.paused:
-        DebugConfig.debugPrint('App paused');
-        break;
-      case AppLifecycleState.inactive:
-        DebugConfig.debugPrint('App inactive');
-        break;
-      case AppLifecycleState.detached:
-        DebugConfig.debugPrint('App detached');
-        break;
-      case AppLifecycleState.hidden:
-        DebugConfig.debugPrint('App hidden');
-        break;
+    if (state == AppLifecycleState.resumed && mounted) {
+      final dashProvider = context.read<DashChatProvider>();
+      dashProvider.refreshMessages();
     }
   }
 
@@ -103,25 +81,14 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   void _handleSubmitted(String text) {
     if (text.isEmpty) return;
 
-    DebugConfig.debugPrint(
-        '[SendMessage] Sending message with ID: ${DateTime.now().millisecondsSinceEpoch}');
-
     final dashChatProvider = context.read<DashChatProvider>();
-
-    // FIXED: Don't add message to ChatProvider immediately
-    // Let DashMessagingService handle adding the message with proper timestamp ordering
-    // This prevents duplicate messages and ensures chronological order
-
-    // Send message to the Dash backend - this will handle adding to UI via Firebase
     dashChatProvider.sendMessage(text);
 
     _messageController.clear();
     _scrollToBottom();
   }
 
-  // ignore: unused_element
   Future<void> _pickGif() async {
-    // Show a grid of local GIFs in a bottom sheet
     showModalBottomSheet(
       context: context,
       builder: (BuildContext context) => _buildGifPicker(),
@@ -183,7 +150,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                           gifPaths[index],
                           fit: BoxFit.cover,
                           errorBuilder: (context, error, stackTrace) {
-                            DebugConfig.debugPrint('Error loading GIF: $error');
                             return Container(
                               color: Colors.grey[300],
                               child: const Center(
@@ -209,9 +175,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     chatProvider.addGifMessage(gifPath);
   }
 
-  // ignore: unused_element
   Future<void> _pickMedia() async {
-    // Show Android-style bottom sheet
     showModalBottomSheet(
       context: context,
       builder: (BuildContext context) {
@@ -247,7 +211,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     );
   }
 
-  // ignore: unused_element
   Future<void> _pickMediaFromSource(MediaSource source) async {
     final result = await MediaPickerService.pickMedia(
       allowedExtensions: ['jpg', 'jpeg', 'png', 'gif', 'mp4'],
@@ -282,7 +245,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         ),
         child: Column(
           children: [
-            // Modern header section
             Container(
               padding: const EdgeInsets.only(
                   top: 60, bottom: 32, left: 24, right: 24),
@@ -299,7 +261,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Modern profile section
                   Container(
                     width: 56,
                     height: 56,
@@ -323,7 +284,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                     ),
                   ),
                   const SizedBox(height: 20),
-                  // User info card
                   Container(
                     width: double.infinity,
                     padding: const EdgeInsets.all(16),
@@ -355,7 +315,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               ),
             ),
 
-            // Modern menu items
             Expanded(
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -363,7 +322,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                   children: [
                     const SizedBox(height: 8),
 
-                    // Profile item
                     _buildModernMenuItem(
                       icon: Icons.person_outline_rounded,
                       title: 'Profile',
@@ -380,7 +338,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
                     const SizedBox(height: 8),
 
-                    // Chat item
                     _buildModernMenuItem(
                       icon: Icons.chat_bubble_outline_rounded,
                       title: 'Chat',
@@ -393,7 +350,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
                     const SizedBox(height: 8),
 
-                    // Help item
                     _buildModernMenuItem(
                       icon: Icons.help_outline_rounded,
                       title: 'Help',
@@ -410,7 +366,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
                     const SizedBox(height: 8),
 
-                    // About item
                     _buildModernMenuItem(
                       icon: Icons.info_outline_rounded,
                       title: 'About',
@@ -427,7 +382,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
                     const Spacer(),
 
-                    // Exit item (at bottom)
                     _buildModernMenuItem(
                       icon: Icons.logout_rounded,
                       title: 'Sign Out',
@@ -436,7 +390,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                       onTap: () async {
                         Navigator.pop(context);
 
-                        // Show modern confirmation dialog
                         bool confirmLogout = await showDialog(
                               context: context,
                               builder: (context) => AlertDialog(
@@ -607,7 +560,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
-              // Text input field
               Expanded(
                 child: Container(
                   constraints: const BoxConstraints(
@@ -652,7 +604,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               ),
               const SizedBox(width: 8),
 
-              // Send button
               Container(
                 width: 48,
                 height: 48,
@@ -802,7 +753,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                           ),
                           const SizedBox(height: 24),
                           const Text(
-                            'Welcome to Quitxt! 👋',
+                            'Welcome to Quitxt!',
                             style: TextStyle(
                               fontSize: 24,
                               fontWeight: FontWeight.w700,
@@ -844,10 +795,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                     );
                   }
 
-                  // Show quick reply buttons for ALL poll messages, not just the most recent one
-                  DebugConfig.debugPrint(
-                      '🔍 HomeScreen: Analyzing ${dashChatProvider.messages.length} messages for quick replies');
-
                   return ListView.builder(
                     controller: _scrollController,
                     padding: const EdgeInsets.all(16),
@@ -855,17 +802,12 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                     itemBuilder: (context, index) {
                       final message = dashChatProvider.messages[index];
 
-                      // Check if this message has quick replies - show for ALL poll messages
                       final shouldShowQuickReplies =
                           message.type == MessageType.quickReply &&
                               message.suggestedReplies != null &&
                               message.suggestedReplies!.isNotEmpty;
 
-                      DebugConfig.debugPrint(
-                          '🔍 HomeScreen: Message $index: type=${message.type}, hasReplies=${message.suggestedReplies?.isNotEmpty}, shouldShow=$shouldShowQuickReplies');
-
                       if (shouldShowQuickReplies) {
-                        // For poll messages with quick replies, show both content and buttons
                         return Column(
                           children: [
                             ChatMessageWidget(
@@ -890,7 +832,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                           ],
                         );
                       } else {
-                        // For regular messages, just show the content
                         return ChatMessageWidget(
                           message: message,
                           onReplyTap: () => _scrollToBottom(),

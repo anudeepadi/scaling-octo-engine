@@ -48,4 +48,4 @@ class LinkPreview {
       siteName: siteName ?? this.siteName,
     );
   }
-} 
+}

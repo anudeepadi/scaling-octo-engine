@@ -18,7 +18,6 @@ class ProfileScreen extends StatelessWidget {
     final localizations = AppLocalizations.of(context);
     final user = authProvider.currentUser;
 
-    // Get data from user profile and auth info
     final userId = user?.uid ?? 'pUuutN05eoYeWshsKyXBwrRoFW9u1';
     final username = userProfileProvider.displayName ??
         user?.displayName ??
@@ -27,7 +26,6 @@ class ProfileScreen extends StatelessWidget {
     final signInMethod =
         user?.providerData.first.providerId ?? 'GOOGLE_SIGN_IN';
 
-    // Format last access time
     final lastAccessTime = DateTime.now()
         .subtract(const Duration(days: 3, hours: 12, minutes: 30));
     final lastAccessString =
@@ -55,12 +53,8 @@ class ProfileScreen extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Profile header section
               _buildProfileHeader(username),
-
               const SizedBox(height: 24),
-
-              // Account information card
               _buildAccountInfoCard(
                 localizations,
                 username,
@@ -68,17 +62,10 @@ class ProfileScreen extends StatelessWidget {
                 signInMethod,
                 userId,
               ),
-
               const SizedBox(height: 24),
-
-              // Language preferences card
               _buildLanguageCard(context, localizations, languageProvider),
-
               const SizedBox(height: 32),
-
-              // Sign out button
               _buildSignOutButton(context, authProvider, localizations),
-
               const SizedBox(height: 24),
             ],
           ),

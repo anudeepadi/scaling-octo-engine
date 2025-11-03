@@ -9,14 +9,12 @@ class UserProfile {
   final String? displayName;
   final String? email;
   final String? photoUrl;
-  
-  // Onboarding & Consent
+
   final bool hasCompletedOnboarding;
   final bool hasAcceptedTerms;
   final DateTime? consentDate;
-  final String preferredLanguage; // 'en' or 'es'
-  
-  // Intake Questionnaire
+  final String preferredLanguage;
+
   final int? averageCigarettesPerDay;
   final NicotineDependence? nicotineDependence;
   final List<String> reasonsForQuitting;
@@ -24,21 +22,18 @@ class UserProfile {
   final QuitReadiness? readinessToQuit;
   final TimeOfDay? dailyChatTime;
   final DateTime? quitDate;
-  
-  // User Settings
+
   final bool notificationsEnabled;
   final TimeOfDay? notificationStartTime;
   final TimeOfDay? notificationEndTime;
   final bool highContrastMode;
-  
-  // Progress Tracking
+
   final DateTime? actualQuitDate;
   final int daysSmokeFree;
   final double moneySaved;
   final int cigarettesAvoided;
   final List<String> achievementsUnlocked;
-  
-  // Study Participation
+
   final bool isActive;
   final bool hasOptedOut;
   final DateTime? optOutDate;
@@ -191,25 +186,25 @@ class UserProfile {
       consentDate: json['consentDate'] != null ? DateTime.parse(json['consentDate']) : null,
       preferredLanguage: json['preferredLanguage'] as String? ?? 'en',
       averageCigarettesPerDay: json['averageCigarettesPerDay'] as int?,
-      nicotineDependence: json['nicotineDependence'] != null 
+      nicotineDependence: json['nicotineDependence'] != null
           ? NicotineDependence.values.firstWhere((e) => e.name == json['nicotineDependence'])
           : null,
       reasonsForQuitting: List<String>.from(json['reasonsForQuitting'] ?? []),
       supportNetwork: (json['supportNetwork'] as List<dynamic>?)
           ?.map((e) => SupportNetworkType.values.firstWhere((type) => type.name == e))
           .toList() ?? [],
-      readinessToQuit: json['readinessToQuit'] != null 
+      readinessToQuit: json['readinessToQuit'] != null
           ? QuitReadiness.values.firstWhere((e) => e.name == json['readinessToQuit'])
           : null,
-      dailyChatTime: json['dailyChatTime'] != null 
+      dailyChatTime: json['dailyChatTime'] != null
           ? _parseTimeOfDay(json['dailyChatTime'])
           : null,
       quitDate: json['quitDate'] != null ? DateTime.parse(json['quitDate']) : null,
       notificationsEnabled: json['notificationsEnabled'] as bool? ?? true,
-      notificationStartTime: json['notificationStartTime'] != null 
+      notificationStartTime: json['notificationStartTime'] != null
           ? _parseTimeOfDay(json['notificationStartTime'])
           : null,
-      notificationEndTime: json['notificationEndTime'] != null 
+      notificationEndTime: json['notificationEndTime'] != null
           ? _parseTimeOfDay(json['notificationEndTime'])
           : null,
       highContrastMode: json['highContrastMode'] as bool? ?? false,
@@ -228,7 +223,6 @@ class UserProfile {
   }
 
   static TimeOfDay _parseTimeOfDay(String timeString) {
-    // Handle both "8:30" and "830" formats
     if (timeString.contains(':')) {
       final parts = timeString.split(':');
       return TimeOfDay(
@@ -236,21 +230,17 @@ class UserProfile {
         minute: int.parse(parts[1]),
       );
     } else {
-      // Handle "830" format - assume it's HHMM or HMM
       if (timeString.length == 3) {
-        // Format like "830" -> hour=8, minute=30
         return TimeOfDay(
           hour: int.parse(timeString.substring(0, 1)),
           minute: int.parse(timeString.substring(1)),
         );
       } else if (timeString.length == 4) {
-        // Format like "1130" -> hour=11, minute=30
         return TimeOfDay(
           hour: int.parse(timeString.substring(0, 2)),
           minute: int.parse(timeString.substring(2)),
         );
       } else {
-        // Fallback: assume it's just hours
         return TimeOfDay(
           hour: int.parse(timeString),
           minute: 0,
@@ -259,8 +249,7 @@ class UserProfile {
     }
   }
 
-  // Helper methods
-  bool get hasCompletedIntake => 
+  bool get hasCompletedIntake =>
       averageCigarettesPerDay != null &&
       nicotineDependence != null &&
       reasonsForQuitting.isNotEmpty &&
@@ -281,7 +270,6 @@ class UserProfile {
 
   double get estimatedMoneySavedPerDay {
     if (averageCigarettesPerDay == null) return 0.0;
-    // Assuming $0.50 per cigarette (average cost)
     return averageCigarettesPerDay! * 0.50;
   }
-} 
+}

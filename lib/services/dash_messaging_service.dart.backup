@@ -18,13 +18,16 @@ class DashMessagingService implements MessagingService {
       DashMessagingService._internal();
   factory DashMessagingService() => _instance;
   DashMessagingService._internal() {
+    // Enable Firestore offline persistence for better performance
     _enableFirestorePersistence();
   }
 
+  // Enable Firestore offline persistence
   void _enableFirestorePersistence() async {
     try {
       final firestore = FirebaseFirestore.instance;
 
+      // INSTANT OPTIMIZATION: Configure Firestore for maximum performance
       firestore.settings = const Settings(
         persistenceEnabled: true,
         cacheSizeBytes: Settings.CACHE_SIZE_UNLIMITED,
@@ -35,17 +38,20 @@ class DashMessagingService implements MessagingService {
       // Enable network for real-time updates
       await firestore.enableNetwork();
 
+      // Warm up the connection
       firestore.collection('messages').doc('_warmup').get().catchError((_) {
         // Return a valid DocumentSnapshot or rethrow the error
         return firestore.collection('messages').doc('_warmup').get();
       });
 
+      DebugConfig.debugPrint('⚡ Firestore optimized for instant performance');
     } catch (e) {
+      DebugConfig.debugPrint('Error enabling Firestore persistence: $e');
     }
   }
 
   // Server host URL - initialize with correct server URL from main.py
-  String _hostUrl = "https://demo-server.example.com/api/mobile";
+  String _hostUrl = "https://dashmessaging-com.ngrok.io/scheduler/mobile-app";
   String get hostUrl => _hostUrl;
 
   // User information
@@ -86,18 +92,24 @@ class DashMessagingService implements MessagingService {
   final Map<String, String> _messageContentCache = {};
 
   // Add performance monitoring
+  final Stopwatch _performanceStopwatch = Stopwatch();
 
   // Debug flag for message alignment logging
+  static const bool _debugMessageAlignment = true; // Set to false in production
 
   // Filter messages older than this many days to prevent legacy messages
   static const int _maxMessageAgeDays = 30;
 
+  void _startPerformanceTimer(String operation) {
     _performanceStopwatch.reset();
     _performanceStopwatch.start();
+    DebugConfig.performancePrint('Starting performance timer for: $operation');
   }
 
+  void _stopPerformanceTimer(String operation) {
     _performanceStopwatch.stop();
     final elapsedMs = _performanceStopwatch.elapsedMilliseconds;
+    DebugConfig.performancePrint('$operation completed in ${elapsedMs}ms');
   }
 
   void _addToCache(ChatMessage message) {
@@ -112,6 +124,7 @@ class DashMessagingService implements MessagingService {
   void clearCache() {
     _messageCache.clear();
     _messageContentCache.clear();
+    DebugConfig.debugPrint('Message cache cleared');
   }
 
   // Generate deduplication key from message content and quick replies
@@ -141,7 +154,8 @@ class DashMessagingService implements MessagingService {
     final age = now.difference(timestamp);
     final tooOld = age.inDays > _maxMessageAgeDays;
     if (tooOld) {
-          '  Filtering out old message (${age.inDays} days old): ${timestamp.toIso8601String()}');
+      DebugConfig.debugPrint(
+          '🗑️  Filtering out old message (${age.inDays} days old): ${timestamp.toIso8601String()}');
     }
     return tooOld;
   }
@@ -149,16 +163,21 @@ class DashMessagingService implements MessagingService {
   @override
   Future<void> initialize(String userId, String? fcmToken) async {
     if (_isInitialized && _userId == userId) {
+      DebugConfig.debugPrint(
           'DashMessagingService already initialized for user: $userId');
       return;
     }
 
-        ' initializing DashMessagingService for user: $userId');
+    DebugConfig.infoPrint(
+        '⚡ INSTANT initializing DashMessagingService for user: $userId');
     _userId = userId;
     _fcmToken = fcmToken;
 
+    // Apply platform-specific URL transformations
     _hostUrl = PlatformUtils.transformLocalHostUrl(_hostUrl);
+    DebugConfig.infoPrint('Using platform-specific server URL: $_hostUrl');
 
+    // Clear cache when switching users
     if (_messageCache.isNotEmpty) {
       clearCache();
     }
@@ -169,22 +188,29 @@ class DashMessagingService implements MessagingService {
     // Stop any existing listeners
     stopRealtimeMessageListener();
 
+    // Reset timestamp tracking
+    DebugConfig.debugPrint('Reset timestamps during initialization');
     _lastFirestoreMessageTime = 0;
     _lowestLoadedTimestamp = 0;
 
     try {
+      // INSTANT OPTIMIZATION: Start listener FIRST for immediate updates
       startRealtimeMessageListener();
 
+      // Then load existing messages and FCM token in parallel
       final futures = <Future>[];
 
       futures.add(loadExistingMessages());
       futures.add(_loadFcmTokenInBackground());
 
+      // Non-critical background tasks
       Future.delayed(Duration.zero, () => _testConnectionInBackground());
 
+      // Wait only for critical tasks
       await Future.wait(futures);
 
       _isInitialized = true;
+      DebugConfig.infoPrint('⚡ DashMessagingService initialized instantly');
     } catch (e) {
       DebugConfig.errorPrint('Error during initialization: $e');
       _isInitialized = false;
@@ -192,14 +218,17 @@ class DashMessagingService implements MessagingService {
     }
   }
 
+  // Load FCM token in background without blocking initialization
   Future<void> _loadFcmTokenInBackground() async {
     try {
       _fcmToken = await _loadFcmToken().timeout(
         const Duration(seconds: 2),
         onTimeout: () {
+          DebugConfig.debugPrint('FCM token loading timed out, using default');
           return null; // do not fall back to a hardcoded token
         },
       );
+      DebugConfig.debugPrint('FCM Token: $_fcmToken');
     } catch (e) {
       DebugConfig.debugPrint('Error loading FCM token in background: $e');
       // Leave token null on error
@@ -207,13 +236,20 @@ class DashMessagingService implements MessagingService {
     }
   }
 
+  // Background connection test that doesn't block initialization
   Future<void> _testConnectionInBackground() async {
     try {
       final hostUrl = _hostUrl;
+      DebugConfig.debugPrint('========== CONNECTION TEST ==========');
+      DebugConfig.debugPrint('Platform: ${PlatformUtils.getPlatformInfo()}');
+      DebugConfig.debugPrint('Using host URL: $hostUrl');
+      DebugConfig.debugPrint('FCM Token: $_fcmToken');
+      DebugConfig.debugPrint('Testing connection to server: $hostUrl');
 
       final stopwatch = Stopwatch()..start();
 
       try {
+        // Platform-specific headers to improve connection reliability
         final headers = {
           'Content-Type': 'application/json',
           'Accept': 'application/json',
@@ -222,10 +258,12 @@ class DashMessagingService implements MessagingService {
           'Connection': 'keep-alive', // Important for iOS connection stability
         };
 
+        // Platform-specific timeout
         final connectionTimeout = Platform.isIOS
             ? const Duration(seconds: 15) // Longer timeout for iOS
             : const Duration(seconds: 10); // Standard timeout for Android
 
+        DebugConfig.debugPrint(
             'Using ${Platform.isIOS ? "iOS" : "Android"}-optimized connection settings');
 
         final response = await http
@@ -236,24 +274,35 @@ class DashMessagingService implements MessagingService {
             .timeout(connectionTimeout);
 
         final elapsed = stopwatch.elapsedMilliseconds;
+        DebugConfig.debugPrint('Connection test completed in ${elapsed}ms');
+        DebugConfig.debugPrint(
             'Server connection test response: ${response.statusCode}');
 
         if (response.statusCode == 200) {
+          DebugConfig.debugPrint('✅ Successfully connected to server');
+          DebugConfig.debugPrint(
               'Response size: ${response.body.length} bytes');
           if (response.body.length < 1000) {
+            DebugConfig.debugPrint('Response body: ${response.body}');
           }
         } else {
-              ' Server responded with status: ${response.statusCode}');
+          DebugConfig.debugPrint(
+              '⚠️ Server responded with status: ${response.statusCode}');
+          DebugConfig.debugPrint('Response body: ${response.body}');
         }
       } catch (e) {
         final elapsed = stopwatch.elapsedMilliseconds;
+        DebugConfig.debugPrint('❌ Connection test failed after ${elapsed}ms');
+        DebugConfig.debugPrint('Connection error: $e');
 
         // Try an alternate test with a standard timeout
+        DebugConfig.debugPrint('Attempting alternate connection test...');
         try {
           // For iOS, try with a different URL scheme first
           if (Platform.isIOS) {
             try {
               final altUrl = _hostUrl.replaceFirst('https://', 'http://');
+              DebugConfig.debugPrint(
                   'iOS: Trying alternate URL scheme: $altUrl');
 
               final altResponse = await http.get(
@@ -261,14 +310,18 @@ class DashMessagingService implements MessagingService {
                 headers: {'Content-Type': 'application/json'},
               ).timeout(const Duration(seconds: 5));
 
+              DebugConfig.debugPrint(
                   'iOS alternate URL test: ${altResponse.statusCode}');
               if (altResponse.statusCode >= 200 &&
                   altResponse.statusCode < 300) {
-                    ' iOS alternate URL connection successful');
+                DebugConfig.debugPrint(
+                    '✅ iOS alternate URL connection successful');
                 // If this works, update the URL to use this scheme
                 _hostUrl = altUrl;
+                DebugConfig.debugPrint('Updated host URL to: $_hostUrl');
               }
             } catch (altError) {
+              DebugConfig.debugPrint(
                   'iOS alternate URL test failed: $altError');
             }
           }
@@ -280,12 +333,16 @@ class DashMessagingService implements MessagingService {
               )
               .timeout(const Duration(seconds: 5));
 
+          DebugConfig.debugPrint(
               'Internet connectivity test: ${pingResponse.statusCode}');
           if (pingResponse.statusCode >= 200 && pingResponse.statusCode < 300) {
-                ' Issue appears specific to the app server');
+            DebugConfig.debugPrint('✅ Internet connection is working');
+            DebugConfig.debugPrint(
+                '⚠️ Issue appears specific to the app server');
 
             // iOS-specific: Try a different network configuration
             if (Platform.isIOS) {
+              DebugConfig.debugPrint(
                   'iOS: Attempting connection with cellular data...');
               try {
                 // This doesn't actually force cellular, but it logs the attempt for debugging
@@ -296,24 +353,32 @@ class DashMessagingService implements MessagingService {
                     'X-Cellular-Fallback': 'true',
                   },
                 ).timeout(const Duration(seconds: 8));
+                DebugConfig.debugPrint(
                     'iOS cellular data connection attempt completed');
               } catch (cellularError) {
+                DebugConfig.debugPrint(
                     'iOS cellular connection attempt failed: $cellularError');
               }
             }
           } else {
-                ' Internet connectivity test returned non-success code: ${pingResponse.statusCode}');
+            DebugConfig.debugPrint(
+                '⚠️ Internet connectivity test returned non-success code: ${pingResponse.statusCode}');
           }
         } catch (pingError) {
-              ' Internet connectivity test failed: $pingError');
+          DebugConfig.debugPrint(
+              '❌ Internet connectivity test failed: $pingError');
+          DebugConfig.debugPrint('⚠️ Device may have limited connectivity');
 
           if (Platform.isIOS) {
+            DebugConfig.debugPrint(
                 'iOS: Network appears to be restricted. Check VPN or firewall settings.');
           }
         }
       }
 
+      DebugConfig.debugPrint('===================================');
     } catch (e) {
+      DebugConfig.debugPrint('Error in connection test: $e');
     }
   }
 
@@ -322,7 +387,8 @@ class DashMessagingService implements MessagingService {
   Future<void> _loadHostUrl() async {
     try {
       // Always use the correct ngrok URL from main.py with full path
-      _hostUrl = "https://demo-server.example.com/api/mobile";
+      _hostUrl = "https://dashmessaging-com.ngrok.io/scheduler/mobile-app";
+      DebugConfig.debugPrint('Using server URL: $_hostUrl');
       FirebaseMessaging.instance
           .getToken()
           .then((token) => debugPrint('ACTUAL FCM TOKEN: $token'));
@@ -332,6 +398,7 @@ class DashMessagingService implements MessagingService {
         final prefs = await SharedPreferences.getInstance();
         await prefs.setString('hostUrl', _hostUrl);
       } catch (e) {
+        DebugConfig.debugPrint('Error saving host URL to preferences: $e');
       }
 
       return;
@@ -342,6 +409,7 @@ class DashMessagingService implements MessagingService {
 
   // Load existing messages from Firestore
   Future<void> loadExistingMessages() async {
+    _startPerformanceTimer('Initial message loading');
 
     if (_userId == null) {
       DebugConfig.debugPrint('Cannot load messages, user ID is null');
@@ -349,40 +417,47 @@ class DashMessagingService implements MessagingService {
     }
 
     try {
+      DebugConfig.debugPrint('⚡ INSTANT loading messages for user: $_userId');
 
-      // Loading: Load messages in chronological order
+      // CHRONOLOGICAL LOADING: Load messages in chronological order
       final chatRef = FirebaseFirestore.instance
           .collection('messages')
           .doc(_userId)
           .collection('chat')
           .orderBy('createdAt', descending: false);
 
+      // Platform-specific optimization: Use different limit based on platform
       final queryLimit = Platform.isIOS
           ? 15
           : 30; // Reduce limit for iOS to improve performance
       final limitedQuery = chatRef.limitToLast(queryLimit);
 
+      DebugConfig.debugPrint(
           'Using platform-optimized query limit: $queryLimit');
 
+      // Try cache first for INSTANT display
       Future<QuerySnapshot>? cacheQuery;
       Future<QuerySnapshot>? serverQuery;
 
       // Start both queries in parallel
       cacheQuery = limitedQuery.get(const GetOptions(source: Source.cache));
 
+      // Platform-specific optimization: Use longer timeout for iOS server queries
       final serverTimeout = Platform.isIOS
           ? const Duration(seconds: 8)
           : const Duration(seconds: 5);
       serverQuery = limitedQuery
           .get(const GetOptions(source: Source.server))
           .timeout(serverTimeout, onTimeout: () {
-            ' Server query timed out after ${serverTimeout.inSeconds}s');
+        DebugConfig.debugPrint(
+            '⚠️ Server query timed out after ${serverTimeout.inSeconds}s');
         throw TimeoutException('Server timeout');
       });
 
       // Process cache results INSTANTLY if available
       bool cacheProcessed = false;
       try {
+        // Platform-specific optimization: Use different cache timeout for iOS
         final cacheTimeout = Platform.isIOS
             ? const Duration(milliseconds: 200)
             : const Duration(milliseconds: 100);
@@ -392,8 +467,10 @@ class DashMessagingService implements MessagingService {
         );
 
         if (cacheSnapshot.docs.isNotEmpty) {
-              ' cache hit: ${cacheSnapshot.docs.length} messages');
+          DebugConfig.debugPrint(
+              '⚡ INSTANT cache hit: ${cacheSnapshot.docs.length} messages');
 
+          // Platform-specific optimization: For iOS, process cache in batches to reduce UI freezing
           if (Platform.isIOS && cacheSnapshot.docs.length > 10) {
             await _processSnapshotInBatches(cacheSnapshot);
           } else {
@@ -402,16 +479,19 @@ class DashMessagingService implements MessagingService {
           cacheProcessed = true;
         }
       } catch (e) {
+        DebugConfig.debugPrint('Cache miss or timeout - loading from server');
       }
 
       // Always process server results for updates
       try {
         final serverSnapshot = await serverQuery;
+        DebugConfig.debugPrint(
             'Server loaded: ${serverSnapshot.docs.length} messages');
 
         // Only process if cache wasn't successful or if there are new messages
         if (!cacheProcessed ||
             serverSnapshot.docs.length > _messageCache.length) {
+          // Platform-specific optimization: For iOS, process server results in batches
           if (Platform.isIOS && serverSnapshot.docs.length > 10) {
             await _processSnapshotInBatches(serverSnapshot);
           } else {
@@ -419,13 +499,17 @@ class DashMessagingService implements MessagingService {
           }
         }
       } catch (e) {
+        DebugConfig.debugPrint('Server load error: $e');
         if (!cacheProcessed) {
+          _stopPerformanceTimer('Initial message loading (error)');
           return;
         }
       }
 
+      _stopPerformanceTimer('Initial message loading (instant)');
     } catch (e) {
       DebugConfig.debugPrint('Error loading existing messages: $e');
+      _stopPerformanceTimer('Initial message loading (error)');
     }
   }
 
@@ -464,20 +548,25 @@ class DashMessagingService implements MessagingService {
           final content = data['messageBody']?.toString() ?? '';
           if (content.isEmpty) continue;
 
+          // Fast timestamp extraction
           final timestamp = _extractTimestampFast(data);
           lowestTimestamp = timestamp.millisecondsSinceEpoch < lowestTimestamp
               ? timestamp.millisecondsSinceEpoch
               : lowestTimestamp;
 
+          // Quick user check - prioritize source field for reliability
           final source = data['source']?.toString() ?? '';
           final senderId = data['senderId'] ?? data['userId'] ?? '';
           final isMe =
               source == 'client' || (source.isEmpty && senderId == _userId);
 
+          // Simplified alignment check for batched processing
           if (_debugMessageAlignment && content.isNotEmpty) {
-                ' BATCH Message alignment check: "${content.substring(0, content.length > 20 ? 20 : content.length)}..." -> isMe: $isMe');
+            DebugConfig.debugPrint(
+                '📍 BATCH Message alignment check: "${content.substring(0, content.length > 20 ? 20 : content.length)}..." -> isMe: $isMe');
           }
 
+          // Simplified quick reply detection for batched processing
           final isPoll = data['isPoll'];
           final hasQuickReplyData = isMessagePoll(isPoll) ||
               data['questionsAnswers'] != null ||
@@ -490,6 +579,7 @@ class DashMessagingService implements MessagingService {
             final quickReplies = _extractAllQuickReplies(data);
 
             if (quickReplies.isNotEmpty) {
+              // Use server content and quick replies directly without transformation
               final message = ChatMessage(
                 id: messageId,
                 content: content,
@@ -528,6 +618,7 @@ class DashMessagingService implements MessagingService {
             messages.add(message);
           }
         } catch (e) {
+          DebugConfig.debugPrint('Error processing doc in batch: $e');
         }
       }
 
@@ -544,7 +635,8 @@ class DashMessagingService implements MessagingService {
     }
 
     _lowestLoadedTimestamp = lowestTimestamp;
-        ' Processed ${processedIds.length} messages in batches');
+    DebugConfig.debugPrint(
+        '⚡ Processed ${processedIds.length} messages in batches');
   }
 
   // Helper method to extract all quick replies from message data
@@ -619,6 +711,7 @@ class DashMessagingService implements MessagingService {
         return quickReplies;
       }
     } catch (e) {
+      DebugConfig.debugPrint('Error extracting quick replies: $e');
     }
 
     return quickReplies;
@@ -637,6 +730,7 @@ class DashMessagingService implements MessagingService {
         return DateTime.parse(createdAt);
       }
     } catch (e) {
+      DebugConfig.debugPrint('Error parsing timestamp: $e');
     }
     return DateTime.now();
   }
@@ -668,6 +762,7 @@ class DashMessagingService implements MessagingService {
             .toList();
       }
     } catch (e) {
+      DebugConfig.debugPrint('Error extracting quick replies: $e');
     }
     return null;
   }
@@ -685,6 +780,7 @@ class DashMessagingService implements MessagingService {
     if (_lastMessageText == message && _lastResponseTime != null) {
       final timeSinceLastSend = now.difference(_lastResponseTime!);
       if (timeSinceLastSend.inSeconds < 3) {
+        DebugConfig.debugPrint(
             'Preventing duplicate message within 3 seconds: $message');
         return;
       }
@@ -703,11 +799,13 @@ class DashMessagingService implements MessagingService {
     // User messages will appear when they come back through Firebase real-time listener
     // with proper server timestamps ensuring correct chronological ordering
 
-    // History: Store user message in Firebase for complete conversation history
+    // CONVERSATION HISTORY: Store user message in Firebase for complete conversation history
     await _storeUserMessageInFirebase(messageId, message, now, 1);
 
-        ' User message stored in Firebase, will appear through real-time listener with correct server timestamp');
+    DebugConfig.debugPrint(
+        '🕐 User message stored in Firebase, will appear through real-time listener with correct server timestamp');
 
+    DebugConfig.debugPrint(
         'Sending message to server: {messageId: $messageId, userId: $_userId, messageText: $message, eventTypeCode: 1}');
 
     try {
@@ -723,7 +821,10 @@ class DashMessagingService implements MessagingService {
       // Pretty print JSON for better readability in console
       final prettyRequestJson =
           const JsonEncoder.withIndent('  ').convert(jsonDecode(requestBody));
+      DebugConfig.debugPrint('📤 REQUEST JSON:');
+      DebugConfig.debugPrint(prettyRequestJson);
 
+      DebugConfig.debugPrint('Using endpoint: $_hostUrl');
 
       // Send to server with optimized timeout
       final response = await http
@@ -739,12 +840,14 @@ class DashMessagingService implements MessagingService {
           .timeout(
         const Duration(seconds: 8), // Reduced from 10 to 8 seconds
         onTimeout: () {
-              ' Server request timeout for message: $message');
+          DebugConfig.debugPrint(
+              '⚠️ Server request timeout for message: $message');
           // Don't throw - let Firebase handle the response
           return http.Response('', 408); // Request timeout
         },
       );
 
+      DebugConfig.debugPrint(
           'Send message response status: ${response.statusCode}');
 
       // Pretty print response JSON for better readability if it's valid JSON
@@ -753,25 +856,33 @@ class DashMessagingService implements MessagingService {
           final responseJson = jsonDecode(response.body);
           final prettyResponseJson =
               const JsonEncoder.withIndent('  ').convert(responseJson);
+          DebugConfig.debugPrint('📥 RESPONSE JSON:');
+          DebugConfig.debugPrint(prettyResponseJson);
         } catch (e) {
           // Not valid JSON, just print the raw body
+          DebugConfig.debugPrint('Response body: ${response.body}');
         }
       }
 
       if (response.statusCode == 200) {
+        DebugConfig.debugPrint('Message sent successfully to server');
         // Server will send response via Firebase, no need to process here
         return;
       } else if (response.statusCode == 408) {
         // Timeout - message might still be delivered via Firebase
+        DebugConfig.debugPrint(
             'Server timeout, but message may still be delivered');
         return;
       } else {
+        DebugConfig.debugPrint(
             'Failed to send message. Status: ${response.statusCode}');
+        DebugConfig.debugPrint('Response body: ${response.body}');
         // Remove the message from stream if server rejected it
         // Note: In a real app, you might want to show an error state instead
         return;
       }
     } catch (e) {
+      DebugConfig.debugPrint('Error sending message to server: $e');
       // Message already shown in UI, server might still process it
       return; // Return true to avoid confusing the user
     }
@@ -787,11 +898,13 @@ class DashMessagingService implements MessagingService {
     // Stop any existing listener
     stopRealtimeMessageListener();
 
+    _startPerformanceTimer('Realtime listener setup');
 
     try {
-          'Setting up realtime listener for user: $_userId');
+      DebugConfig.debugPrint(
+          'Setting up INSTANT realtime listener for user: $_userId');
 
-      // Ordering: Get messages in ascending order for proper chronological display
+      // CHRONOLOGICAL ORDERING: Get messages in ascending order for proper chronological display
       final chatRef = FirebaseFirestore.instance
           .collection('messages')
           .doc(_userId)
@@ -799,13 +912,13 @@ class DashMessagingService implements MessagingService {
           .orderBy('createdAt', descending: false)
           .limitToLast(100); // Get last 100 messages in chronological order
 
-      // Enable network synchronization for updates
+      // Enable network synchronization for instant updates
       FirebaseFirestore.instance.enableNetwork();
 
       _firestoreSubscription = chatRef
           .snapshots(
               includeMetadataChanges:
-                  true // Include metadata for local writes
+                  true // Include metadata for instant local writes
               )
           .listen(
         (snapshot) {
@@ -813,13 +926,14 @@ class DashMessagingService implements MessagingService {
           final docChanges = snapshot.docChanges;
           if (docChanges.isEmpty) return;
 
-              ' update: ${docChanges.length} changes');
+          DebugConfig.debugPrint(
+              '⚡ INSTANT update: ${docChanges.length} changes');
 
           // Collect new messages and sort them chronologically
           final newMessages = <ChatMessage>[];
 
           for (var change in docChanges) {
-            // Process all change types for updates
+            // Process all change types for instant updates
             if (change.type == DocumentChangeType.added ||
                 (change.type == DocumentChangeType.modified &&
                     !change.doc.metadata.hasPendingWrites)) {
@@ -840,11 +954,15 @@ class DashMessagingService implements MessagingService {
               if (messageBody.toLowerCase().contains('cigarette') ||
                   messageBody.toLowerCase().contains('ready') ||
                   messageBody.toLowerCase().contains('quiz')) {
-                    ' REALTIME POTENTIAL QUICK REPLY MESSAGE:');
-                    ' Full data keys: ${data.keys.toList()}');
+                DebugConfig.debugPrint(
+                    '🔍 REALTIME POTENTIAL QUICK REPLY MESSAGE:');
+                DebugConfig.debugPrint('🔍 Content: $messageBody');
+                DebugConfig.debugPrint(
+                    '🔍 Full data keys: ${data.keys.toList()}');
+                DebugConfig.debugPrint('🔍 Full data: $data');
               }
 
-              // timestamp - use now if not available
+              // Instant timestamp - use now if not available
               final messageTimestamp = _extractTimestampFast(data);
 
               // Filter out messages that are too old (legacy messages)
@@ -852,15 +970,17 @@ class DashMessagingService implements MessagingService {
                 continue; // Skip old messages
               }
 
+              // Quick user check - prioritize source field for reliability
               final source = data['source']?.toString() ?? '';
               final senderId = data['senderId'] ?? data['userId'] ?? '';
               // FIXED: Prioritize source field since it's more reliable than senderId comparison
               final isMe =
                   source == 'client' || (source.isEmpty && senderId == _userId);
 
-              //  Log message alignment for troubleshooting
+              // DEBUG: Log message alignment for troubleshooting
               if (_debugMessageAlignment && messageBody.isNotEmpty) {
-                    ' REALTIME Message alignment check: "${messageBody.substring(0, messageBody.length > 30 ? 30 : messageBody.length)}..." -> isMe: $isMe (source: "$source", senderId: "$senderId", _userId: "$_userId")');
+                DebugConfig.debugPrint(
+                    '📍 REALTIME Message alignment check: "${messageBody.substring(0, messageBody.length > 30 ? 30 : messageBody.length)}..." -> isMe: $isMe (source: "$source", senderId: "$senderId", _userId: "$_userId")');
               }
 
               // Enhanced poll detection - check ALL possible quick reply fields (same as unified logic)
@@ -877,9 +997,17 @@ class DashMessagingService implements MessagingService {
                   messageBody.toLowerCase().contains('ready') ||
                   messageBody.toLowerCase().contains('quiz') ||
                   messageBody.toLowerCase().contains('smoke')) {
-                    ' REALTIME: Analyzing potential poll message:');
-                    ' questionsAnswers: $questionsAnswers');
-                    ' suggestedReplies: $suggestedReplies');
+                DebugConfig.debugPrint(
+                    '🔍 REALTIME: Analyzing potential poll message:');
+                DebugConfig.debugPrint('🔍 Content: $messageBody');
+                DebugConfig.debugPrint('🔍 isPoll: $isPoll');
+                DebugConfig.debugPrint(
+                    '🔍 questionsAnswers: $questionsAnswers');
+                DebugConfig.debugPrint('🔍 answers: $answers');
+                DebugConfig.debugPrint('🔍 buttons: $buttons');
+                DebugConfig.debugPrint(
+                    '🔍 suggestedReplies: $suggestedReplies');
+                DebugConfig.debugPrint('🔍 All keys: ${data.keys.toList()}');
               }
 
               final hasQuickReplyData = isMessagePoll(isPoll) ||
@@ -900,7 +1028,8 @@ class DashMessagingService implements MessagingService {
                     quickReplies.add(QuickReply(
                         text: entry.key, value: entry.value.toString()));
                   }
-                      ' REALTIME: Added ${questionsAnswers.length} quick replies from questionsAnswers');
+                  DebugConfig.debugPrint(
+                      '🔧 REALTIME: Added ${questionsAnswers.length} quick replies from questionsAnswers');
                 }
 
                 // 2. answers (List or String format)
@@ -909,7 +1038,8 @@ class DashMessagingService implements MessagingService {
                     quickReplies.add(
                         QuickReply(text: a.toString(), value: a.toString()));
                   }
-                      ' REALTIME: Added ${answers.length} quick replies from answers (List)');
+                  DebugConfig.debugPrint(
+                      '🔧 REALTIME: Added ${answers.length} quick replies from answers (List)');
                 } else if (answers is String &&
                     answers != 'None' &&
                     answers.isNotEmpty) {
@@ -922,7 +1052,8 @@ class DashMessagingService implements MessagingService {
                   for (final a in answerList) {
                     quickReplies.add(QuickReply(text: a, value: a));
                   }
-                      ' REALTIME: Added ${answerList.length} quick replies from answers (String)');
+                  DebugConfig.debugPrint(
+                      '🔧 REALTIME: Added ${answerList.length} quick replies from answers (String)');
                 }
 
                 // 3. buttons (from push notifications)
@@ -934,7 +1065,8 @@ class DashMessagingService implements MessagingService {
                       quickReplies.add(QuickReply(text: title, value: title));
                     }
                   }
-                      ' REALTIME: Added ${buttons.length} quick replies from buttons');
+                  DebugConfig.debugPrint(
+                      '🔧 REALTIME: Added ${buttons.length} quick replies from buttons');
                 }
 
                 // 4. suggestedReplies (already processed)
@@ -947,7 +1079,8 @@ class DashMessagingService implements MessagingService {
                       quickReplies.add(QuickReply(text: text, value: value));
                     }
                   }
-                      ' REALTIME: Added ${suggestedReplies.length} quick replies from suggestedReplies');
+                  DebugConfig.debugPrint(
+                      '🔧 REALTIME: Added ${suggestedReplies.length} quick replies from suggestedReplies');
                 }
 
                 // 5. Check for legacy field names that might exist
@@ -959,17 +1092,20 @@ class DashMessagingService implements MessagingService {
                       quickReplies.add(QuickReply(
                           text: option.toString(), value: option.toString()));
                     }
-                        ' REALTIME: Added ${oldAnswers.length} quick replies from legacy options/choices/replies');
+                    DebugConfig.debugPrint(
+                        '🔧 REALTIME: Added ${oldAnswers.length} quick replies from legacy options/choices/replies');
                   }
                 }
 
                 if (quickReplies.isNotEmpty) {
                   // Check for duplicate message (retry scenario)
                   if (_isDuplicateMessage(messageBody, quickReplies)) {
-                        '   REALTIME: Skipping duplicate message (retry): "$messageBody"');
+                    DebugConfig.debugPrint(
+                        '🔧 ⏭️  REALTIME: Skipping duplicate message (retry): "$messageBody"');
                     continue; // Skip this duplicate message
                   }
 
+                  // Use server content and quick replies directly without transformation
                   // Create a single message with both content and quick replies
                   final message = ChatMessage(
                     id: messageId,
@@ -983,9 +1119,11 @@ class DashMessagingService implements MessagingService {
                   _messageCache[messageId] = message;
                   _registerMessage(messageId, messageBody, quickReplies);
                   newMessages.add(message);
-                      '  REALTIME: Created single poll message with content and ${quickReplies.length} options: ${quickReplies.map((r) => r.text).join(", ")}');
+                  DebugConfig.debugPrint(
+                      '🔧 ✅ REALTIME: Created single poll message with content and ${quickReplies.length} options: ${quickReplies.map((r) => r.text).join(", ")}');
                 } else {
-                      '  REALTIME: Poll detected but no valid quick replies created for: $messageBody');
+                  DebugConfig.debugPrint(
+                      '🔧 ⚠️ REALTIME: Poll detected but no valid quick replies created for: $messageBody');
                   // Fallback to regular text message if no quick replies could be created
                   final message = ChatMessage(
                     id: messageId,
@@ -1023,18 +1161,23 @@ class DashMessagingService implements MessagingService {
           }
         },
         onError: (error) {
-          // retry with exponential backoff
+          DebugConfig.debugPrint('Realtime listener error: $error');
+          // Instant retry with exponential backoff
           Future.delayed(const Duration(seconds: 1), () {
             if (_userId != null) startRealtimeMessageListener();
           });
         },
       );
 
+      _stopPerformanceTimer('Realtime listener setup');
+      DebugConfig.debugPrint('⚡ INSTANT realtime listener active');
     } catch (e) {
-      DebugConfig.debugPrint('Error setting up listener: $e');
+      DebugConfig.debugPrint('Error setting up instant listener: $e');
+      _stopPerformanceTimer('Realtime listener setup (error)');
     }
   }
 
+  // Ultra-fast timestamp extraction
   // ignore: unused_element
   DateTime _extractTimestampFast(Map<String, dynamic> data) {
     try {
@@ -1060,7 +1203,7 @@ class DashMessagingService implements MessagingService {
         return DateTime.fromMillisecondsSinceEpoch(clientTimestamp);
       }
     } catch (_) {}
-    return DateTime.now(); // fallback
+    return DateTime.now(); // Instant fallback
   }
 
   // Create quick reply message without directly adding to stream
@@ -1073,14 +1216,17 @@ class DashMessagingService implements MessagingService {
           data['questionsAnswers'] as Map<String, dynamic>?;
       final answers = data['answers'];
 
-          ' Creating quick reply for message $messageId: isPoll=$isPoll, questionsAnswers=$questionsAnswers, answers=$answers');
-          ' All fields in message data: ${data.keys.toList()}');
+      DebugConfig.debugPrint(
+          '🔧 Creating quick reply for message $messageId: isPoll=$isPoll, questionsAnswers=$questionsAnswers, answers=$answers');
+      DebugConfig.debugPrint(
+          '🔧 All fields in message data: ${data.keys.toList()}');
 
       // Check if this message has quick reply data
       final hasQuickReplyData =
           isMessagePoll(isPoll) || questionsAnswers != null || answers != null;
       if (!hasQuickReplyData) {
-            ' No quick reply data found for message $messageId');
+        DebugConfig.debugPrint(
+            '🔧 No quick reply data found for message $messageId');
         return null;
       }
 
@@ -1089,19 +1235,22 @@ class DashMessagingService implements MessagingService {
 
       List<QuickReply> quickReplies = [];
 
+      // Fast processing - handle both questionsAnswers and answers formats
       if (questionsAnswers != null && questionsAnswers.isNotEmpty) {
         for (final entry in questionsAnswers.entries) {
           quickReplies
               .add(QuickReply(text: entry.key, value: entry.value.toString()));
         }
-            ' Added ${questionsAnswers.length} quick replies from questionsAnswers');
+        DebugConfig.debugPrint(
+            '🔧 Added ${questionsAnswers.length} quick replies from questionsAnswers');
       } else if (answers != null) {
         if (answers is List) {
           for (var a in answers.take(4)) {
             quickReplies
                 .add(QuickReply(text: a.toString(), value: a.toString()));
           }
-              ' Added ${answers.length} quick replies from answers (List)');
+          DebugConfig.debugPrint(
+              '🔧 Added ${answers.length} quick replies from answers (List)');
         } else if (answers is String &&
             answers != 'None' &&
             answers.isNotEmpty) {
@@ -1114,13 +1263,16 @@ class DashMessagingService implements MessagingService {
           for (final a in answerList) {
             quickReplies.add(QuickReply(text: a, value: a));
           }
-              ' Added ${answerList.length} quick replies from answers (String)');
+          DebugConfig.debugPrint(
+              '🔧 Added ${answerList.length} quick replies from answers (String)');
         }
       }
 
       if (quickReplies.isNotEmpty) {
+        // Use server quick replies directly without transformation
 
-            '  Created quick reply message with ${quickReplies.length} options: ${quickReplies.map((r) => r.text).join(", ")}');
+        DebugConfig.debugPrint(
+            '🔧 ✅ Created quick reply message with ${quickReplies.length} options: ${quickReplies.map((r) => r.text).join(", ")}');
         return ChatMessage(
           id: quickReplyId,
           content: '',
@@ -1131,9 +1283,11 @@ class DashMessagingService implements MessagingService {
         );
       }
 
-          '  No quick replies created for message $messageId');
+      DebugConfig.debugPrint(
+          '🔧 ❌ No quick replies created for message $messageId');
       return null;
     } catch (e) {
+      DebugConfig.debugPrint('Quick reply processing error: $e');
       return null;
     }
   }
@@ -1142,6 +1296,7 @@ class DashMessagingService implements MessagingService {
   void stopRealtimeMessageListener() {
     _firestoreSubscription?.cancel();
     _firestoreSubscription = null;
+    DebugConfig.debugPrint('Stopped real-time Firestore listener');
   }
 
   // Load FCM token from Firebase Messaging
@@ -1154,9 +1309,11 @@ class DashMessagingService implements MessagingService {
       final token = await messaging.getToken();
 
       if (token != null && token.isNotEmpty) {
+        DebugConfig.debugPrint(
             'Successfully retrieved FCM token from Firebase Messaging');
         return token;
       } else {
+        DebugConfig.debugPrint(
             'Failed to get FCM token from Firebase Messaging');
         return null;
       }
@@ -1185,6 +1342,7 @@ class DashMessagingService implements MessagingService {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString('hostUrl', newUrl);
 
+      DebugConfig.debugPrint('Host URL updated to: $_hostUrl');
 
       // Test if the new URL is working
       if (_userId != null) {
@@ -1194,12 +1352,15 @@ class DashMessagingService implements MessagingService {
             headers: {'Content-Type': 'application/json'},
           ).timeout(const Duration(seconds: 5));
 
+          DebugConfig.debugPrint(
               'Connection test response with new URL: ${testResponse.statusCode}');
         } catch (e) {
+          DebugConfig.debugPrint('Error testing new URL: $e');
           // We don't throw here since the URL might be valid but endpoint not available
         }
       }
     } catch (e) {
+      DebugConfig.debugPrint('Error updating host URL: $e');
       throw Exception('Failed to update host URL: $e');
     }
   }
@@ -1207,6 +1368,7 @@ class DashMessagingService implements MessagingService {
   // Handle incoming push notifications
   void handlePushNotification(Map<String, dynamic> data) {
     try {
+      DebugConfig.debugPrint('Received push notification: $data');
 
       // Parse data into QuitxtServerIncomingDto format
       final recipientId = data['recipientId'] as String?;
@@ -1220,6 +1382,7 @@ class DashMessagingService implements MessagingService {
       if (recipientId == null ||
           serverMessageId == null ||
           messageBody == null) {
+        DebugConfig.debugPrint('Missing required fields in push notification');
         return;
       }
 
@@ -1250,6 +1413,7 @@ class DashMessagingService implements MessagingService {
         }
 
         if (quickReplies.isNotEmpty) {
+          // Use server quick replies directly without transformation
 
           // Add a separate message with quick replies
           final quickReplyMessage = ChatMessage(
@@ -1277,6 +1441,7 @@ class DashMessagingService implements MessagingService {
           }
 
           if (quickReplies.isNotEmpty) {
+            // Use server quick replies directly without transformation
 
             // Add a separate message with quick replies
             final quickReplyMessage = ChatMessage(
@@ -1292,36 +1457,43 @@ class DashMessagingService implements MessagingService {
         }
       }
     } catch (e) {
+      DebugConfig.debugPrint('Error handling push notification: $e');
     }
   }
 
   // Mock method to simulate server response (for testing without server)
   Future<void> simulateServerResponse(String userMessage) async {
     // Skip all mock responses to keep chat completely clean
+    DebugConfig.debugPrint(
         'Mock server responses disabled - no responses will be generated');
+    DebugConfig.debugPrint('Message received but not processed: $userMessage');
     return;
   }
 
   // Send all test messages in sequence (useful for testing)
   Future<void> sendTestMessages() async {
+    DebugConfig.debugPrint(
         "Test messages disabled - no test messages will be sent");
     return;
   }
 
   // Process sample test data
   Future<void> processSampleTestData() async {
+    DebugConfig.debugPrint(
         "Sample test data processing disabled - no sample messages will be sent");
     return;
   }
 
   // Process server responses
   Future<void> processServerResponses() async {
+    DebugConfig.debugPrint(
         "Predefined server responses disabled - no predefined messages will be sent");
     return;
   }
 
   // Send a quick reply to the server
   Future<void> sendQuickReply(String value, String text) async {
+    DebugConfig.debugPrint('Sending quick reply: value="$value", text="$text" (sending value to server)');
     return sendMessage(value,
         metadata: {'eventTypeCode': 2, 'quickReplyValue': value});
   }
@@ -1332,6 +1504,7 @@ class DashMessagingService implements MessagingService {
     try {
       final List<dynamic> serverResponses = jsonInput['serverResponses'];
       if (serverResponses.isEmpty) {
+        DebugConfig.debugPrint('No server responses found in the input JSON');
         return;
       }
 
@@ -1352,6 +1525,7 @@ class DashMessagingService implements MessagingService {
             quickReplies.add(QuickReply(text: entry.key, value: entry.value));
           }
 
+          // Use server content and quick replies directly without transformation
 
           // Add poll message with quick replies
           final message = ChatMessage(
@@ -1378,16 +1552,19 @@ class DashMessagingService implements MessagingService {
         }
       }
     } catch (e) {
+      DebugConfig.debugPrint('Error processing predefined responses: $e');
     }
   }
 
   // Process responses from custom JSON input
   Future<bool> processCustomJsonInput(String jsonInput) async {
     try {
+      DebugConfig.debugPrint('Processing custom JSON input');
       final Map<String, dynamic> data = jsonDecode(jsonInput);
       await processPredefinedResponses(data);
       return true;
     } catch (e) {
+      DebugConfig.debugPrint('Error processing custom JSON input: $e');
       return false;
     }
   }
@@ -1395,6 +1572,7 @@ class DashMessagingService implements MessagingService {
   // Process interactive responses for specific user inputs
   Future<bool> processInteractiveResponses(String userInput) async {
     // Return false to bypass all prebuilt responses and always use the server
+    DebugConfig.debugPrint('Bypassing prebuilt responses for: $userInput');
     return false;
   }
 
@@ -1414,17 +1592,21 @@ class DashMessagingService implements MessagingService {
     if (_isStreamClosed || _messageStreamController.isClosed) {
       _messageStreamController = StreamController<ChatMessage>.broadcast();
       _isStreamClosed = false;
+      DebugConfig.debugPrint('Stream controller reinitialized');
     }
   }
 
   // Reset the last message time to force a full refresh
   void resetLastMessageTime() {
     _lastFirestoreMessageTime = 0;
+    DebugConfig.debugPrint('Reset _lastFirestoreMessageTime to 0');
   }
 
   /// Takes a raw JSON text message from the server and processes it into a ChatMessage.
   /// This handles processing of response messages received from the server.
+  ///
   /// [serverResponseJson] should be a JSON string containing the server response data.
+  ///
   /// Returns a ChatMessage object ready to be added to the chat stream.
   Future<ChatMessage> processServerResponseJson(
       String serverResponseJson) async {
@@ -1468,6 +1650,7 @@ class DashMessagingService implements MessagingService {
 
       return message;
     } catch (e) {
+      DebugConfig.debugPrint('Error processing server response JSON: $e');
       // In case of error, return a fallback message
       return ChatMessage(
         id: _uuid.v4(),
@@ -1482,17 +1665,20 @@ class DashMessagingService implements MessagingService {
   // Test connection to the server using the exact URL
   Future<bool> testConnection() async {
     if (!_isInitialized) {
+      DebugConfig.debugPrint(
           'DashMessagingService not initialized, cannot test connection');
       return false;
     }
 
     // Double check that we're using the correct URL
     if (!_hostUrl.contains("/scheduler/mobile-app")) {
+      DebugConfig.debugPrint(
           'Correcting server URL to include path for connection test');
-      _hostUrl = "https://demo-server.example.com/api/mobile";
+      _hostUrl = "https://dashmessaging-com.ngrok.io/scheduler/mobile-app";
     }
 
     try {
+      DebugConfig.debugPrint('Testing connection to server: $_hostUrl');
 
       // Try to connect to the server
       final response = await http.get(
@@ -1500,11 +1686,13 @@ class DashMessagingService implements MessagingService {
         headers: {'Content-Type': 'application/json'},
       ).timeout(const Duration(seconds: 5));
 
+      DebugConfig.debugPrint(
           'Server connection test response: ${response.statusCode}');
 
       // Any response means we can reach the server
       return response.statusCode >= 200;
     } catch (e) {
+      DebugConfig.debugPrint('Error testing connection to server: $e');
       return false;
     }
   }
@@ -1529,13 +1717,16 @@ class DashMessagingService implements MessagingService {
 
   // Load older messages for pagination
   Future<List<ChatMessage>> loadOlderMessages({int limit = 10}) async {
+    _startPerformanceTimer('Loading older messages (pagination)');
 
     if (_userId == null) {
       DebugConfig.debugPrint('Cannot load older messages, user ID is null');
+      _stopPerformanceTimer('Loading older messages (pagination - no user)');
       return [];
     }
 
     try {
+      DebugConfig.debugPrint(
           'Loading $limit older messages from Firestore for user: $_userId');
 
       // Get reference to the user's chat collection
@@ -1549,16 +1740,20 @@ class DashMessagingService implements MessagingService {
       // Add pagination using the lowest timestamp we've seen
       if (_lowestLoadedTimestamp > 0) {
         query = query.where('createdAt', isLessThan: _lowestLoadedTimestamp);
+        DebugConfig.debugPrint(
             'Loading messages older than timestamp: $_lowestLoadedTimestamp');
       }
 
       final snapshot = await query.get();
 
       if (snapshot.docs.isEmpty) {
+        DebugConfig.debugPrint('No older messages found');
+        _stopPerformanceTimer(
             'Loading older messages (pagination - no messages)');
         return [];
       }
 
+      DebugConfig.debugPrint('Found ${snapshot.docs.length} older messages');
 
       final messages = <ChatMessage>[];
       final processedMessageIds = <String>{};
@@ -1599,6 +1794,7 @@ class DashMessagingService implements MessagingService {
               }
             }
           } catch (e) {
+            DebugConfig.debugPrint('Error updating pagination timestamp: $e');
           }
 
           // Use unified processing logic for historical messages
@@ -1612,18 +1808,23 @@ class DashMessagingService implements MessagingService {
             messages.add(message);
           }
         } catch (e) {
+          DebugConfig.debugPrint('Error processing older message: $e');
         }
       }
 
+      DebugConfig.debugPrint('Processed ${messages.length} older messages');
+      _stopPerformanceTimer('Loading older messages (pagination)');
       return messages;
     } catch (e) {
       DebugConfig.debugPrint('Error loading older messages: $e');
+      _stopPerformanceTimer('Loading older messages (pagination - error)');
       return [];
     }
   }
 
   // Load more messages on demand (for pagination or when user scrolls up)
   Future<void> loadMoreMessages({int additionalCount = 10}) async {
+    _startPerformanceTimer('Loading additional messages');
 
     if (_userId == null) {
       DebugConfig.debugPrint('Cannot load more messages, user ID is null');
@@ -1631,6 +1832,7 @@ class DashMessagingService implements MessagingService {
     }
 
     try {
+      DebugConfig.debugPrint(
           'Loading $additionalCount additional messages from Firestore');
 
       // Query for older messages using pagination
@@ -1649,15 +1851,19 @@ class DashMessagingService implements MessagingService {
       final snapshot = await query.get().timeout(
         const Duration(seconds: 3),
         onTimeout: () {
+          DebugConfig.debugPrint('Additional messages query timeout');
           throw TimeoutException(
               'Additional messages query timeout', const Duration(seconds: 3));
         },
       );
 
       if (snapshot.docs.isEmpty) {
+        DebugConfig.debugPrint('No additional messages found');
+        _stopPerformanceTimer('Loading additional messages (no messages)');
         return;
       }
 
+      DebugConfig.debugPrint(
           'Found ${snapshot.docs.length} additional messages');
 
       // Process additional messages efficiently
@@ -1720,9 +1926,12 @@ class DashMessagingService implements MessagingService {
         _safeAddToStream(message);
       }
 
+      DebugConfig.debugPrint(
           'Added ${messages.length} additional messages to stream');
+      _stopPerformanceTimer('Loading additional messages');
     } catch (e) {
       DebugConfig.debugPrint('Error loading additional messages: $e');
+      _stopPerformanceTimer('Loading additional messages (error)');
     }
   }
 
@@ -1732,16 +1941,24 @@ class DashMessagingService implements MessagingService {
       try {
         _messageStreamController.add(message);
       } catch (e) {
+        DebugConfig.debugPrint('Error adding message to stream: $e');
       }
     } else {
+      DebugConfig.debugPrint(
           'Stream is closed, cannot add message: ${message.id}');
     }
   }
 
   // Test stream controller functionality
   void testStreamController() {
+    DebugConfig.debugPrint('Testing stream controller...');
+    DebugConfig.debugPrint(
         'Stream controller closed: ${_messageStreamController.isClosed}');
+    DebugConfig.debugPrint(
         'Stream has listener: ${_messageStreamController.hasListener}');
+    DebugConfig.debugPrint('Is stream closed flag: $_isStreamClosed');
+    DebugConfig.debugPrint('Service initialized: $_isInitialized');
+    DebugConfig.debugPrint('User ID: $_userId');
 
     // Test adding a message to the stream
     try {
@@ -1753,7 +1970,9 @@ class DashMessagingService implements MessagingService {
         type: MessageType.text,
       );
       _safeAddToStream(testMessage);
+      DebugConfig.debugPrint('Successfully added test message to stream');
     } catch (e) {
+      DebugConfig.debugPrint('Error testing stream controller: $e');
     }
   }
 
@@ -1808,6 +2027,7 @@ class DashMessagingService implements MessagingService {
     if (_userId == null) return;
 
     try {
+      DebugConfig.debugPrint('Loading additional messages in background...');
 
       // Load additional messages in chronological order
       final chatRef = FirebaseFirestore.instance
@@ -1824,6 +2044,7 @@ class DashMessagingService implements MessagingService {
               const Duration(seconds: 3),
             );
       } catch (e) {
+        DebugConfig.debugPrint(
             'Background loading timeout or error - continuing with current messages: $e');
         return;
       }
@@ -1850,9 +2071,11 @@ class DashMessagingService implements MessagingService {
           _safeAddToStream(additionalMessages[i]);
         }
 
+        DebugConfig.debugPrint(
             'Background loaded ${additionalMessages.length} additional messages in chronological order');
       }
     } catch (e) {
+      DebugConfig.debugPrint('Background message loading failed: $e');
     }
   }
 
@@ -1891,7 +2114,9 @@ class DashMessagingService implements MessagingService {
       // Store the user message in Firebase
       await userMessagesRef.doc(messageId).set(userMessageData);
 
+      DebugConfig.debugPrint('✓ User message stored in Firebase: $messageId');
     } catch (e) {
+      DebugConfig.debugPrint('Error storing user message in Firebase: $e');
       // Don't throw the error - this shouldn't prevent sending the message
     }
   }
@@ -1900,6 +2125,7 @@ class DashMessagingService implements MessagingService {
   Future<List<Map<String, dynamic>>> getConversationHistory(
       {int limit = 20}) async {
     if (_userId == null) {
+      DebugConfig.debugPrint(
           'Cannot get conversation history: user ID is null');
       return [];
     }
@@ -1932,14 +2158,17 @@ class DashMessagingService implements MessagingService {
         });
       }
 
+      DebugConfig.debugPrint('📜 Conversation History ($_userId):');
       for (var i = 0; i < history.length; i++) {
         final msg = history[i];
         final prefix = msg['isUserMessage'] ? '👤 User:' : '🤖 Server:';
+        DebugConfig.debugPrint(
             '  ${i + 1}. $prefix ${msg['message']} [${msg['timestamp']}]');
       }
 
       return history;
     } catch (e) {
+      DebugConfig.debugPrint('Error getting conversation history: $e');
       return [];
     }
   }
@@ -1952,7 +2181,8 @@ class DashMessagingService implements MessagingService {
     }
 
     try {
-          ' Verifying message ordering for user: $_userId');
+      DebugConfig.debugPrint(
+          '🔍 Verifying message ordering for user: $_userId');
 
       final userMessagesRef = FirebaseFirestore.instance
           .collection('messages')
@@ -1964,9 +2194,11 @@ class DashMessagingService implements MessagingService {
       final snapshot = await userMessagesRef.get();
 
       if (snapshot.docs.isEmpty) {
+        DebugConfig.debugPrint('✅ No messages to verify ordering');
         return;
       }
 
+      DebugConfig.debugPrint(
           '📋 Message ordering verification (chronological):');
       DateTime? lastTimestamp;
       bool orderingIssues = false;
@@ -1979,26 +2211,32 @@ class DashMessagingService implements MessagingService {
         final messageBody = data['messageBody'] ?? '';
 
         if (lastTimestamp != null && timestamp.isBefore(lastTimestamp)) {
+          DebugConfig.debugPrint('⚠️  Ordering issue at message ${i + 1}');
           orderingIssues = true;
         }
 
         final timeStr = timestamp.toString().substring(11, 19); // HH:MM:SS
         final prefix = source == 'client' ? '👤' : '🤖';
+        DebugConfig.debugPrint(
             '  ${i + 1}. $prefix [$timeStr] ${messageBody.substring(0, messageBody.length > 30 ? 30 : messageBody.length)}${messageBody.length > 30 ? '...' : ''}');
 
         lastTimestamp = timestamp;
       }
 
       if (orderingIssues) {
-            '  Ordering issues detected. Consider clearing and resyncing messages.');
+        DebugConfig.debugPrint(
+            '⚠️  Ordering issues detected. Consider clearing and resyncing messages.');
       } else {
+        DebugConfig.debugPrint('✅ Message ordering is correct');
       }
     } catch (e) {
+      DebugConfig.debugPrint('Error verifying message ordering: $e');
     }
   }
 
   // Force reload all messages (clear cache and reload)
   Future<void> forceReloadMessages() async {
+    DebugConfig.debugPrint('🔄 Force reloading all messages...');
 
     // Clear the cache to remove old format messages
     clearCache();
@@ -2016,17 +2254,20 @@ class DashMessagingService implements MessagingService {
     // Restart listener
     startRealtimeMessageListener();
 
+    DebugConfig.debugPrint('🔄 ✅ Force reload completed');
   }
 
   // Debug method to test message alignment fix
   Future<void> debugMessageAlignment() async {
     if (_userId == null) {
-          ' Cannot debug message alignment: user ID is null');
+      DebugConfig.debugPrint(
+          '❌ Cannot debug message alignment: user ID is null');
       return;
     }
 
     try {
-          '  Testing message alignment fix for user: $_userId');
+      DebugConfig.debugPrint(
+          '🔍 DEBUG: Testing message alignment fix for user: $_userId');
 
       final userMessagesRef = FirebaseFirestore.instance
           .collection('messages')
@@ -2038,9 +2279,11 @@ class DashMessagingService implements MessagingService {
       final snapshot = await userMessagesRef.get();
 
       if (snapshot.docs.isEmpty) {
+        DebugConfig.debugPrint('✅ No messages found to test alignment');
         return;
       }
 
+      DebugConfig.debugPrint('📋 Message alignment test results:');
 
       for (int i = 0; i < snapshot.docs.length; i++) {
         final doc = snapshot.docs[i];
@@ -2056,10 +2299,13 @@ class DashMessagingService implements MessagingService {
         final alignmentStatus = isMe ? '👤 USER (RIGHT)' : '🤖 SERVER (LEFT)';
         final sourceInfo = source.isNotEmpty ? source : 'no source';
 
+        DebugConfig.debugPrint(
             '  ${i + 1}. $alignmentStatus - "$messageBody" (source: $sourceInfo)');
       }
 
+      DebugConfig.debugPrint('✅ Message alignment test completed');
     } catch (e) {
+      DebugConfig.debugPrint('❌ Error testing message alignment: $e');
     }
   }
 
@@ -2081,6 +2327,14 @@ class DashMessagingService implements MessagingService {
         content.toLowerCase().contains('ready') ||
         content.toLowerCase().contains('quiz') ||
         content.toLowerCase().contains('smoke')) {
+      DebugConfig.debugPrint('🔍 UNIFIED: Analyzing potential poll message:');
+      DebugConfig.debugPrint('🔍 Content: $content');
+      DebugConfig.debugPrint('🔍 isPoll: $isPoll');
+      DebugConfig.debugPrint('🔍 questionsAnswers: $questionsAnswers');
+      DebugConfig.debugPrint('🔍 answers: $answers');
+      DebugConfig.debugPrint('🔍 buttons: $buttons');
+      DebugConfig.debugPrint('🔍 suggestedReplies: $suggestedReplies');
+      DebugConfig.debugPrint('🔍 All keys: ${data.keys.toList()}');
     }
 
     // Enhanced quick reply detection - check ALL possible sources
@@ -2101,7 +2355,8 @@ class DashMessagingService implements MessagingService {
           quickReplies
               .add(QuickReply(text: entry.key, value: entry.value.toString()));
         }
-            ' UNIFIED: Added ${questionsAnswers.length} quick replies from questionsAnswers');
+        DebugConfig.debugPrint(
+            '🔧 UNIFIED: Added ${questionsAnswers.length} quick replies from questionsAnswers');
       }
 
       // 2. answers (List or String format)
@@ -2109,7 +2364,8 @@ class DashMessagingService implements MessagingService {
         for (var a in answers.take(4)) {
           quickReplies.add(QuickReply(text: a.toString(), value: a.toString()));
         }
-            ' UNIFIED: Added ${answers.length} quick replies from answers (List)');
+        DebugConfig.debugPrint(
+            '🔧 UNIFIED: Added ${answers.length} quick replies from answers (List)');
       } else if (answers is String && answers != 'None' && answers.isNotEmpty) {
         final answerList = answers
             .split(',')
@@ -2120,7 +2376,8 @@ class DashMessagingService implements MessagingService {
         for (final a in answerList) {
           quickReplies.add(QuickReply(text: a, value: a));
         }
-            ' UNIFIED: Added ${answerList.length} quick replies from answers (String)');
+        DebugConfig.debugPrint(
+            '🔧 UNIFIED: Added ${answerList.length} quick replies from answers (String)');
       }
 
       // 3. buttons (from push notifications)
@@ -2131,7 +2388,8 @@ class DashMessagingService implements MessagingService {
             quickReplies.add(QuickReply(text: title, value: title));
           }
         }
-            ' UNIFIED: Added ${buttons.length} quick replies from buttons');
+        DebugConfig.debugPrint(
+            '🔧 UNIFIED: Added ${buttons.length} quick replies from buttons');
       }
 
       // 4. suggestedReplies (already processed)
@@ -2143,7 +2401,8 @@ class DashMessagingService implements MessagingService {
             quickReplies.add(QuickReply(text: text, value: value));
           }
         }
-            ' UNIFIED: Added ${suggestedReplies.length} quick replies from suggestedReplies');
+        DebugConfig.debugPrint(
+            '🔧 UNIFIED: Added ${suggestedReplies.length} quick replies from suggestedReplies');
       }
 
       // 5. Check for legacy field names that might exist
@@ -2154,13 +2413,16 @@ class DashMessagingService implements MessagingService {
             quickReplies.add(
                 QuickReply(text: option.toString(), value: option.toString()));
           }
-              ' UNIFIED: Added ${oldAnswers.length} quick replies from legacy options/choices/replies');
+          DebugConfig.debugPrint(
+              '🔧 UNIFIED: Added ${oldAnswers.length} quick replies from legacy options/choices/replies');
         }
       }
 
       if (quickReplies.isNotEmpty) {
+        // Use server content and quick replies directly without transformation
 
-            '  UNIFIED: Created single poll message with content and ${quickReplies.length} options: ${quickReplies.map((r) => r.text).join(", ")}');
+        DebugConfig.debugPrint(
+            '🔧 ✅ UNIFIED: Created single poll message with content and ${quickReplies.length} options: ${quickReplies.map((r) => r.text).join(", ")}');
         return ChatMessage(
           id: messageId,
           content: content, // Include the poll question content
@@ -2170,7 +2432,8 @@ class DashMessagingService implements MessagingService {
           suggestedReplies: quickReplies,
         );
       } else {
-            '  UNIFIED: Poll detected but no valid quick replies created for: $content');
+        DebugConfig.debugPrint(
+            '🔧 ⚠️ UNIFIED: Poll detected but no valid quick replies created for: $content');
       }
     }
 
@@ -2187,11 +2450,14 @@ class DashMessagingService implements MessagingService {
   // Test connection to the server using the exact URL
   Future<bool> testServerConnection() async {
     try {
+      DebugConfig.debugPrint('Testing connection to server: $_hostUrl');
       final response = await http
           .get(Uri.parse(_hostUrl))
           .timeout(const Duration(seconds: 5));
+      DebugConfig.debugPrint('Server response: ${response.statusCode}');
       return response.statusCode >= 200 && response.statusCode < 300;
     } catch (e) {
+      DebugConfig.debugPrint('Error testing server connection: $e');
       return false;
     }
   }
@@ -2254,26 +2520,33 @@ class DashMessagingService implements MessagingService {
         final content = data['messageBody']?.toString() ?? '';
         if (content.isEmpty) continue;
 
+        // Fast timestamp extraction
         final timestamp = _extractTimestampFast(data);
         lowestTimestamp = timestamp.millisecondsSinceEpoch < lowestTimestamp
             ? timestamp.millisecondsSinceEpoch
             : lowestTimestamp;
 
+        // Quick user check - prioritize source field for reliability
         final source = data['source']?.toString() ?? '';
         final senderId = data['senderId'] ?? data['userId'] ?? '';
         // FIXED: Prioritize source field since it's more reliable than senderId comparison
         final isMe =
             source == 'client' || (source.isEmpty && senderId == _userId);
 
-        //  Log message alignment for troubleshooting
+        // DEBUG: Log message alignment for troubleshooting
         if (_debugMessageAlignment && content.isNotEmpty) {
-              ' INITIAL Message alignment check: "${content.substring(0, content.length > 30 ? 30 : content.length)}..." -> isMe: $isMe (source: "$source", senderId: "$senderId", _userId: "$_userId")');
+          DebugConfig.debugPrint(
+              '📍 INITIAL Message alignment check: "${content.substring(0, content.length > 30 ? 30 : content.length)}..." -> isMe: $isMe (source: "$source", senderId: "$senderId", _userId: "$_userId")');
         }
 
         // Debug: Print full message data for messages that might have quick replies
         if (content.toLowerCase().contains('cigarette') ||
             content.toLowerCase().contains('ready') ||
             content.toLowerCase().contains('quiz')) {
+          DebugConfig.debugPrint('🔍 POTENTIAL QUICK REPLY MESSAGE:');
+          DebugConfig.debugPrint('🔍 Content: $content');
+          DebugConfig.debugPrint('🔍 Full data keys: ${data.keys.toList()}');
+          DebugConfig.debugPrint('🔍 Full data: $data');
         }
 
         // Enhanced poll detection - check ALL possible quick reply fields
@@ -2289,7 +2562,15 @@ class DashMessagingService implements MessagingService {
             content.toLowerCase().contains('ready') ||
             content.toLowerCase().contains('quiz') ||
             content.toLowerCase().contains('smoke')) {
-              ' INITIAL: Analyzing potential poll message:');
+          DebugConfig.debugPrint(
+              '🔍 INITIAL: Analyzing potential poll message:');
+          DebugConfig.debugPrint('🔍 Content: $content');
+          DebugConfig.debugPrint('🔍 isPoll: $isPoll');
+          DebugConfig.debugPrint('🔍 questionsAnswers: $questionsAnswers');
+          DebugConfig.debugPrint('🔍 answers: $answers');
+          DebugConfig.debugPrint('🔍 buttons: $buttons');
+          DebugConfig.debugPrint('🔍 suggestedReplies: $suggestedReplies');
+          DebugConfig.debugPrint('🔍 All keys: ${data.keys.toList()}');
         }
 
         // Use the helper method to extract quick replies
@@ -2298,6 +2579,7 @@ class DashMessagingService implements MessagingService {
             isMessagePoll(isPoll) || quickReplies.isNotEmpty;
 
         if (hasQuickReplyData && quickReplies.isNotEmpty) {
+          // Use server content and quick replies directly without transformation
 
           // Create a single message with both content and quick replies
           final message = ChatMessage(
@@ -2311,7 +2593,8 @@ class DashMessagingService implements MessagingService {
 
           _messageCache[messageId] = message;
           messages.add(message);
-              '  INITIAL: Created single poll message with content and ${quickReplies.length} options: ${quickReplies.map((r) => r.text).join(", ")}');
+          DebugConfig.debugPrint(
+              '🔧 ✅ INITIAL: Created single poll message with content and ${quickReplies.length} options: ${quickReplies.map((r) => r.text).join(", ")}');
         } else {
           // Create regular text message
           final message = ChatMessage(
@@ -2326,6 +2609,7 @@ class DashMessagingService implements MessagingService {
           messages.add(message);
         }
       } catch (e) {
+        DebugConfig.debugPrint('Error processing doc: $e');
       }
     }
 
@@ -2338,16 +2622,19 @@ class DashMessagingService implements MessagingService {
     }
 
     _lowestLoadedTimestamp = lowestTimestamp;
-        ' Processed ${processedIds.length} messages in chronological order');
+    DebugConfig.debugPrint(
+        '⚡ Processed ${processedIds.length} messages in chronological order');
   }
 
   // Clear all messages in Firebase for the current user
   Future<void> clearAllMessagesInFirebase() async {
     if (_userId == null) {
+      DebugConfig.debugPrint(
           'Cannot clear messages in Firebase: user ID is null');
       return;
     }
 
+    DebugConfig.debugPrint(
         'Clearing all messages in Firebase for user: $_userId');
 
     try {
@@ -2361,9 +2648,11 @@ class DashMessagingService implements MessagingService {
       final snapshot = await chatRef.get();
 
       if (snapshot.docs.isEmpty) {
+        DebugConfig.debugPrint('No messages found to delete');
         return;
       }
 
+      DebugConfig.debugPrint(
           'Deleting ${snapshot.docs.length} messages from Firebase');
 
       // Use batched writes for efficiency (max 500 operations per batch)
@@ -2378,6 +2667,7 @@ class DashMessagingService implements MessagingService {
         // Commit batch when it reaches the limit and create a new batch
         if (count >= batchSize) {
           await batch.commit();
+          DebugConfig.debugPrint('Committed batch of $count deletions');
           count = 0;
           batch = FirebaseFirestore.instance.batch();
         }
@@ -2386,8 +2676,10 @@ class DashMessagingService implements MessagingService {
       // Commit any remaining operations
       if (count > 0) {
         await batch.commit();
+        DebugConfig.debugPrint('Committed final batch of $count deletions');
       }
 
+      DebugConfig.debugPrint('Successfully cleared all messages in Firebase');
     } catch (e) {
       DebugConfig.errorPrint('Error clearing messages in Firebase: $e');
       rethrow;

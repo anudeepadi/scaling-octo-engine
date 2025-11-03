@@ -35,10 +35,8 @@ class _LoginScreenState extends State<LoginScreen> {
 
   Future<void> _submitForm() async {
     if (_formKey.currentState?.validate() ?? false) {
-      // Check for signup backdoor
       if (_usernameController.text.trim().toLowerCase() == "signup" &&
           _passwordController.text.trim().toLowerCase() == "signup") {
-        // Navigate to registration screen instead of authenticating
         Navigator.push(
           context,
           MaterialPageRoute(
@@ -115,7 +113,7 @@ class _LoginScreenState extends State<LoginScreen> {
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
-        toolbarHeight: 0, // Hide app bar for cleaner look
+        toolbarHeight: 0,
       ),
       body: SafeArea(
         child: Center(
@@ -125,7 +123,6 @@ class _LoginScreenState extends State<LoginScreen> {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                // Modern Health Logo with glassmorphism effect
                 Container(
                   padding:
                       const EdgeInsets.symmetric(horizontal: 32, vertical: 24),
@@ -150,7 +147,6 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                   child: Column(
                     children: [
-                      // Quitxt Logo
                       Container(
                         width: 200,
                         height: 80,
@@ -177,7 +173,6 @@ class _LoginScreenState extends State<LoginScreen> {
                 ),
                 const SizedBox(height: 48),
 
-                // Modern Login Card
                 Container(
                   width: double.infinity,
                   constraints: const BoxConstraints(maxWidth: 400),
@@ -199,7 +194,6 @@ class _LoginScreenState extends State<LoginScreen> {
                       mainAxisSize: MainAxisSize.min,
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        // Welcome Text
                         Text(
                           'Welcome Back',
                           style: TextStyle(
@@ -220,7 +214,6 @@ class _LoginScreenState extends State<LoginScreen> {
                         ),
                         const SizedBox(height: 32),
 
-                        // Username Field
                         Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
@@ -260,7 +253,6 @@ class _LoginScreenState extends State<LoginScreen> {
                         ),
                         const SizedBox(height: 24),
 
-                        // Password Field
                         Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
@@ -311,7 +303,6 @@ class _LoginScreenState extends State<LoginScreen> {
                         ),
                         const SizedBox(height: 32),
 
-                        // Login Button
                         SizedBox(
                           width: double.infinity,
                           height: 56,
@@ -339,7 +330,6 @@ class _LoginScreenState extends State<LoginScreen> {
                         ),
                         const SizedBox(height: 16),
 
-                        // Divider with text
                         Row(
                           children: [
                             Expanded(
@@ -362,7 +352,6 @@ class _LoginScreenState extends State<LoginScreen> {
                         ),
                         const SizedBox(height: 16),
 
-                        // Google Sign In Button
                         SizedBox(
                           width: double.infinity,
                           height: 56,
@@ -399,7 +388,6 @@ class _LoginScreenState extends State<LoginScreen> {
                         ),
                         const SizedBox(height: 32),
 
-                        // Create Account Link
                         Row(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [

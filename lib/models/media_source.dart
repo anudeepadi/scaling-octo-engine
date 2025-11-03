@@ -4,4 +4,4 @@ enum MediaSource {
   file,
   network,
   asset
-} 
+}

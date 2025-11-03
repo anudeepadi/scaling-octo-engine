@@ -6,7 +6,7 @@ import '../services/analytics_service.dart';
 class UserProfileProvider with ChangeNotifier {
   final UserProfileService _userProfileService;
   final AnalyticsService _analyticsService;
-  
+
   UserProfile? _userProfile;
   bool _isLoading = false;
   String? _error;
@@ -17,7 +17,6 @@ class UserProfileProvider with ChangeNotifier {
   }) : _userProfileService = userProfileService,
        _analyticsService = analyticsService;
 
-  // Getters
   UserProfile? get userProfile => _userProfile;
   bool get isLoading => _isLoading;
   String? get error => _error;
@@ -28,13 +27,11 @@ class UserProfileProvider with ChangeNotifier {
   String get preferredLanguage => _userProfile?.preferredLanguage ?? 'en';
   String? get displayName => _userProfile?.displayName;
 
-  // Initialize user profile
   Future<void> initializeProfile(String userId) async {
     _setLoading(true);
     try {
       _userProfile = await _userProfileService.getUserProfile(userId);
       if (_userProfile == null) {
-        // Create new profile for first-time user
         _userProfile = UserProfile(
           id: userId,
           createdAt: DateTime.now(),
@@ -55,10 +52,9 @@ class UserProfileProvider with ChangeNotifier {
     }
   }
 
-  // Update display name from Firebase Auth
   Future<void> updateDisplayName(String? displayName) async {
     if (_userProfile == null) return;
-    
+
     try {
       _userProfile = _userProfile!.copyWith(
         displayName: displayName,
@@ -76,10 +72,9 @@ class UserProfileProvider with ChangeNotifier {
     }
   }
 
-  // Onboarding & Consent
   Future<void> completeOnboarding() async {
     if (_userProfile == null) return;
-    
+
     _setLoading(true);
     try {
       _userProfile = _userProfile!.copyWith(
@@ -101,7 +96,7 @@ class UserProfileProvider with ChangeNotifier {
 
   Future<void> acceptTerms() async {
     if (_userProfile == null) return;
-    
+
     _setLoading(true);
     try {
       _userProfile = _userProfile!.copyWith(
@@ -124,7 +119,7 @@ class UserProfileProvider with ChangeNotifier {
 
   Future<void> setLanguage(String languageCode) async {
     if (_userProfile == null) return;
-    
+
     _setLoading(true);
     try {
       _userProfile = _userProfile!.copyWith(
@@ -145,10 +140,9 @@ class UserProfileProvider with ChangeNotifier {
     }
   }
 
-  // Intake Questionnaire
   Future<void> updateCigarettesPerDay(int cigarettes) async {
     if (_userProfile == null) return;
-    
+
     _userProfile = _userProfile!.copyWith(
       averageCigarettesPerDay: cigarettes,
       updatedAt: DateTime.now(),
@@ -158,7 +152,7 @@ class UserProfileProvider with ChangeNotifier {
 
   Future<void> updateNicotineDependence(NicotineDependence dependence) async {
     if (_userProfile == null) return;
-    
+
     _userProfile = _userProfile!.copyWith(
       nicotineDependence: dependence,
       updatedAt: DateTime.now(),
@@ -168,7 +162,7 @@ class UserProfileProvider with ChangeNotifier {
 
   Future<void> updateReasonsForQuitting(List<String> reasons) async {
     if (_userProfile == null) return;
-    
+
     _userProfile = _userProfile!.copyWith(
       reasonsForQuitting: reasons,
       updatedAt: DateTime.now(),
@@ -178,7 +172,7 @@ class UserProfileProvider with ChangeNotifier {
 
   Future<void> updateSupportNetwork(List<SupportNetworkType> network) async {
     if (_userProfile == null) return;
-    
+
     _userProfile = _userProfile!.copyWith(
       supportNetwork: network,
       updatedAt: DateTime.now(),
@@ -188,7 +182,7 @@ class UserProfileProvider with ChangeNotifier {
 
   Future<void> updateReadinessToQuit(QuitReadiness readiness) async {
     if (_userProfile == null) return;
-    
+
     _userProfile = _userProfile!.copyWith(
       readinessToQuit: readiness,
       updatedAt: DateTime.now(),
@@ -198,7 +192,7 @@ class UserProfileProvider with ChangeNotifier {
 
   Future<void> updateDailyChatTime(TimeOfDay time) async {
     if (_userProfile == null) return;
-    
+
     _userProfile = _userProfile!.copyWith(
       dailyChatTime: time,
       updatedAt: DateTime.now(),
@@ -208,13 +202,13 @@ class UserProfileProvider with ChangeNotifier {
 
   Future<void> updateQuitDate(DateTime date) async {
     if (_userProfile == null) return;
-    
+
     _userProfile = _userProfile!.copyWith(
       quitDate: date,
       updatedAt: DateTime.now(),
     );
     await _saveProfileAndNotify();
-    
+
     _analyticsService.trackEvent('quit_date_set', {
       'user_id': _userProfile!.id,
       'quit_date': date.toIso8601String(),
@@ -224,7 +218,7 @@ class UserProfileProvider with ChangeNotifier {
 
   Future<void> completeIntakeQuestionnaire() async {
     if (_userProfile == null || !_userProfile!.hasCompletedIntake) return;
-    
+
     _setLoading(true);
     try {
       await _userProfileService.saveUserProfile(_userProfile!);
@@ -244,14 +238,13 @@ class UserProfileProvider with ChangeNotifier {
     }
   }
 
-  // Settings
   Future<void> updateNotificationSettings({
     bool? enabled,
     TimeOfDay? startTime,
     TimeOfDay? endTime,
   }) async {
     if (_userProfile == null) return;
-    
+
     _userProfile = _userProfile!.copyWith(
       notificationsEnabled: enabled ?? _userProfile!.notificationsEnabled,
       notificationStartTime: startTime ?? _userProfile!.notificationStartTime,
@@ -265,7 +258,7 @@ class UserProfileProvider with ChangeNotifier {
     bool? highContrastMode,
   }) async {
     if (_userProfile == null) return;
-    
+
     _userProfile = _userProfile!.copyWith(
       highContrastMode: highContrastMode ?? _userProfile!.highContrastMode,
       updatedAt: DateTime.now(),
@@ -273,16 +266,15 @@ class UserProfileProvider with ChangeNotifier {
     await _saveProfileAndNotify();
   }
 
-  // Progress Tracking
   Future<void> updateActualQuitDate(DateTime date) async {
     if (_userProfile == null) return;
-    
+
     _userProfile = _userProfile!.copyWith(
       actualQuitDate: date,
       updatedAt: DateTime.now(),
     );
     await _saveProfileAndNotify();
-    
+
     _analyticsService.trackEvent('actual_quit_date_set', {
       'user_id': _userProfile!.id,
       'actual_quit_date': date.toIso8601String(),
@@ -291,44 +283,41 @@ class UserProfileProvider with ChangeNotifier {
 
   Future<void> updateProgress() async {
     if (_userProfile == null || _userProfile!.actualQuitDate == null) return;
-    
+
     final now = DateTime.now();
     final quitDate = _userProfile!.actualQuitDate!;
     final daysSinceQuit = now.difference(quitDate).inDays;
-    
+
     if (daysSinceQuit >= 0) {
       final cigarettesAvoided = daysSinceQuit * (_userProfile!.averageCigarettesPerDay ?? 0);
-      final moneySaved = cigarettesAvoided * 0.50; // $0.50 per cigarette
-      
+      final moneySaved = cigarettesAvoided * 0.50;
+
       _userProfile = _userProfile!.copyWith(
         daysSmokeFree: daysSinceQuit,
         cigarettesAvoided: cigarettesAvoided,
         moneySaved: moneySaved,
         updatedAt: DateTime.now(),
       );
-      
-      // Check for new achievements
+
       await _checkAndUnlockAchievements(daysSinceQuit);
-      
       await _saveProfileAndNotify();
     }
   }
 
   Future<void> _checkAndUnlockAchievements(int daysSmokeFree) async {
     if (_userProfile == null) return;
-    
+
     final achievements = List<String>.from(_userProfile!.achievementsUnlocked);
     bool hasNewAchievements = false;
-    
-    // Define achievement milestones
+
     final milestones = [1, 3, 7, 14, 30, 60, 90, 180, 365];
-    
+
     for (final milestone in milestones) {
       final achievementKey = 'smoke_free_${milestone}_days';
       if (daysSmokeFree >= milestone && !achievements.contains(achievementKey)) {
         achievements.add(achievementKey);
         hasNewAchievements = true;
-        
+
         _analyticsService.trackEvent('achievement_unlocked', {
           'user_id': _userProfile!.id,
           'achievement': achievementKey,
@@ -336,7 +325,7 @@ class UserProfileProvider with ChangeNotifier {
         });
       }
     }
-    
+
     if (hasNewAchievements) {
       _userProfile = _userProfile!.copyWith(
         achievementsUnlocked: achievements,
@@ -345,10 +334,9 @@ class UserProfileProvider with ChangeNotifier {
     }
   }
 
-  // Opt-out handling
   Future<void> optOut(String reason) async {
     if (_userProfile == null) return;
-    
+
     _setLoading(true);
     try {
       _userProfile = _userProfile!.copyWith(
@@ -372,10 +360,9 @@ class UserProfileProvider with ChangeNotifier {
     }
   }
 
-  // Helper methods
   Future<void> _saveProfileAndNotify() async {
     if (_userProfile == null) return;
-    
+
     try {
       await _userProfileService.saveUserProfile(_userProfile!);
       _clearError();
@@ -399,10 +386,9 @@ class UserProfileProvider with ChangeNotifier {
     _error = null;
   }
 
-  // Validation helpers
   bool validateIntakeData() {
     if (_userProfile == null) return false;
-    
+
     return _userProfile!.averageCigarettesPerDay != null &&
            _userProfile!.averageCigarettesPerDay! > 0 &&
            _userProfile!.nicotineDependence != null &&
@@ -415,28 +401,27 @@ class UserProfileProvider with ChangeNotifier {
 
   String? validateQuitDate(DateTime? date) {
     if (date == null) return 'Please select a quit date';
-    
+
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
     final selectedDate = DateTime(date.year, date.month, date.day);
-    
+
     final daysDifference = selectedDate.difference(today).inDays;
-    
+
     if (daysDifference < 7) {
       return 'Quit date must be at least 7 days from today';
     }
-    
+
     if (daysDifference > 14) {
       return 'Quit date must be within 14 days from today';
     }
-    
+
     return null;
   }
 
-  // Refresh profile data
   Future<void> refreshProfile() async {
     if (_userProfile == null) return;
-    
+
     _setLoading(true);
     try {
       final refreshedProfile = await _userProfileService.getUserProfile(_userProfile!.id);
@@ -451,4 +436,4 @@ class UserProfileProvider with ChangeNotifier {
       _setLoading(false);
     }
   }
-} 
+}

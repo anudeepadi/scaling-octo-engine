@@ -40,52 +40,54 @@ class DefaultFirebaseOptions {
     }
   }
 
+  // DEMO/THESIS VERSION - Using placeholder credentials
+  // These are NOT connected to any production Firebase project
   static const FirebaseOptions web = FirebaseOptions(
-    apiKey: 'AIzaSyDFelQtntQg2O7T9humJXbepnqu-jCpprY',
-    appId: '1:560333483278:web:your_web_app_id',
-    messagingSenderId: '560333483278',
-    projectId: 'quitxtmobile',
-    authDomain: 'quitxtmobile.firebaseapp.com',
-    databaseURL: 'https://quitxtmobile-default-rtdb.firebaseio.com',
-    storageBucket: 'quitxtmobile.firebasestorage.app',
+    apiKey: 'DEMO-API-KEY-WEB',
+    appId: '1:000000000000:web:demo_app_id',
+    messagingSenderId: '000000000000',
+    projectId: 'quittxt-demo',
+    authDomain: 'quittxt-demo.firebaseapp.com',
+    databaseURL: 'https://quittxt-demo-default-rtdb.firebaseio.com',
+    storageBucket: 'quittxt-demo.firebasestorage.app',
   );
 
   static const FirebaseOptions android = FirebaseOptions(
-    apiKey: 'AIzaSyDFelQtntQg2O7T9humJXbepnqu-jCpprY',
-    appId: '1:560333483278:android:477162cb0e780131b8fb5f',
-    messagingSenderId: '560333483278',
-    projectId: 'quitxtmobile',
-    databaseURL: 'https://quitxtmobile-default-rtdb.firebaseio.com',
-    storageBucket: 'quitxtmobile.firebasestorage.app',
+    apiKey: 'DEMO-API-KEY-ANDROID',
+    appId: '1:000000000000:android:demo_android_id',
+    messagingSenderId: '000000000000',
+    projectId: 'quittxt-demo',
+    databaseURL: 'https://quittxt-demo-default-rtdb.firebaseio.com',
+    storageBucket: 'quittxt-demo.firebasestorage.app',
   );
 
   static const FirebaseOptions ios = FirebaseOptions(
-    apiKey: 'AIzaSyC3U2IV08Nh_pfs3VVpyn8GE1tG7qLwJrA',
-    appId: '1:560333483278:ios:05dfdea509de9518b8fb5f',
-    messagingSenderId: '560333483278',
-    projectId: 'quitxtmobile',
-    databaseURL: 'https://quitxtmobile-default-rtdb.firebaseio.com',
-    storageBucket: 'quitxtmobile.firebasestorage.app',
-    iosBundleId: 'com.utsascns.quitTxTapp',
+    apiKey: 'DEMO-API-KEY-IOS',
+    appId: '1:000000000000:ios:demo_ios_id',
+    messagingSenderId: '000000000000',
+    projectId: 'quittxt-demo',
+    databaseURL: 'https://quittxt-demo-default-rtdb.firebaseio.com',
+    storageBucket: 'quittxt-demo.firebasestorage.app',
+    iosBundleId: 'com.demo.quittxt',
   );
 
   static const FirebaseOptions macos = FirebaseOptions(
-    apiKey: 'AIzaSyC3U2IV08Nh_pfs3VVpyn8GE1tG7qLwJrA',
-    appId: '1:560333483278:ios:05dfdea509de9518b8fb5f',
-    messagingSenderId: '560333483278',
-    projectId: 'quitxtmobile',
-    databaseURL: 'https://quitxtmobile-default-rtdb.firebaseio.com',
-    storageBucket: 'quitxtmobile.firebasestorage.app',
-    iosBundleId: 'com.utsascns.quitTxTapp',
+    apiKey: 'DEMO-API-KEY-MACOS',
+    appId: '1:000000000000:ios:demo_macos_id',
+    messagingSenderId: '000000000000',
+    projectId: 'quittxt-demo',
+    databaseURL: 'https://quittxt-demo-default-rtdb.firebaseio.com',
+    storageBucket: 'quittxt-demo.firebasestorage.app',
+    iosBundleId: 'com.demo.quittxt',
   );
 
   static const FirebaseOptions windows = FirebaseOptions(
-    apiKey: 'AIzaSyDFelQtntQg2O7T9humJXbepnqu-jCpprY',
-    appId: '1:560333483278:web:your_web_app_id',
-    messagingSenderId: '560333483278',
-    projectId: 'quitxtmobile',
-    authDomain: 'quitxtmobile.firebaseapp.com',
-    databaseURL: 'https://quitxtmobile-default-rtdb.firebaseio.com',
-    storageBucket: 'quitxtmobile.firebasestorage.app',
+    apiKey: 'DEMO-API-KEY-WINDOWS',
+    appId: '1:000000000000:web:demo_windows_id',
+    messagingSenderId: '000000000000',
+    projectId: 'quittxt-demo',
+    authDomain: 'quittxt-demo.firebaseapp.com',
+    databaseURL: 'https://quittxt-demo-default-rtdb.firebaseio.com',
+    storageBucket: 'quittxt-demo.firebasestorage.app',
   );
 }

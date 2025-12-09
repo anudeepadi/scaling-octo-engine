@@ -72,4 +72,10 @@ node_modules/
 # BMAD-METHOD
 .bmad-core/
 .bmad/
-bmad-config.json 
+bmad-config.json
+
+# Firebase credentials (NEVER commit these)
+*-firebase-adminsdk-*.json
+*-firebase-adminsdk*.json
+google-services.json
+GoogleService-Info.plist
